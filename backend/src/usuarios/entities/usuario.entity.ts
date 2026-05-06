@@ -52,7 +52,7 @@ export class Usuario {
     idTipoUsr: number;
 
     @Column({
-        length: 6,
+        length: 7,
         nullable: true,
     })
     idFormacion: string;
