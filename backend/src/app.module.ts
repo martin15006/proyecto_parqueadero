@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { UsuariosModule } from './usuarios/usuarios.module';
 
 // AQUI ESTA LA CONEXION A LA BASE DE DATOS
 // NO OLVIDEN CREAR SU .ENV
@@ -26,11 +27,11 @@ import { AppService } from './app.service';
         synchronize: true,
       }),
     }),
+    UsuariosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-
 export class AppModule implements OnModuleInit {
   private readonly logger = new Logger(AppModule.name);
 

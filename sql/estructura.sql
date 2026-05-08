@@ -68,7 +68,7 @@ CREATE TABLE usuario (
 	correo VARCHAR(50) UNIQUE NOT NULL,
 	contra VARCHAR(255) NOT NULL,
 	idTipoUsr SMALLINT NOT NULL,
-	idFormacion VARCHAR(6),
+	idFormacion VARCHAR(7),
 	QR VARCHAR(100) UNIQUE,
 
 	FOREIGN KEY (idTipoUsr)
