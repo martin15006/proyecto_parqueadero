@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Usuario } from './entities/usuario.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class UsuarioService {
@@ -14,6 +15,18 @@ export class UsuarioService {
   async create(createUsuarioDto: CreateUsuarioDto): Promise<Usuario> {
     const nuevoUsuario = this.usuarioRepository.create(createUsuarioDto);
     return await this.usuarioRepository.save(nuevoUsuario);
+  }
+
+  async login(loginDto: LoginDto): Promise<Usuario> {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { correo: loginDto.correo },
+    });
+
+    if (!usuario || usuario.contra !== loginDto.contra) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    return usuario;
   }
 
   async findAll(): Promise<Usuario[]> {
