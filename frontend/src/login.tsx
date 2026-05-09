@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import api from './api/axios';
+import { useAuth } from './AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 function Login() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     correo: '',
     contra: '',
@@ -22,7 +26,9 @@ function Login() {
     try {
       const response = await api.post('/usuarios/login', formData);
       console.log('Login exitoso:', response.data);
+      login(response.data); // Guardar estado de autenticación
       setStatus(`Bienvenido, ${response.data.nombreCompleto}`);
+      navigate('/'); // Redirigir al main
     } catch (error: any) {
       console.error('Error en el login:', error);
       setStatus(`Error: ${error.response?.data?.message || 'Credenciales incorrectas o error de servidor'}`);
