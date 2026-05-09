@@ -59,6 +59,7 @@ const Registro: React.FC = () => {
             <option value="3">Personal Operativo</option>
           </select>
         </label>
+        <a href="/login">Ya tienes cuenta? Inicia sesión aquí</a>
 
         <button type="submit" style={{ padding: '10px', backgroundColor: '#4CAF50', color: 'white', border: 'none', cursor: 'pointer' }}>
           Registrar

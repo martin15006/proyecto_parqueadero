@@ -56,7 +56,7 @@ function Login() {
           onChange={handleChange} 
           required 
         />
-        
+        <a href="/registro">No tienes cuenta? Regístrate aquí</a>
         <button type="submit" style={{ padding: '10px', cursor: 'pointer' }}>
           Ingresar
         </button>
