@@ -52,15 +52,17 @@ export class Usuario {
     idTipoUsr: number;
 
     @Column({
+        type: 'varchar',
         length: 7,
         nullable: true,
     })
-    idFormacion: string;
+    idFormacion: string | null;
 
     @Column({
+        type: 'varchar',
         length: 100,
         nullable: true,
         unique: true,
     })
-    QR: string;
+    QR: string | null;
 }

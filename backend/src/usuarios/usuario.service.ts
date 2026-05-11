@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Usuario } from './entities/usuario.entity';
@@ -14,6 +14,24 @@ export class UsuarioService {
   ) {}
 
   async create(createUsuarioDto: CreateUsuarioDto): Promise<Usuario> {
+    // Verificar si el documento ya existe
+    const usuarioExistenteDoc = await this.usuarioRepository.findOne({
+      where: { documento: createUsuarioDto.documento },
+    });
+
+    if (usuarioExistenteDoc) {
+      throw new ConflictException('Ese documento ya está registrado');
+    }
+
+    // Verificar si el correo ya existe
+    const usuarioExistenteCorreo = await this.usuarioRepository.findOne({
+      where: { correo: createUsuarioDto.correo },
+    });
+
+    if (usuarioExistenteCorreo) {
+      throw new ConflictException('Ese correo ya está registrado');
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(createUsuarioDto.contra, salt);
     
@@ -29,8 +47,8 @@ export class UsuarioService {
     const nuevoUsuario = this.usuarioRepository.create({
       ...createUsuarioDto,
       contra: hashedPassword,
-      QR: qrValue,
       idFormacion: formacionValue,
+      QR: qrValue,
     });
     
     return await this.usuarioRepository.save(nuevoUsuario);

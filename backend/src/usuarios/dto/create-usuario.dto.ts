@@ -7,6 +7,6 @@ export class CreateUsuarioDto {
   correo: string;
   contra: string;
   idTipoUsr: number;
-  idFormacion?: string;
-  QR?: string;
+  idFormacion?: string | null;
+  QR?: string | null;
 }

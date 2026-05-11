@@ -1,5 +1,3 @@
-CREATE DATABASE parqueadero;
-
 CREATE TABLE tipo_bahia (
 	idTipoB SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 	tipoBahia VARCHAR(50) NOT NULL
@@ -77,7 +75,7 @@ CREATE TABLE usuario (
 	ON UPDATE CASCADE,
 
 	FOREIGN KEY (idFormacion)
-	REFERENCES formacion_ficha(ficha)
+	REFERENCES formacion(ficha)
 	ON DELETE RESTRICT
 	ON UPDATE CASCADE
 );
@@ -99,6 +97,7 @@ CREATE TABLE registro_vehiculo (
 	ON DELETE CASCADE
 	ON UPDATE CASCADE
 );
+
 CREATE TYPE estado_mov AS ENUM ('ADENTRO', 'SALIDA');
 
 CREATE TABLE movimiento_vehiculo (
@@ -107,7 +106,7 @@ CREATE TABLE movimiento_vehiculo (
 	horaSalida TIMESTAMP,
 	idRegistroVehiculo INT NOT NULL,
 	estado estado_mov,
-	
+
 	FOREIGN KEY (idRegistroVehiculo)
 	REFERENCES registro_vehiculo(idRegistroV)
 	ON DELETE CASCADE
