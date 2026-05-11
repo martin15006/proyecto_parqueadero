@@ -29,7 +29,7 @@ CREATE TABLE bahia (
 
 CREATE TABLE tipo_vehiculo (
     idTipoV SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    tipoVehiculo VARCHAR(20) NOT NULL
+    tipoVehiculo VARCHAR(30) NOT NULL
 );
 
 CREATE TABLE vehiculo (
@@ -77,7 +77,7 @@ CREATE TABLE usuario (
 	ON UPDATE CASCADE,
 
 	FOREIGN KEY (idFormacion)
-	REFERENCES formacion(ficha)
+	REFERENCES formacion_ficha(ficha)
 	ON DELETE RESTRICT
 	ON UPDATE CASCADE
 );

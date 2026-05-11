@@ -1,2 +1,0 @@
-insert into usuario (documento, nombrecompleto, numtelf, contactoemerg, correo, contra, idtipousr, idformacion)
-values (1006799474, 'Joshua Julian Dominguez Leon', '3213846303', '3125004660', 'joshuajuliandominguez@gmail.com', 'contraseña1234', 2, 3066600)
