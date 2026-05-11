@@ -5,7 +5,7 @@ import {
     TextInput,
     TouchableOpacity,
 } from 'react-native';
-import { loginStyles } from './loginStyles';
+import { loginStyles } from '../styles/loginStyles';
 
 export default function LoginScreen({ navigation }: any) {
     return (

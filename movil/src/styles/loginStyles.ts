@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, fonts, espacios } from './senaTheme';
+import { colors, fonts, espacios } from '../theme/senaTheme';
 
 export const loginStyles = StyleSheet.create({
     container: {
