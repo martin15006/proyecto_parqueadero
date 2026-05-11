@@ -12,7 +12,6 @@ const Registro: React.FC = () => {
     contra: '',
     idTipoUsr: 1,
     idFormacion: '',
-    QR: '',
   });
 
   const [status, setStatus] = useState<string>('');
