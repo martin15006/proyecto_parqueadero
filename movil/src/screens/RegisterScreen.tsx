@@ -3,12 +3,10 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Image,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as ImagePicker from 'expo-image-picker';
 import { registerStyles } from '../styles/registerStyles';
 import { usuarioService } from '../services/usuarioService';
@@ -71,8 +69,7 @@ export default function RegisterScreen({ navigation }: any) {
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
+      allowsEditing: false,
       quality: 0.7,
     });
     if (!result.canceled && result.assets.length > 0) {
@@ -89,8 +86,7 @@ export default function RegisterScreen({ navigation }: any) {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
+      allowsEditing: false,
       quality: 0.7,
     });
     if (!result.canceled && result.assets.length > 0) {
@@ -168,13 +164,13 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
+    <>
+      <KeyboardAwareScrollView
         contentContainerStyle={registerStyles.scrollContainer}
         keyboardShouldPersistTaps="handled"
+        enableOnAndroid={true}
+        extraScrollHeight={20}
+        enableAutomaticScroll={true}
       >
         <View style={registerStyles.container}>
           <FadeInView style={registerStyles.logoContainer}>
@@ -299,9 +295,9 @@ export default function RegisterScreen({ navigation }: any) {
             </View>
           </FadeInView>
         </View>
-      </ScrollView>
-      <Footer />
+        <Footer />
+      </KeyboardAwareScrollView>
       <SuccessCheck visible={exitoVisible} mensaje="¡Registro exitoso!" />
-    </KeyboardAvoidingView>
+    </>
   );
 }

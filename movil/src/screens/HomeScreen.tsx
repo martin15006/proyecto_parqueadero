@@ -15,7 +15,7 @@ import SenaHeader from '../components/SenaHeader';
 import AnimatedButton from '../components/AnimatedButton';
 import FadeInView from '../components/FadeInView';
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }: any) {
   const { usuario, cerrarSesion } = useAuth();
   const qrScale = useRef(new Animated.Value(0)).current;
   const lineaEscaneo = useRef(new Animated.Value(0)).current;
@@ -58,7 +58,7 @@ export default function HomeScreen() {
 
   return (
     <View style={homeStyles.container}>
-      <SenaHeader titulo="Mi Perfil" />
+      <SenaHeader titulo="Mi Perfil" onMenuPress={() => navigation.openDrawer()} />
 
       <ScrollView contentContainerStyle={homeStyles.content}>
         <FadeInView>

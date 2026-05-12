@@ -2,6 +2,8 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -10,8 +12,6 @@ import { Usuario } from './entities/usuario.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import * as bcrypt from 'bcrypt';
 
-// idTipoUsr fijo para usuarios registrados desde la app móvil.
-// Según tipoUsr.sql: 1 = 'Usuario'
 const ID_TIPO_USUARIO_APP = 1;
 
 @Injectable()
@@ -38,20 +38,50 @@ export class UsuarioService {
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(createUsuarioDto.contra, salt);
-
     const qrValue = randomUUID();
 
-    const nuevoUsuario = this.usuarioRepository.create({
-      ...createUsuarioDto,
-      contra: hashedPassword,
-      idTipoUsr: ID_TIPO_USUARIO_APP,
-      QR: qrValue,
-    });
+    try {
+      const nuevoUsuario = this.usuarioRepository.create({
+        ...createUsuarioDto,
+        contra: hashedPassword,
+        idTipoUsr: ID_TIPO_USUARIO_APP,
+        QR: qrValue,
+      });
 
-    const usuarioGuardado = await this.usuarioRepository.save(nuevoUsuario);
+      const usuarioGuardado = await this.usuarioRepository.save(nuevoUsuario);
+      const { contra, ...usuarioSinContrasena } = usuarioGuardado;
+      return usuarioSinContrasena;
+    } catch (error: any) {
+      // Si la ficha no existe, dar un error claro al usuario
+      if (error.code === '23503' && error.constraint === 'usuario_idformacion_fkey') {
+        throw new BadRequestException(
+          'La ficha de formación no existe. Verifica el número con tu instructor.',
+        );
+      }
+      throw error;
+    }
+  }
 
-    const { contra, ...usuarioSinContrasena } = usuarioGuardado;
-    return usuarioSinContrasena;
+  async cambiarContrasena(
+    documento: string,
+    contraActual: string,
+    contraNueva: string,
+  ): Promise<{ mensaje: string }> {
+    const usuario = await this.usuarioRepository.findOne({ where: { documento } });
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+
+    const esCorrecta = await bcrypt.compare(contraActual, usuario.contra);
+    if (!esCorrecta) throw new UnauthorizedException('La contraseña actual es incorrecta');
+
+    if (contraActual === contraNueva) {
+      throw new BadRequestException('La nueva contraseña debe ser diferente a la actual');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    usuario.contra = await bcrypt.hash(contraNueva, salt);
+    await this.usuarioRepository.save(usuario);
+
+    return { mensaje: 'Contraseña actualizada correctamente' };
   }
 
   async findAll(): Promise<Omit<Usuario, 'contra'>[]> {
@@ -61,9 +91,7 @@ export class UsuarioService {
 
   async findOne(documento: string): Promise<Omit<Usuario, 'contra'>> {
     const usuario = await this.usuarioRepository.findOne({ where: { documento } });
-    if (!usuario) {
-      throw new NotFoundException('Usuario no encontrado');
-    }
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
     const { contra, ...usuarioSinContrasena } = usuario;
     return usuarioSinContrasena;
   }

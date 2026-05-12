@@ -1,32 +1,39 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Patch } from '@nestjs/common';
 import { UsuarioService } from './usuario.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import { CambiarContrasenaDto } from './dto/cambiar-contrasena.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Usuario } from './entities/usuario.entity';
 
 @Controller('usuarios')
 export class UsuariosController {
   constructor(private readonly usuarioService: UsuarioService) {}
 
-  /**
-   * Registro de usuario (público, no requiere autenticación).
-   */
   @Post()
   create(@Body() createUsuarioDto: CreateUsuarioDto) {
     return this.usuarioService.create(createUsuarioDto);
   }
 
-  /**
-   * Listar todos los usuarios (requiere autenticación).
-   */
+  @UseGuards(JwtAuthGuard)
+  @Patch('cambiar-contrasena')
+  cambiarContrasena(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Body() dto: CambiarContrasenaDto,
+  ) {
+    return this.usuarioService.cambiarContrasena(
+      usuario.documento,
+      dto.contraActual,
+      dto.contraNueva,
+    );
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get()
   findAll() {
     return this.usuarioService.findAll();
   }
 
-  /**
-   * Obtener un usuario por documento (requiere autenticación).
-   */
   @UseGuards(JwtAuthGuard)
   @Get(':documento')
   findOne(@Param('documento') documento: string) {

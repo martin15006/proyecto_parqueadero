@@ -10,7 +10,11 @@ interface Props {
 export default function SenaHeader({ titulo, onMenuPress }: Props) {
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={onMenuPress} style={styles.botonMenu}>
+      <TouchableOpacity
+        onPress={onMenuPress}
+        style={styles.botonMenu}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
         <View style={styles.iconoMenu}>
           <View style={styles.lineaMenu} />
           <View style={styles.lineaMenu} />
@@ -39,19 +43,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  botonMenu: {
-    padding: espacios.pequeno,
-  },
-  iconoMenu: {
-    width: 22,
-    height: 16,
-    justifyContent: 'space-between',
-  },
-  lineaMenu: {
-    height: 2.5,
-    backgroundColor: colors.blanco,
-    borderRadius: 2,
-  },
+  botonMenu: { padding: espacios.pequeno },
+  iconoMenu: { width: 22, height: 16, justifyContent: 'space-between' },
+  lineaMenu: { height: 2.5, backgroundColor: colors.blanco, borderRadius: 2 },
   titulo: {
     color: colors.blanco,
     fontSize: fonts.grande,
@@ -59,8 +53,5 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  logo: {
-    width: 45,
-    height: 45,
-  },
+  logo: { width: 45, height: 45 },
 });

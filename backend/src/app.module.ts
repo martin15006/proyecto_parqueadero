@@ -7,6 +7,8 @@ import { AppService } from './app.service';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
+import { VehiculosModule } from './vehiculos/vehiculos.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 // AQUI ESTA LA CONEXION A LA BASE DE DATOS
 // NO OLVIDEN CREAR SU .ENV
@@ -32,6 +34,8 @@ import { MailModule } from './mail/mail.module';
     UsuariosModule,
     AuthModule,
     MailModule,
+    VehiculosModule,
+    CloudinaryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

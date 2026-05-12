@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
-import HomeScreen from '../screens/HomeScreen';
+import AppDrawer from './AppDrawer';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/senaTheme';
 
@@ -15,7 +15,14 @@ export default function AppNavigator() {
 
   if (cargandoSesion) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.blanco }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: colors.blanco,
+        }}
+      >
         <ActivityIndicator size="large" color={colors.verde} />
       </View>
     );
@@ -30,7 +37,7 @@ export default function AppNavigator() {
         }}
       >
         {usuario ? (
-          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Main" component={AppDrawer} />
         ) : (
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
