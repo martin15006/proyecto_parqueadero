@@ -1,7 +1,5 @@
-// ⚠️ IMPORTANTE: Cambia esta IP por la tuya (resultado de ipconfig)
-// localhost NO funciona desde el celular, debe ser la IP de la PC en la red local
-// La URL del backend viene del archivo .env
-// En desarrollo cada quien usa su IP local, en producción será un dominio real
+import { sessionService } from './sessionService';
+
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 if (!API_BASE_URL) {
@@ -12,33 +10,51 @@ if (!API_BASE_URL) {
 
 export { API_BASE_URL };
 
+interface ApiRequestOptions extends RequestInit {
+  conAuth?: boolean; // Si es true, agrega el JWT automáticamente
+}
+
 /**
  * Función genérica para hacer peticiones HTTP al backend.
- * Maneja errores de forma consistente.
+ * Si `conAuth=true`, agrega automáticamente el token JWT guardado.
  */
 export async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {},
+  options: ApiRequestOptions = {},
 ): Promise<T> {
+  const { conAuth = false, ...fetchOptions } = options;
   const url = `${API_BASE_URL}${endpoint}`;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(fetchOptions.headers as Record<string, string>),
+  };
+
+  // Si se requiere autenticación, agregar el JWT
+  if (conAuth) {
+    const token = await sessionService.obtenerToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
 
   try {
     const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      ...fetchOptions,
+      headers,
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      // El backend devuelve errores con formato { statusCode, message, error }
       const errorMessage = Array.isArray(data.message)
         ? data.message.join('\n')
         : data.message || 'Error desconocido';
-      throw new Error(errorMessage);
+      
+      // Si es 401 (token inválido/expirado), también lanzamos error pero con código
+      const error: any = new Error(errorMessage);
+      error.statusCode = response.status;
+      throw error;
     }
 
     return data as T;

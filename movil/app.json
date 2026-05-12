@@ -9,6 +9,7 @@
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/logoSena.png",
+      "icon": "./assets/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },

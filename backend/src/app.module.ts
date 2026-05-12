@@ -5,6 +5,8 @@ import { DataSource } from 'typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsuariosModule } from './usuarios/usuarios.module';
+import { AuthModule } from './auth/auth.module';
+import { MailModule } from './mail/mail.module';
 
 // AQUI ESTA LA CONEXION A LA BASE DE DATOS
 // NO OLVIDEN CREAR SU .ENV
@@ -19,15 +21,17 @@ import { UsuariosModule } from './usuarios/usuarios.module';
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
         host: configService.get<string>('DB_HOST'),
-        port: configService.get<number>('DB_PORT'),
+        port: parseInt(configService.get<string>('DB_PORT') ?? '5432', 10),
         username: configService.get<string>('DB_USERNAME'),
-        password: configService.get<string>('DB_PASSWORD'),
+        password: String(configService.get('DB_PASSWORD') ?? ''),
         database: configService.get<string>('DB_NAME'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false,
       }),
     }),
     UsuariosModule,
+    AuthModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

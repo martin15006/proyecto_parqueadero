@@ -1,5 +1,5 @@
 import { apiRequest } from './api';
-import { CreateUsuarioDto, Usuario, LoginDto } from '../types/usuario';
+import { CreateUsuarioDto, Usuario } from '../types/usuario';
 
 export const usuarioService = {
   /**
@@ -7,16 +7,6 @@ export const usuarioService = {
    */
   async registrar(datos: CreateUsuarioDto): Promise<Usuario> {
     return apiRequest<Usuario>('/usuarios', {
-      method: 'POST',
-      body: JSON.stringify(datos),
-    });
-  },
-
-  /**
-   * Inicia sesión con correo y contraseña.
-   */
-  async login(datos: LoginDto): Promise<Usuario> {
-    return apiRequest<Usuario>('/usuarios/login', {
       method: 'POST',
       body: JSON.stringify(datos),
     });

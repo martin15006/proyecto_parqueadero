@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Usuario } from '../types/usuario';
 import { sessionService } from '../services/sessionService';
+import { authService } from '../services/authService';
 
 interface AuthContextType {
   usuario: Usuario | null;
   cargandoSesion: boolean;
-  iniciarSesion: (usuario: Usuario) => Promise<void>;
+  iniciarSesion: (usuario: Usuario, token: string) => Promise<void>;
   cerrarSesion: () => Promise<void>;
 }
 
@@ -16,12 +17,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [cargandoSesion, setCargandoSesion] = useState(true);
 
   // Al iniciar la app, intentar recuperar la sesión guardada
+  // Y verificar con el backend que el JWT siga válido.
   useEffect(() => {
     (async () => {
       try {
-        const usuarioGuardado = await sessionService.obtenerSesion();
-        if (usuarioGuardado) {
-          setUsuario(usuarioGuardado);
+        const token = await sessionService.obtenerToken();
+        const usuarioGuardado = await sessionService.obtenerUsuario();
+
+        if (!token || !usuarioGuardado) {
+          setCargandoSesion(false);
+          return;
+        }
+
+        // Verificar con el backend que el JWT siga siendo válido
+        try {
+          const usuarioActualizado = await authService.verificarSesion();
+          setUsuario(usuarioActualizado);
+          // Actualizar datos locales por si cambiaron en el backend
+          await sessionService.guardarSesion(usuarioActualizado, token);
+        } catch (error: any) {
+          // Token inválido o expirado → cerrar sesión silenciosamente
+          if (error.statusCode === 401) {
+            await sessionService.cerrarSesion();
+            setUsuario(null);
+          } else {
+            // Si es error de red, dejamos al usuario logueado con datos en cache
+            setUsuario(usuarioGuardado);
+          }
         }
       } catch (error) {
         console.error('Error al recuperar sesión:', error);
@@ -31,8 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const iniciarSesion = async (datosUsuario: Usuario) => {
-    await sessionService.guardarSesion(datosUsuario);
+  const iniciarSesion = async (datosUsuario: Usuario, token: string) => {
+    await sessionService.guardarSesion(datosUsuario, token);
     setUsuario(datosUsuario);
   };
 
@@ -42,15 +64,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ usuario, cargandoSesion, iniciarSesion, cerrarSesion }}>
+    <AuthContext.Provider
+      value={{ usuario, cargandoSesion, iniciarSesion, cerrarSesion }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
-/**
- * Hook para usar el contexto de autenticación en cualquier pantalla.
- */
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
