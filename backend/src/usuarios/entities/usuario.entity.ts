@@ -1,68 +1,34 @@
 import { Entity, PrimaryColumn, Column } from 'typeorm';
 
-@Entity()
+@Entity({ name: 'usuario' })
 export class Usuario {
+  @PrimaryColumn({ name: 'documento', type: 'varchar', length: 10 })
+  documento: string;
 
-    @PrimaryColumn({
-        length: 10,
-    })
-    documento: string;
+  @Column({ name: 'fotopersona', type: 'varchar', length: 255 })
+  fotoPersona: string;
 
-    @Column({
-        length: 255,
-        nullable: false,
-    })
-    fotoPersona: string;
+  @Column({ name: 'nombrecompleto', type: 'varchar', length: 50 })
+  nombreCompleto: string;
 
-    @Column({
-        length: 50,
-        nullable: false,
-    })
-    nombreCompleto: string;
+  @Column({ name: 'numtelf', type: 'varchar', length: 10 })
+  numTelf: string;
 
-    @Column({
-        length: 10,
-        nullable: false,
-    })
-    numTelf: string;
+  @Column({ name: 'contactoemerg', type: 'varchar', length: 10 })
+  contactoEmerg: string;
 
-    @Column({
-        length: 10,
-        nullable: false,
-    })
-    contactoEmerg: string;
+  @Column({ name: 'correo', type: 'varchar', length: 50, unique: true })
+  correo: string;
 
-    @Column({
-        length: 50,
-        nullable: false,
-        unique: true,
-    })
-    correo: string;
+  @Column({ name: 'contra', type: 'varchar', length: 255 })
+  contra: string;
 
-    @Column({
-        length: 255,
-        nullable: false,
-    })
-    contra: string;
+  @Column({ name: 'idtipousr', type: 'smallint' })
+  idTipoUsr: number;
 
-    @Column({
-        type: 'smallint',
-        nullable: false,
-    })
-    idTipoUsr: number;
+  @Column({ name: 'idformacion', type: 'varchar', length: 7, nullable: true })
+  idFormacion: string | null;
 
-    @Column({
-        type: 'varchar',
-        length: 7,
-        nullable: true,
-    })
-    idFormacion: string | null;
-
-    @Column({
-        type: 'varchar',
-        length: 100,
-        nullable: true,
-        unique: true,
-    })
-    QR: string | null;
+  @Column({ name: 'qr', type: 'varchar', length: 100, nullable: true, unique: true })
+  QR: string | null;
 }

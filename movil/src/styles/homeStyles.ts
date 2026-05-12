@@ -1,0 +1,106 @@
+import { StyleSheet } from 'react-native';
+import { colors, fonts, espacios } from '../theme/senaTheme';
+
+export const homeStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.blanco,
+  },
+  content: {
+    padding: espacios.grande,
+    alignItems: 'center',
+    paddingBottom: espacios.grande * 2,
+  },
+  fotoContainer: {
+    alignItems: 'center',
+    marginBottom: espacios.normal,
+  },
+  fotoPerfil: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 3,
+    borderColor: colors.verde,
+  },
+  nombre: {
+    fontSize: fonts.grande,
+    fontWeight: 'bold',
+    color: colors.negro,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  correo: {
+    fontSize: fonts.normal,
+    color: colors.gris,
+    marginBottom: espacios.grande,
+    textAlign: 'center',
+  },
+  qrContainer: {
+    backgroundColor: colors.blanco,
+    padding: espacios.medio,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: colors.verde,
+    marginBottom: espacios.medio,
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: colors.negro,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  qrLabel: {
+    fontSize: fonts.normal,
+    fontWeight: 'bold',
+    color: colors.verde,
+    marginBottom: espacios.pequeno,
+  },
+  qrWrapper: {
+    position: 'relative',
+    width: 200,
+    height: 200,
+    overflow: 'hidden',
+  },
+  lineaEscaneo: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: colors.verde,
+    shadowColor: colors.verde,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  documento: {
+    fontSize: fonts.medio,
+    color: colors.negro,
+    marginTop: espacios.pequeno,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+  },
+  infoBox: {
+    width: '100%',
+    backgroundColor: colors.grisClaro,
+    padding: espacios.medio,
+    borderRadius: 10,
+    marginBottom: espacios.medio,
+  },
+  infoLabel: {
+    fontSize: fonts.pequeno,
+    color: colors.gris,
+    marginBottom: 2,
+  },
+  infoValor: {
+    fontSize: fonts.normal,
+    color: colors.negro,
+    marginBottom: espacios.pequeno,
+    fontWeight: '500',
+  },
+  sinQR: {
+    fontSize: fonts.normal,
+    color: colors.gris,
+    fontStyle: 'italic',
+  },
+});
