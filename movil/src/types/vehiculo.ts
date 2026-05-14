@@ -17,5 +17,6 @@ export interface VehiculoUsuario {
   fotoTarjetaP: string;
   color: string;
   tipoVehiculo: string;
+  idTipoVehiculo: number;
   idRegistroV: number;
 }

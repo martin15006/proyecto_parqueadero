@@ -1,7 +1,18 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Patch,
+} from '@nestjs/common';
 import { UsuarioService } from './usuario.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { CambiarContrasenaDto } from './dto/cambiar-contrasena.dto';
+import { ActualizarPerfilDto } from './dto/actualizar-perfil.dto';
+import { SolicitarCambioCorreoDto } from './dto/solicitar-cambio-correo.dto';
+import { ConfirmarCambioCorreoDto } from './dto/confirmar-cambio-correo.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Usuario } from './entities/usuario.entity';
@@ -25,6 +36,37 @@ export class UsuariosController {
       usuario.documento,
       dto.contraActual,
       dto.contraNueva,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('perfil')
+  actualizarPerfil(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Body() dto: ActualizarPerfilDto,
+  ) {
+    return this.usuarioService.actualizarPerfil(usuario.documento, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('correo/solicitar')
+  solicitarCambioCorreo(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Body() dto: SolicitarCambioCorreoDto,
+  ) {
+    return this.usuarioService.solicitarCambioCorreo(usuario.documento, dto.nuevoCorreo);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('correo/confirmar')
+  confirmarCambioCorreo(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Body() dto: ConfirmarCambioCorreoDto,
+  ) {
+    return this.usuarioService.confirmarCambioCorreo(
+      usuario.documento,
+      dto.nuevoCorreo,
+      dto.codigo,
     );
   }
 

@@ -1,13 +1,14 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
+  TextInput,
+  View,
+  Text,
   Animated,
   StyleSheet,
-  Text,
-  TextInput,
   TextInputProps,
-  View,
 } from 'react-native';
-import { colors, fonts, espacios, animaciones } from '../theme/senaTheme';
+import { useTheme } from '../context/ThemeContext';
+import { fonts, espacios } from '../theme/senaTheme';
 
 interface Props extends TextInputProps {
   label: string;
@@ -15,20 +16,20 @@ interface Props extends TextInputProps {
 }
 
 export default function AnimatedInput({ label, error, ...rest }: Props) {
-  const [enfocado, setEnfocado] = useState(false);
-  const lineaAncho = useRef(new Animated.Value(0)).current;
+  const { colores, esOscuro } = useTheme();
+  const [focused, setFocused] = useState(false);
+  const lineAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
-  const animarLinea = (valor: number) => {
-    Animated.timing(lineaAncho, {
-      toValue: valor,
-      duration: animaciones.media,
+  useEffect(() => {
+    Animated.timing(lineAnim, {
+      toValue: focused ? 1 : 0,
+      duration: 250,
       useNativeDriver: false,
     }).start();
-  };
+  }, [focused]);
 
-  // Cuando hay error, hace un pequeño shake
-  React.useEffect(() => {
+  useEffect(() => {
     if (error) {
       Animated.sequence([
         Animated.timing(shakeAnim, { toValue: 8, duration: 50, useNativeDriver: true }),
@@ -40,81 +41,80 @@ export default function AnimatedInput({ label, error, ...rest }: Props) {
     }
   }, [error]);
 
-  const colorLinea = error ? colors.error : colors.verde;
-
   return (
     <Animated.View style={[styles.container, { transform: [{ translateX: shakeAnim }] }]}>
-      <Text style={[styles.label, error && { color: colors.error }]}>{label}</Text>
-      <View style={styles.inputContainer}>
+      <Text style={[styles.label, { color: error ? colores.error : colores.textoSecundario }]}>
+        {label}
+      </Text>
+      <View
+        style={[
+          styles.inputWrapper,
+          {
+            backgroundColor: esOscuro ? colores.glassFondo : colores.superficie,
+            borderColor: error
+              ? colores.error
+              : focused
+                ? colores.verde
+                : colores.borde,
+          },
+        ]}
+      >
         <TextInput
+          style={[styles.input, { color: colores.textoPrimario }]}
+          placeholderTextColor={colores.textoTenue}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           {...rest}
-          style={styles.input}
-          placeholderTextColor="#aaa"
-          onFocus={(e) => {
-            setEnfocado(true);
-            animarLinea(100);
-            rest.onFocus?.(e);
-          }}
-          onBlur={(e) => {
-            setEnfocado(false);
-            animarLinea(0);
-            rest.onBlur?.(e);
-          }}
         />
-        <View style={styles.lineaBase} />
         <Animated.View
           style={[
-            styles.lineaActiva,
+            styles.lineaFocus,
             {
-              backgroundColor: colorLinea,
-              width: enfocado || error
-                ? lineaAncho.interpolate({
-                    inputRange: [0, 100],
-                    outputRange: ['0%', '100%'],
-                  })
-                : error
-                ? '100%'
-                : '0%',
+              backgroundColor: error ? colores.error : colores.verde,
+              width: lineAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0%', '100%'],
+              }),
             },
           ]}
         />
       </View>
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && (
+        <Text style={[styles.textoError, { color: colores.error }]}>{error}</Text>
+      )}
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: espacios.normal,
-  },
+  container: { marginBottom: espacios.medio },
   label: {
-    fontSize: fonts.normal,
-    color: colors.verde,
-    fontWeight: 'bold',
-    marginBottom: espacios.pequeno,
+    fontSize: fonts.pequeno,
+    marginBottom: 6,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
-  inputContainer: {
+  inputWrapper: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    overflow: 'hidden',
     position: 'relative',
   },
   input: {
-    fontSize: fonts.medio,
-    paddingVertical: espacios.pequeno,
-    color: colors.negro,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: fonts.normal,
+    fontFamily: undefined,
   },
-  lineaBase: {
-    height: 1,
-    backgroundColor: colors.gris,
-  },
-  lineaActiva: {
+  lineaFocus: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     height: 2,
   },
-  error: {
-    color: colors.error,
+  textoError: {
     fontSize: fonts.pequeno,
     marginTop: 4,
+    marginLeft: 4,
   },
 });

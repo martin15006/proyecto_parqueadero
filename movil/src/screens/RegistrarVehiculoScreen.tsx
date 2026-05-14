@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as ImagePicker from 'expo-image-picker';
-import { colors, fonts, espacios } from '../theme/senaTheme';
+import { useTheme } from '../context/ThemeContext';
+import { fonts, espacios } from '../theme/senaTheme';
 import SenaHeader from '../components/SenaHeader';
 import AnimatedInput from '../components/AnimatedInput';
 import AnimatedButton from '../components/AnimatedButton';
@@ -20,6 +21,7 @@ import { subirImagen } from '../services/uploadService';
 import { TipoVehiculo } from '../types/vehiculo';
 
 export default function RegistrarVehiculoScreen({ navigation }: any) {
+  const { colores, esOscuro } = useTheme();
   const [placa, setPlaca] = useState('');
   const [color, setColor] = useState('');
   const [tipoSeleccionado, setTipoSeleccionado] = useState<number | null>(null);
@@ -65,15 +67,15 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
     const result =
       origen === 'camara'
         ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ['images'],
-            allowsEditing: false,
-            quality: 0.7,
-          })
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 0.7,
+        })
         : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            allowsEditing: false,
-            quality: 0.7,
-          });
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 0.7,
+        });
 
     if (!result.canceled && result.assets.length > 0) {
       if (cual === 'vehiculo') setFotoVehiculo(result.assets[0].uri);
@@ -124,45 +126,67 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colores.fondo }]}>
       <SenaHeader
         titulo="Registrar Vehículo"
-        onMenuPress={() => navigation.openDrawer()}
+        mostrarVolver
+        onBackPress={() => navigation.goBack()}
       />
+
+      {esOscuro && <View style={styles.auroraTop} />}
 
       <KeyboardAwareScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         enableOnAndroid={true}
         extraScrollHeight={20}
-        enableAutomaticScroll={true}
       >
         <FadeInView>
-          <Text style={styles.label}>Foto del Vehículo</Text>
+          <Text style={[styles.label, { color: colores.verde }]}>Foto del Vehículo</Text>
           <TouchableOpacity
-            style={styles.fotoBox}
+            style={[
+              styles.fotoBox,
+              {
+                backgroundColor: esOscuro ? colores.glassFondo : '#f4f6f4',
+                borderColor: esOscuro ? colores.borde : colores.gris,
+              },
+            ]}
             onPress={() => seleccionarFoto('vehiculo')}
           >
             {fotoVehiculo ? (
               <Image source={{ uri: fotoVehiculo }} style={styles.fotoImg} />
             ) : (
-              <Text style={styles.fotoPlaceholder}>📷 Toca para agregar</Text>
+              <Text style={[styles.fotoPlaceholder, { color: colores.textoTenue }]}>
+                📷 Toca para agregar
+              </Text>
             )}
           </TouchableOpacity>
-          {errores.fotoVehiculo && <Text style={styles.error}>{errores.fotoVehiculo}</Text>}
+          {errores.fotoVehiculo && (
+            <Text style={[styles.error, { color: colores.error }]}>{errores.fotoVehiculo}</Text>
+          )}
 
-          <Text style={styles.label}>Foto Tarjeta de Propiedad</Text>
+          <Text style={[styles.label, { color: colores.verde }]}>Foto Tarjeta de Propiedad</Text>
           <TouchableOpacity
-            style={styles.fotoBox}
+            style={[
+              styles.fotoBox,
+              {
+                backgroundColor: esOscuro ? colores.glassFondo : '#f4f6f4',
+                borderColor: esOscuro ? colores.borde : colores.gris,
+              },
+            ]}
             onPress={() => seleccionarFoto('tarjeta')}
           >
             {fotoTarjeta ? (
               <Image source={{ uri: fotoTarjeta }} style={styles.fotoImg} />
             ) : (
-              <Text style={styles.fotoPlaceholder}>📷 Toca para agregar</Text>
+              <Text style={[styles.fotoPlaceholder, { color: colores.textoTenue }]}>
+                📷 Toca para agregar
+              </Text>
             )}
           </TouchableOpacity>
-          {errores.fotoTarjeta && <Text style={styles.error}>{errores.fotoTarjeta}</Text>}
+          {errores.fotoTarjeta && (
+            <Text style={[styles.error, { color: colores.error }]}>{errores.fotoTarjeta}</Text>
+          )}
 
           <AnimatedInput
             label="Placa"
@@ -187,14 +211,27 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
             }}
           />
 
-          <Text style={styles.label}>Tipo de Vehículo</Text>
+          <Text style={[styles.label, { color: colores.verde }]}>Tipo de Vehículo</Text>
           <View style={styles.tiposContainer}>
             {tipos.map((tipo) => (
               <TouchableOpacity
                 key={tipo.idTipoV}
                 style={[
                   styles.tipoChip,
-                  tipoSeleccionado === tipo.idTipoV && styles.tipoChipActivo,
+                  {
+                    backgroundColor:
+                      tipoSeleccionado === tipo.idTipoV
+                        ? esOscuro
+                          ? 'rgba(95,217,36,0.20)'
+                          : colores.verdeMuyClaro
+                        : esOscuro
+                          ? colores.glassFondo
+                          : '#f4f6f4',
+                    borderColor:
+                      tipoSeleccionado === tipo.idTipoV
+                        ? colores.verde
+                        : colores.borde,
+                  },
                 ]}
                 onPress={() => {
                   setTipoSeleccionado(tipo.idTipoV);
@@ -204,7 +241,13 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
                 <Text
                   style={[
                     styles.tipoChipTexto,
-                    tipoSeleccionado === tipo.idTipoV && styles.tipoChipTextoActivo,
+                    {
+                      color:
+                        tipoSeleccionado === tipo.idTipoV
+                          ? colores.verde
+                          : colores.textoSecundario,
+                      fontWeight: tipoSeleccionado === tipo.idTipoV ? 'bold' : '500',
+                    },
                   ]}
                 >
                   {tipo.tipoVehiculo}
@@ -212,7 +255,9 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
               </TouchableOpacity>
             ))}
           </View>
-          {errores.tipo && <Text style={styles.error}>{errores.tipo}</Text>}
+          {errores.tipo && (
+            <Text style={[styles.error, { color: colores.error }]}>{errores.tipo}</Text>
+          )}
 
           <View style={{ marginTop: espacios.medio }}>
             <AnimatedButton
@@ -231,7 +276,16 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.blanco },
+  container: { flex: 1, position: 'relative' },
+  auroraTop: {
+    position: 'absolute',
+    top: 100,
+    right: -80,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: 'rgba(57,169,0,0.15)',
+  },
   scroll: {
     padding: espacios.grande,
     paddingBottom: espacios.grande * 2,
@@ -240,42 +294,27 @@ const styles = StyleSheet.create({
   label: {
     fontSize: fonts.normal,
     fontWeight: 'bold',
-    color: colors.verde,
     marginBottom: espacios.pequeno,
     marginTop: espacios.normal,
   },
   fotoBox: {
-    backgroundColor: colors.grisClaro,
     borderRadius: 12,
     height: 150,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.gris,
     borderStyle: 'dashed',
     overflow: 'hidden',
   },
   fotoImg: { width: '100%', height: '100%' },
-  fotoPlaceholder: { color: colors.gris, fontSize: fonts.medio },
-  error: { color: colors.error, fontSize: fonts.pequeno, marginTop: 4 },
-  tiposContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 4,
-  },
+  fotoPlaceholder: { fontSize: fonts.medio },
+  error: { fontSize: fonts.pequeno, marginTop: 4 },
+  tiposContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   tipoChip: {
     paddingHorizontal: espacios.normal,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: colors.grisClaro,
     borderWidth: 2,
-    borderColor: colors.gris,
   },
-  tipoChipActivo: {
-    backgroundColor: colors.verdeMuyClaro,
-    borderColor: colors.verde,
-  },
-  tipoChipTexto: { color: colors.grisOscuro, fontWeight: '500' },
-  tipoChipTextoActivo: { color: colors.verde, fontWeight: 'bold' },
+  tipoChipTexto: { fontSize: fonts.normal },
 });

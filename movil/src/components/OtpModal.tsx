@@ -12,8 +12,8 @@ import {
   Platform,
 } from 'react-native';
 import OtpInput from './OtpInput';
-import AnimatedButton from './AnimatedButton';
-import { colors, fonts, espacios, animaciones } from '../theme/senaTheme';
+import { useTheme } from '../context/ThemeContext';
+import { fonts, espacios, animaciones } from '../theme/senaTheme';
 import { authService } from '../services/authService';
 
 interface Props {
@@ -23,9 +23,10 @@ interface Props {
   onExito: (token: string, usuario: any) => void;
 }
 
-const TIEMPO_REENVIO = 60; // segundos
+const TIEMPO_REENVIO = 60;
 
 export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) {
+  const { colores, esOscuro } = useTheme();
   const [codigo, setCodigo] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState(false);
@@ -33,19 +34,16 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
   const [reenviando, setReenviando] = useState(false);
   const [segundosRestantes, setSegundosRestantes] = useState(TIEMPO_REENVIO);
 
-  // Animaciones de entrada
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
     if (visible) {
-      // Reset estado
       setCodigo('');
       setError(false);
       setMensajeError('');
       setSegundosRestantes(TIEMPO_REENVIO);
 
-      // Animar entrada
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -65,14 +63,9 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
     }
   }, [visible]);
 
-  // Timer regresivo para reenvío
   useEffect(() => {
     if (!visible || segundosRestantes === 0) return;
-
-    const timer = setTimeout(() => {
-      setSegundosRestantes((prev) => prev - 1);
-    }, 1000);
-
+    const timer = setTimeout(() => setSegundosRestantes((prev) => prev - 1), 1000);
     return () => clearTimeout(timer);
   }, [visible, segundosRestantes]);
 
@@ -80,7 +73,6 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
     setCargando(true);
     setError(false);
     setMensajeError('');
-
     try {
       const respuesta = await authService.verificarOtp({
         correo,
@@ -102,7 +94,6 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
       await authService.reenviarOtp(correo);
       setSegundosRestantes(TIEMPO_REENVIO);
       setError(false);
-      setMensajeError('');
       Alert.alert('Código enviado', 'Revisa tu correo para el nuevo código.');
     } catch (err: any) {
       Alert.alert('Error', err.message);
@@ -111,7 +102,6 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
     }
   };
 
-  // Ocultar parte del correo: ju***@gmail.com
   const correoCensurado = (() => {
     const [usuario, dominio] = correo.split('@');
     if (!usuario || !dominio) return correo;
@@ -141,22 +131,56 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
           <Animated.View
             style={[
               styles.modalContent,
-              { transform: [{ translateY: slideAnim }] },
+              {
+                backgroundColor: esOscuro ? '#001f12' : colores.superficie,
+                borderColor: esOscuro ? 'rgba(95,217,36,0.30)' : 'transparent',
+                borderWidth: esOscuro ? 1 : 0,
+                transform: [{ translateY: slideAnim }],
+              },
             ]}
           >
-            {/* Decoración: círculos verdes */}
-            <View style={styles.decoracionTop} />
-            <View style={styles.decoracionTopChica} />
+            {/* Decoraciones glass */}
+            <View
+              style={[
+                styles.decoTop,
+                {
+                  backgroundColor: esOscuro
+                    ? 'rgba(95,217,36,0.15)'
+                    : colores.verdeMuyClaro,
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.decoTopChica,
+                {
+                  backgroundColor: esOscuro
+                    ? 'rgba(0,120,50,0.25)'
+                    : 'rgba(57,169,0,0.15)',
+                },
+              ]}
+            />
 
-            <View style={styles.iconoCircular}>
+            <View
+              style={[
+                styles.iconoCircular,
+                {
+                  backgroundColor: colores.verde,
+                  shadowColor: colores.verde,
+                  shadowOpacity: esOscuro ? 0.6 : 0.4,
+                },
+              ]}
+            >
               <Text style={styles.iconoEmoji}>📧</Text>
             </View>
 
-            <Text style={styles.titulo}>Verificación</Text>
-            <Text style={styles.subtitulo}>
+            <Text style={[styles.titulo, { color: colores.textoPrimario }]}>
+              Verificación
+            </Text>
+            <Text style={[styles.subtitulo, { color: colores.textoSecundario }]}>
               Te enviamos un código de 6 dígitos a
             </Text>
-            <Text style={styles.correo}>{correoCensurado}</Text>
+            <Text style={[styles.correo, { color: colores.verde }]}>{correoCensurado}</Text>
 
             <OtpInput
               onCompleto={handleVerificar}
@@ -165,28 +189,31 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
             />
 
             {error && mensajeError !== '' && (
-              <Text style={styles.textoError}>{mensajeError}</Text>
+              <Text style={[styles.textoError, { color: colores.error }]}>
+                {mensajeError}
+              </Text>
             )}
 
             {cargando && (
               <View style={styles.cargandoContainer}>
-                <ActivityIndicator color={colors.verde} />
-                <Text style={styles.cargandoTexto}>Verificando código...</Text>
+                <ActivityIndicator color={colores.verde} />
+                <Text style={[styles.cargandoTexto, { color: colores.textoSecundario }]}>
+                  Verificando código...
+                </Text>
               </View>
             )}
 
             <View style={styles.reenviarContainer}>
-              <Text style={styles.reenviarTexto}>¿No te llegó el código?</Text>
+              <Text style={[styles.reenviarTexto, { color: colores.textoSecundario }]}>
+                ¿No te llegó el código?
+              </Text>
               {segundosRestantes > 0 ? (
-                <Text style={styles.contador}>
+                <Text style={[styles.contador, { color: colores.textoTenue }]}>
                   Reenviar en {segundosRestantes}s
                 </Text>
               ) : (
-                <TouchableOpacity
-                  onPress={handleReenviar}
-                  disabled={reenviando}
-                >
-                  <Text style={styles.linkReenviar}>
+                <TouchableOpacity onPress={handleReenviar} disabled={reenviando}>
+                  <Text style={[styles.linkReenviar, { color: colores.verde }]}>
                     {reenviando ? 'Enviando...' : 'Reenviar código'}
                   </Text>
                 </TouchableOpacity>
@@ -198,7 +225,9 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
               style={styles.botonCancelar}
               disabled={cargando}
             >
-              <Text style={styles.botonCancelarTexto}>Cancelar</Text>
+              <Text style={[styles.botonCancelarTexto, { color: colores.textoTenue }]}>
+                Cancelar
+              </Text>
             </TouchableOpacity>
           </Animated.View>
         </Animated.View>
@@ -210,130 +239,89 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: espacios.normal,
   },
-  overlayTouch: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  overlayTouch: { ...StyleSheet.absoluteFillObject },
   modalContent: {
-    backgroundColor: colors.blanco,
-    borderRadius: 20,
+    borderRadius: 24,
     paddingHorizontal: espacios.grande,
     paddingTop: espacios.grande * 1.5,
     paddingBottom: espacios.grande,
     width: '100%',
     maxWidth: 400,
     alignItems: 'center',
-    elevation: 10,
-    shadowColor: colors.negro,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
+    elevation: 15,
     overflow: 'hidden',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
   },
-  decoracionTop: {
+  decoTop: {
     position: 'absolute',
     top: -60,
     left: -60,
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: colors.verdeMuyClaro,
     opacity: 0.6,
   },
-  decoracionTopChica: {
+  decoTopChica: {
     position: 'absolute',
     top: -20,
     right: -30,
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.verde,
-    opacity: 0.15,
   },
   iconoCircular: {
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: colors.verde,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: espacios.normal,
     elevation: 5,
-    shadowColor: colors.verde,
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
+    shadowRadius: 8,
   },
-  iconoEmoji: {
-    fontSize: 32,
-  },
+  iconoEmoji: { fontSize: 32 },
   titulo: {
-    fontSize: fonts.titulo - 4,
-    fontWeight: 'bold',
-    color: colors.negro,
+    fontSize: fonts.titulo,
+    fontWeight: '800',
     marginBottom: espacios.pequeno,
+    letterSpacing: -0.3,
   },
-  subtitulo: {
-    fontSize: fonts.normal,
-    color: colors.grisOscuro,
-    textAlign: 'center',
-  },
+  subtitulo: { fontSize: fonts.normal, textAlign: 'center' },
   correo: {
     fontSize: fonts.medio,
-    fontWeight: 'bold',
-    color: colors.verde,
+    fontWeight: '700',
     marginTop: 4,
     marginBottom: espacios.normal,
   },
   textoError: {
-    color: colors.error,
     fontSize: fonts.normal,
     textAlign: 'center',
     marginTop: -8,
     marginBottom: espacios.pequeno,
-    paddingHorizontal: espacios.normal,
   },
   cargandoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: espacios.pequeno,
   },
-  cargandoTexto: {
-    marginLeft: 8,
-    color: colors.grisOscuro,
-    fontSize: fonts.normal,
-  },
-  reenviarContainer: {
-    alignItems: 'center',
-    marginTop: espacios.normal,
-  },
-  reenviarTexto: {
-    fontSize: fonts.normal,
-    color: colors.grisOscuro,
-  },
-  contador: {
-    marginTop: 4,
-    fontSize: fonts.normal,
-    color: colors.gris,
-    fontWeight: 'bold',
-  },
+  cargandoTexto: { marginLeft: 8, fontSize: fonts.normal },
+  reenviarContainer: { alignItems: 'center', marginTop: espacios.normal },
+  reenviarTexto: { fontSize: fonts.normal },
+  contador: { marginTop: 4, fontSize: fonts.normal, fontWeight: '700' },
   linkReenviar: {
     marginTop: 4,
     fontSize: fonts.normal,
-    color: colors.verde,
-    fontWeight: 'bold',
+    fontWeight: '700',
     textDecorationLine: 'underline',
   },
-  botonCancelar: {
-    marginTop: espacios.normal,
-    paddingVertical: espacios.pequeno,
-  },
-  botonCancelarTexto: {
-    color: colors.gris,
-    fontSize: fonts.normal,
-  },
+  botonCancelar: { marginTop: espacios.normal, paddingVertical: espacios.pequeno },
+  botonCancelarTexto: { fontSize: fonts.normal },
 });

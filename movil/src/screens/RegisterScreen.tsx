@@ -5,10 +5,12 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  StyleSheet,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as ImagePicker from 'expo-image-picker';
-import { registerStyles } from '../styles/registerStyles';
+import { useTheme } from '../context/ThemeContext';
+import { fonts, espacios } from '../theme/senaTheme';
 import { usuarioService } from '../services/usuarioService';
 import { subirImagen } from '../services/uploadService';
 import AnimatedButton from '../components/AnimatedButton';
@@ -41,6 +43,7 @@ const FORM_INICIAL: FormState = {
 };
 
 export default function RegisterScreen({ navigation }: any) {
+  const { colores, esOscuro } = useTheme();
   const [form, setForm] = useState<FormState>(FORM_INICIAL);
   const [errores, setErrores] = useState<Partial<Record<keyof FormState | 'foto', string>>>({});
   const [fotoLocal, setFotoLocal] = useState<string | null>(null);
@@ -54,7 +57,7 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   const seleccionarFoto = async () => {
-    Alert.alert('Foto de perfil', '¿De dónde quieres tomar la foto?', [
+    Alert.alert('Foto de perfil', '¿De dónde tomar la foto?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Cámara', onPress: () => abrirCamara() },
       { text: 'Galería', onPress: () => abrirGaleria() },
@@ -64,7 +67,7 @@ export default function RegisterScreen({ navigation }: any) {
   const abrirCamara = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permiso denegado', 'Necesitamos acceso a la cámara');
+      Alert.alert('Permiso denegado');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -81,7 +84,7 @@ export default function RegisterScreen({ navigation }: any) {
   const abrirGaleria = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permiso denegado', 'Necesitamos acceso a tus fotos');
+      Alert.alert('Permiso denegado');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -97,36 +100,25 @@ export default function RegisterScreen({ navigation }: any) {
 
   const validarFormulario = (): boolean => {
     const e: Partial<Record<keyof FormState | 'foto', string>> = {};
-
     if (!form.nombreCompleto.trim()) e.nombreCompleto = 'El nombre es obligatorio';
     else if (form.nombreCompleto.length < 3) e.nombreCompleto = 'Mínimo 3 caracteres';
-
     if (!form.documento.trim()) e.documento = 'El documento es obligatorio';
     else if (!/^[0-9]+$/.test(form.documento)) e.documento = 'Solo números';
     else if (form.documento.length < 6 || form.documento.length > 10)
       e.documento = 'Entre 6 y 10 dígitos';
-
     if (!form.correo.trim()) e.correo = 'El correo es obligatorio';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo))
-      e.correo = 'Formato de correo inválido';
-
+      e.correo = 'Formato inválido';
     if (!form.contra) e.contra = 'La contraseña es obligatoria';
     else if (form.contra.length < 6) e.contra = 'Mínimo 6 caracteres';
-
-    if (form.contra !== form.confirmarContra) e.confirmarContra = 'Las contraseñas no coinciden';
-
+    if (form.contra !== form.confirmarContra) e.confirmarContra = 'No coinciden';
     if (!form.numTelf.trim()) e.numTelf = 'El teléfono es obligatorio';
-    else if (!/^[0-9]{10}$/.test(form.numTelf)) e.numTelf = 'Debe tener 10 dígitos';
-
+    else if (!/^[0-9]{10}$/.test(form.numTelf)) e.numTelf = '10 dígitos';
     if (!form.contactoEmerg.trim()) e.contactoEmerg = 'Obligatorio';
-    else if (!/^[0-9]{10}$/.test(form.contactoEmerg))
-      e.contactoEmerg = 'Debe tener 10 dígitos';
-
+    else if (!/^[0-9]{10}$/.test(form.contactoEmerg)) e.contactoEmerg = '10 dígitos';
     if (!form.idFormacion.trim()) e.idFormacion = 'La ficha es obligatoria';
-    else if (!/^[0-9]{7}$/.test(form.idFormacion)) e.idFormacion = 'Debe tener 7 dígitos';
-
+    else if (!/^[0-9]{7}$/.test(form.idFormacion)) e.idFormacion = '7 dígitos';
     if (!fotoLocal) e.foto = 'Debes seleccionar una foto';
-
     setErrores(e);
     return Object.keys(e).length === 0;
   };
@@ -137,7 +129,6 @@ export default function RegisterScreen({ navigation }: any) {
     try {
       setMensajeCargando('Subiendo foto...');
       const urlFoto = await subirImagen(fotoLocal!);
-
       setMensajeCargando('Registrando...');
       await usuarioService.registrar({
         documento: form.documento,
@@ -149,7 +140,6 @@ export default function RegisterScreen({ navigation }: any) {
         contra: form.contra,
         idFormacion: form.idFormacion,
       });
-
       setExitoVisible(true);
       setTimeout(() => {
         setExitoVisible(false);
@@ -165,139 +155,229 @@ export default function RegisterScreen({ navigation }: any) {
 
   return (
     <>
-      <KeyboardAwareScrollView
-        contentContainerStyle={registerStyles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-        enableOnAndroid={true}
-        extraScrollHeight={20}
-        enableAutomaticScroll={true}
-      >
-        <View style={registerStyles.container}>
-          <FadeInView style={registerStyles.logoContainer}>
-            <AnimatedLogo size={80} pulse={false} />
-          </FadeInView>
+      <View style={[{ flex: 1, backgroundColor: colores.fondo }, styles.relative]}>
+        {esOscuro && (
+          <>
+            <View style={styles.auroraTop} />
+            <View style={styles.auroraBottom} />
+          </>
+        )}
 
-          <FadeInView delay={150}>
-            <Text style={registerStyles.titulo}>Registro</Text>
+        <KeyboardAwareScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          enableOnAndroid={true}
+          extraScrollHeight={20}
+        >
+          <View style={styles.container}>
+            <FadeInView style={styles.logoContainer}>
+              <AnimatedLogo size={70} pulse={false} />
+            </FadeInView>
 
-            <View style={registerStyles.fotoContainer}>
-              {fotoLocal ? (
-                <Image source={{ uri: fotoLocal }} style={registerStyles.fotoPreview} />
-              ) : (
-                <View style={registerStyles.fotoPlaceholder}>
-                  <Text style={registerStyles.fotoPlaceholderTexto}>Sin foto</Text>
-                </View>
-              )}
-              <TouchableOpacity
-                style={registerStyles.botonFoto}
-                onPress={seleccionarFoto}
-                disabled={cargando}
-              >
-                <Text style={registerStyles.botonFotoTexto}>
-                  {fotoLocal ? 'Cambiar Foto' : 'Subir Foto'}
-                </Text>
-              </TouchableOpacity>
-              {errores.foto && (
-                <Text style={registerStyles.textoError}>{errores.foto}</Text>
-              )}
-            </View>
+            <FadeInView delay={150}>
+              <Text style={[styles.titulo, { color: colores.textoPrimario }]}>Registro</Text>
 
-            <AnimatedInput
-              label="Nombre y Apellido"
-              placeholder="Nombres y apellidos"
-              value={form.nombreCompleto}
-              error={errores.nombreCompleto}
-              onChangeText={(v) => actualizarCampo('nombreCompleto', v)}
-            />
+              <View style={styles.fotoContainer}>
+                {fotoLocal ? (
+                  <Image source={{ uri: fotoLocal }} style={styles.fotoPreview} />
+                ) : (
+                  <View
+                    style={[
+                      styles.fotoPlaceholder,
+                      {
+                        backgroundColor: esOscuro
+                          ? colores.glassFondo
+                          : '#f4f6f4',
+                        borderColor: colores.borde,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.fotoPlaceholderTexto, { color: colores.textoTenue }]}>
+                      Sin foto
+                    </Text>
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={[styles.botonFoto, { backgroundColor: colores.verde }]}
+                  onPress={seleccionarFoto}
+                  disabled={cargando}
+                >
+                  <Text style={styles.botonFotoTexto}>
+                    {fotoLocal ? 'Cambiar Foto' : 'Subir Foto'}
+                  </Text>
+                </TouchableOpacity>
+                {errores.foto && (
+                  <Text style={[styles.textoError, { color: colores.error }]}>
+                    {errores.foto}
+                  </Text>
+                )}
+              </View>
 
-            <AnimatedInput
-              label="Número de Documento"
-              placeholder="Número de documento"
-              keyboardType="numeric"
-              maxLength={10}
-              value={form.documento}
-              error={errores.documento}
-              onChangeText={(v) => actualizarCampo('documento', v)}
-            />
-
-            <AnimatedInput
-              label="Correo"
-              placeholder="ejemplo@correo.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={form.correo}
-              error={errores.correo}
-              onChangeText={(v) => actualizarCampo('correo', v)}
-            />
-
-            <AnimatedInput
-              label="Contraseña"
-              placeholder="Mínimo 6 caracteres"
-              secureTextEntry
-              value={form.contra}
-              error={errores.contra}
-              onChangeText={(v) => actualizarCampo('contra', v)}
-            />
-
-            <AnimatedInput
-              label="Confirmar Contraseña"
-              placeholder="Repite la contraseña"
-              secureTextEntry
-              value={form.confirmarContra}
-              error={errores.confirmarContra}
-              onChangeText={(v) => actualizarCampo('confirmarContra', v)}
-            />
-
-            <AnimatedInput
-              label="Número Telefónico"
-              placeholder="3001234567"
-              keyboardType="phone-pad"
-              maxLength={10}
-              value={form.numTelf}
-              error={errores.numTelf}
-              onChangeText={(v) => actualizarCampo('numTelf', v)}
-            />
-
-            <AnimatedInput
-              label="Contacto de Emergencia"
-              placeholder="3007654321"
-              keyboardType="phone-pad"
-              maxLength={10}
-              value={form.contactoEmerg}
-              error={errores.contactoEmerg}
-              onChangeText={(v) => actualizarCampo('contactoEmerg', v)}
-            />
-
-            <AnimatedInput
-              label="Ficha de Formación"
-              placeholder="7 dígitos"
-              keyboardType="numeric"
-              maxLength={7}
-              value={form.idFormacion}
-              error={errores.idFormacion}
-              onChangeText={(v) => actualizarCampo('idFormacion', v)}
-            />
-
-            <View style={{ marginTop: 16 }}>
-              <AnimatedButton
-                texto="Continuar"
-                onPress={handleRegistro}
-                cargando={cargando}
-                mensajeCargando={mensajeCargando}
+              <AnimatedInput
+                label="Nombre y Apellido"
+                placeholder="Nombres y apellidos"
+                value={form.nombreCompleto}
+                error={errores.nombreCompleto}
+                onChangeText={(v) => actualizarCampo('nombreCompleto', v)}
               />
-            </View>
 
-            <View style={registerStyles.filaInferior}>
-              <Text style={registerStyles.textoNormal}>¿Tienes una cuenta?</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                <Text style={registerStyles.enlace}>Iniciar Sesión</Text>
-              </TouchableOpacity>
-            </View>
-          </FadeInView>
-        </View>
-        <Footer />
-      </KeyboardAwareScrollView>
+              <AnimatedInput
+                label="Número de Documento"
+                placeholder="Número de documento"
+                keyboardType="numeric"
+                maxLength={10}
+                value={form.documento}
+                error={errores.documento}
+                onChangeText={(v) => actualizarCampo('documento', v)}
+              />
+
+              <AnimatedInput
+                label="Correo"
+                placeholder="ejemplo@correo.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={form.correo}
+                error={errores.correo}
+                onChangeText={(v) => actualizarCampo('correo', v)}
+              />
+
+              <AnimatedInput
+                label="Contraseña"
+                placeholder="Mínimo 6 caracteres"
+                secureTextEntry
+                value={form.contra}
+                error={errores.contra}
+                onChangeText={(v) => actualizarCampo('contra', v)}
+              />
+
+              <AnimatedInput
+                label="Confirmar Contraseña"
+                placeholder="Repite la contraseña"
+                secureTextEntry
+                value={form.confirmarContra}
+                error={errores.confirmarContra}
+                onChangeText={(v) => actualizarCampo('confirmarContra', v)}
+              />
+
+              <AnimatedInput
+                label="Número Telefónico"
+                placeholder="3001234567"
+                keyboardType="phone-pad"
+                maxLength={10}
+                value={form.numTelf}
+                error={errores.numTelf}
+                onChangeText={(v) => actualizarCampo('numTelf', v)}
+              />
+
+              <AnimatedInput
+                label="Contacto de Emergencia"
+                placeholder="3007654321"
+                keyboardType="phone-pad"
+                maxLength={10}
+                value={form.contactoEmerg}
+                error={errores.contactoEmerg}
+                onChangeText={(v) => actualizarCampo('contactoEmerg', v)}
+              />
+
+              <AnimatedInput
+                label="Ficha de Formación"
+                placeholder="7 dígitos"
+                keyboardType="numeric"
+                maxLength={7}
+                value={form.idFormacion}
+                error={errores.idFormacion}
+                onChangeText={(v) => actualizarCampo('idFormacion', v)}
+              />
+
+              <View style={{ marginTop: 16 }}>
+                <AnimatedButton
+                  texto="Continuar"
+                  onPress={handleRegistro}
+                  cargando={cargando}
+                  mensajeCargando={mensajeCargando}
+                />
+              </View>
+
+              <View style={styles.filaInferior}>
+                <Text style={[styles.textoNormal, { color: colores.textoTenue }]}>
+                  ¿Tienes una cuenta?
+                </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                  <Text style={[styles.enlace, { color: colores.verde }]}>Iniciar Sesión</Text>
+                </TouchableOpacity>
+              </View>
+            </FadeInView>
+          </View>
+          <Footer />
+        </KeyboardAwareScrollView>
+      </View>
       <SuccessCheck visible={exitoVisible} mensaje="¡Registro exitoso!" />
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  relative: { position: 'relative' },
+  auroraTop: {
+    position: 'absolute',
+    top: -80,
+    right: -80,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: 'rgba(57,169,0,0.20)',
+  },
+  auroraBottom: {
+    position: 'absolute',
+    bottom: -100,
+    left: -80,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: 'rgba(0,120,50,0.15)',
+  },
+  scrollContainer: { flexGrow: 1 },
+  container: { padding: espacios.grande, paddingTop: espacios.enorme },
+  logoContainer: { alignItems: 'center', marginBottom: espacios.medio },
+  titulo: {
+    fontSize: fonts.enorme,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: espacios.medio,
+    letterSpacing: -0.5,
+  },
+  fotoContainer: { alignItems: 'center', marginBottom: espacios.medio },
+  fotoPreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 10,
+  },
+  fotoPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+  },
+  fotoPlaceholderTexto: { fontSize: fonts.normal },
+  botonFoto: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  botonFotoTexto: { color: '#ffffff', fontWeight: 'bold', fontSize: fonts.pequeno },
+  textoError: { fontSize: fonts.pequeno, marginTop: 4 },
+  filaInferior: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: espacios.medio,
+  },
+  textoNormal: { fontSize: fonts.normal },
+  enlace: { fontSize: fonts.normal, fontWeight: '700' },
+});

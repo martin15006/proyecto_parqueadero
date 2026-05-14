@@ -1,20 +1,18 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  Alert,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, Alert, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { colors, fonts, espacios } from '../theme/senaTheme';
+import { useTheme } from '../context/ThemeContext';
+import { fonts, espacios } from '../theme/senaTheme';
 import SenaHeader from '../components/SenaHeader';
 import AnimatedInput from '../components/AnimatedInput';
 import AnimatedButton from '../components/AnimatedButton';
 import FadeInView from '../components/FadeInView';
 import SuccessCheck from '../components/SuccessCheck';
 import { usuarioService } from '../services/usuarioService';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function CambiarContrasenaScreen({ navigation }: any) {
+  const { colores, esOscuro } = useTheme();
   const [contraActual, setContraActual] = useState('');
   const [contraNueva, setContraNueva] = useState('');
   const [confirmarContra, setConfirmarContra] = useState('');
@@ -39,6 +37,13 @@ export default function CambiarContrasenaScreen({ navigation }: any) {
     setCargando(true);
     try {
       await usuarioService.cambiarContrasena(contraActual, contraNueva);
+
+      // Limpiar los campos después del cambio exitoso
+      setContraActual('');
+      setContraNueva('');
+      setConfirmarContra('');
+      setErrores({});
+
       setExitoVisible(true);
       setTimeout(() => {
         setExitoVisible(false);
@@ -51,29 +56,55 @@ export default function CambiarContrasenaScreen({ navigation }: any) {
     }
   };
 
+  useFocusEffect(
+    React.useCallback(() => {
+      // Cuando entra a la pantalla
+      return () => {
+        // Cuando sale de la pantalla → limpiar
+        setContraActual('');
+        setContraNueva('');
+        setConfirmarContra('');
+        setErrores({});
+      };
+    }, [])
+  );
+
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colores.fondo }]}>
       <SenaHeader
         titulo="Cambiar Contraseña"
         onMenuPress={() => navigation.openDrawer()}
       />
+
+      {esOscuro && <View style={styles.auroraTop} />}
 
       <KeyboardAwareScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         enableOnAndroid={true}
         extraScrollHeight={20}
-        enableAutomaticScroll={true}
       >
         <FadeInView>
           <View style={styles.iconoContainer}>
-            <View style={styles.iconoCirculo}>
+            <View
+              style={[
+                styles.iconoCirculo,
+                {
+                  backgroundColor: colores.verde,
+                  shadowColor: colores.verde,
+                  shadowOpacity: esOscuro ? 0.6 : 0.3,
+                },
+              ]}
+            >
               <Text style={styles.iconoEmoji}>🔒</Text>
             </View>
           </View>
-          <Text style={styles.titulo}>Actualiza tu contraseña</Text>
-          <Text style={styles.subtitulo}>
-            Ingresa tu contraseña actual y la nueva contraseña
+          <Text style={[styles.titulo, { color: colores.textoPrimario }]}>
+            Actualiza tu contraseña
+          </Text>
+          <Text style={[styles.subtitulo, { color: colores.textoSecundario }]}>
+            Ingresa tu contraseña actual y la nueva
           </Text>
 
           <AnimatedInput
@@ -132,7 +163,16 @@ export default function CambiarContrasenaScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.blanco },
+  container: { flex: 1, position: 'relative' },
+  auroraTop: {
+    position: 'absolute',
+    top: 100,
+    right: -80,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: 'rgba(57,169,0,0.15)',
+  },
   scroll: {
     padding: espacios.grande,
     paddingBottom: espacios.grande * 2,
@@ -143,22 +183,21 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.verde,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
   },
   iconoEmoji: { fontSize: 38 },
   titulo: {
     fontSize: fonts.grande,
     fontWeight: 'bold',
-    color: colors.negro,
     textAlign: 'center',
     marginBottom: espacios.pequeno,
   },
   subtitulo: {
     fontSize: fonts.normal,
-    color: colors.gris,
     textAlign: 'center',
     marginBottom: espacios.grande,
   },

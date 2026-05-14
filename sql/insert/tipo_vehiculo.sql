@@ -1,4 +1,6 @@
-insert into tipo_vehiculo (tipovehiculo) values 
-('Carro'), 
-('Vehiculo Institucional'), 
-('Moto')
+-- Tipos de vehículo
+INSERT INTO tipo_vehiculo (tipoVehiculo) VALUES
+    ('Carro'),
+    ('Moto'),
+    ('Bicicleta'),
+    ('Camioneta');

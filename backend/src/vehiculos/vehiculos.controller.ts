@@ -1,14 +1,9 @@
 import {
-  Controller,
-  Post,
-  Body,
-  Get,
-  UseGuards,
-  Delete,
-  Param,
+  Controller, Post, Body, Get, UseGuards, Delete, Param, Patch,
 } from '@nestjs/common';
 import { VehiculosService } from './vehiculos.service';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
+import { ActualizarVehiculoDto } from './dto/actualizar-vehiculo.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -35,6 +30,25 @@ export class VehiculosController {
   @Get('mios')
   listarMios(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
     return this.vehiculosService.listarMisVehiculos(usuario.documento);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('detalle/:placa')
+  obtenerDetalle(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Param('placa') placa: string,
+  ) {
+    return this.vehiculosService.obtenerDetalle(usuario.documento, placa);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':placa')
+  actualizar(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Param('placa') placa: string,
+    @Body() dto: ActualizarVehiculoDto,
+  ) {
+    return this.vehiculosService.actualizarVehiculo(usuario.documento, placa, dto);
   }
 
   @UseGuards(JwtAuthGuard)
