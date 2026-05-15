@@ -211,13 +211,13 @@ export default function HomeScreen({ navigation }: any) {
               },
             ]}
           >
-            <InfoRow icono="🪪" label="Documento" valor={usuario.documento} colores={colores} />
+            <InfoRow label="Documento" valor={usuario.documento} colores={colores} />
             <View style={[styles.divider, { backgroundColor: colores.borde }]} />
-            <InfoRow icono="📱" label="Teléfono" valor={usuario.numTelf} colores={colores} />
+            <InfoRow label="Teléfono" valor={usuario.numTelf} colores={colores} />
             <View style={[styles.divider, { backgroundColor: colores.borde }]} />
-            <InfoRow icono="🚨" label="Contacto Emergencia" valor={usuario.contactoEmerg} colores={colores} />
+            <InfoRow label="Contacto Emergencia" valor={usuario.contactoEmerg} colores={colores} />
             <View style={[styles.divider, { backgroundColor: colores.borde }]} />
-            <InfoRow icono="🎓" label="Ficha" valor={usuario.idFormacion || 'Sin asignar'} colores={colores} />
+            <InfoRow label="Ficha" valor={usuario.idFormacion || 'Sin asignar'} colores={colores} />
           </View>
         </FadeInView>
       </ScrollView>

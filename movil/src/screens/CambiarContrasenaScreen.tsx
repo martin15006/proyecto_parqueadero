@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, Alert, StyleSheet } from 'react-native';
+import { View, Text, Alert, StyleSheet, Image } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { fonts, espacios } from '../theme/senaTheme';
 import SenaHeader from '../components/SenaHeader';
@@ -9,7 +10,9 @@ import AnimatedButton from '../components/AnimatedButton';
 import FadeInView from '../components/FadeInView';
 import SuccessCheck from '../components/SuccessCheck';
 import { usuarioService } from '../services/usuarioService';
-import { useFocusEffect } from '@react-navigation/native';
+
+// Logo SENA importado correctamente como recurso
+const logoSena = require('../../assets/logoSena.png');
 
 export default function CambiarContrasenaScreen({ navigation }: any) {
   const { colores, esOscuro } = useTheme();
@@ -56,11 +59,10 @@ export default function CambiarContrasenaScreen({ navigation }: any) {
     }
   };
 
+  // Limpiar campos al salir de la pantalla (seguridad)
   useFocusEffect(
     React.useCallback(() => {
-      // Cuando entra a la pantalla
       return () => {
-        // Cuando sale de la pantalla → limpiar
         setContraActual('');
         setContraNueva('');
         setConfirmarContra('');
@@ -69,12 +71,12 @@ export default function CambiarContrasenaScreen({ navigation }: any) {
     }, [])
   );
 
-
   return (
     <View style={[styles.container, { backgroundColor: colores.fondo }]}>
       <SenaHeader
         titulo="Cambiar Contraseña"
-        onMenuPress={() => navigation.openDrawer()}
+        mostrarVolver
+        onBackPress={() => navigation.goBack()}
       />
 
       {esOscuro && <View style={styles.auroraTop} />}
@@ -91,15 +93,21 @@ export default function CambiarContrasenaScreen({ navigation }: any) {
               style={[
                 styles.iconoCirculo,
                 {
-                  backgroundColor: colores.verde,
+                  backgroundColor: '#ffffff',
                   shadowColor: colores.verde,
                   shadowOpacity: esOscuro ? 0.6 : 0.3,
+                  borderColor: colores.verde,
                 },
               ]}
             >
-              <Text style={styles.iconoEmoji}>🔒</Text>
+              <Image
+                source={logoSena}
+                style={styles.iconoImagen}
+                resizeMode="contain"
+              />
             </View>
           </View>
+
           <Text style={[styles.titulo, { color: colores.textoPrimario }]}>
             Actualiza tu contraseña
           </Text>
@@ -180,16 +188,21 @@ const styles = StyleSheet.create({
   },
   iconoContainer: { alignItems: 'center', marginBottom: espacios.medio },
   iconoCirculo: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,
+    borderWidth: 2.5,
+    padding: 8,
   },
-  iconoEmoji: { fontSize: 38 },
+  iconoImagen: {
+    width: '100%',
+    height: '100%',
+  },
   titulo: {
     fontSize: fonts.grande,
     fontWeight: 'bold',
