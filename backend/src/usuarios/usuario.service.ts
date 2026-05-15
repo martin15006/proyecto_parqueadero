@@ -4,6 +4,8 @@ import {
   NotFoundException,
   UnauthorizedException,
   BadRequestException,
+  forwardRef,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
@@ -15,6 +17,7 @@ import { ActualizarPerfilDto } from './dto/actualizar-perfil.dto';
 import * as bcrypt from 'bcrypt';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { MailService } from '../mail/mail.service';
+import { VehiculosService } from '../vehiculos/vehiculos.service';
 
 const ID_TIPO_USUARIO_APP = 1;
 const OTP_EXPIRA_MINUTOS = 5;
@@ -28,6 +31,8 @@ export class UsuarioService {
     private readonly otpRepository: Repository<CodigoOtp>,
     private readonly cloudinaryService: CloudinaryService,
     private readonly mailService: MailService,
+    @Inject(forwardRef(() => VehiculosService))
+    private readonly vehiculosService: VehiculosService,
   ) {}
 
   async create(createUsuarioDto: CreateUsuarioDto): Promise<Omit<Usuario, 'contra'>> {
@@ -92,10 +97,6 @@ export class UsuarioService {
     return { mensaje: 'Contraseña actualizada correctamente' };
   }
 
-  /**
-   * Actualiza datos del perfil (foto, teléfono, contacto emergencia).
-   * Si se cambia la foto, borra la anterior de Cloudinary.
-   */
   async actualizarPerfil(
     documento: string,
     dto: ActualizarPerfilDto,
@@ -105,14 +106,12 @@ export class UsuarioService {
 
     const fotoVieja = usuario.fotoPersona;
 
-    // Aplicar cambios solo de los campos presentes
     if (dto.fotoPersona) usuario.fotoPersona = dto.fotoPersona;
     if (dto.numTelf) usuario.numTelf = dto.numTelf;
     if (dto.contactoEmerg) usuario.contactoEmerg = dto.contactoEmerg;
 
     const guardado = await this.usuarioRepository.save(usuario);
 
-    // Si cambió la foto, borrar la vieja de Cloudinary
     if (dto.fotoPersona && fotoVieja && fotoVieja !== dto.fotoPersona) {
       await this.cloudinaryService.borrarPorUrl(fotoVieja);
     }
@@ -121,10 +120,6 @@ export class UsuarioService {
     return sinContrasena;
   }
 
-  /**
-   * Paso 1 del cambio de correo: envía un OTP al NUEVO correo para verificar
-   * que le pertenece al usuario.
-   */
   async solicitarCambioCorreo(
     documento: string,
     nuevoCorreo: string,
@@ -136,17 +131,14 @@ export class UsuarioService {
       throw new BadRequestException('El nuevo correo debe ser diferente al actual');
     }
 
-    // Verificar que ningún otro usuario tenga ese correo
     const yaExiste = await this.usuarioRepository.findOne({ where: { correo: nuevoCorreo } });
     if (yaExiste) {
       throw new ConflictException('Ese correo ya está registrado por otro usuario');
     }
 
-    // Generar OTP y guardarlo con un identificador especial para cambio de correo
     const codigo = Math.floor(100000 + Math.random() * 900000).toString();
     const expiraEn = new Date(Date.now() + OTP_EXPIRA_MINUTOS * 60 * 1000);
 
-    // Borrar OTPs anteriores del usuario para este propósito
     await this.otpRepository.delete({ documento });
 
     const otp = this.otpRepository.create({
@@ -158,15 +150,11 @@ export class UsuarioService {
     });
     await this.otpRepository.save(otp);
 
-    // Enviar el OTP al NUEVO correo
     await this.mailService.enviarCodigoOtp(nuevoCorreo, codigo, usuario.nombreCompleto);
 
     return { mensaje: `Código enviado a ${nuevoCorreo}. Verifícalo para confirmar el cambio.` };
   }
 
-  /**
-   * Paso 2 del cambio de correo: verifica el OTP y actualiza el correo.
-   */
   async confirmarCambioCorreo(
     documento: string,
     nuevoCorreo: string,
@@ -175,7 +163,6 @@ export class UsuarioService {
     const usuario = await this.usuarioRepository.findOne({ where: { documento } });
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
 
-    // Verificar que el nuevo correo no esté tomado (puede haber pasado desde el paso 1)
     const yaExiste = await this.usuarioRepository.findOne({ where: { correo: nuevoCorreo } });
     if (yaExiste && yaExiste.documento !== documento) {
       throw new ConflictException('Ese correo ya está registrado por otro usuario');
@@ -204,16 +191,53 @@ export class UsuarioService {
       throw new UnauthorizedException('Código incorrecto');
     }
 
-    // Marcar OTP como usado
     otp.usado = true;
     await this.otpRepository.save(otp);
 
-    // Actualizar el correo
     usuario.correo = nuevoCorreo;
     const guardado = await this.usuarioRepository.save(usuario);
 
     const { contra, ...sinContrasena } = guardado;
     return sinContrasena;
+  }
+
+  /**
+   * Busca un usuario por el UUID guardado en su QR.
+   * Devuelve toda la información que el celador necesita para verificar
+   * la identidad y conocer los vehículos del usuario al escanear su QR.
+   *
+   * Este endpoint es consumido por la app del celador.
+   */
+  async buscarPorQR(qr: string): Promise<any> {
+    // Validar formato básico del UUID (mejora seguridad)
+    if (!qr || qr.length < 10) {
+      throw new BadRequestException('Código QR no válido');
+    }
+
+    const usuario = await this.usuarioRepository.findOne({
+      where: { QR: qr },
+    });
+
+    if (!usuario) {
+      throw new NotFoundException('QR no válido o usuario no registrado');
+    }
+
+    // Obtener vehículos del usuario reutilizando el método existente
+    const vehiculos = await this.vehiculosService.listarMisVehiculos(usuario.documento);
+
+    // Devolver SOLO la información que el celador necesita
+    // No incluimos: contraseña, OTPs, datos de admin
+    return {
+      documento: usuario.documento,
+      nombreCompleto: usuario.nombreCompleto,
+      fotoPersona: usuario.fotoPersona,
+      numTelf: usuario.numTelf,
+      contactoEmerg: usuario.contactoEmerg,
+      correo: usuario.correo,
+      idFormacion: usuario.idFormacion,
+      idTipoUsr: usuario.idTipoUsr,
+      vehiculos: vehiculos,
+    };
   }
 
   async findAll(): Promise<Omit<Usuario, 'contra'>[]> {

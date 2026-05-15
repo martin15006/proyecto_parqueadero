@@ -70,6 +70,19 @@ export class UsuariosController {
     );
   }
 
+  /**
+   * Endpoint consumido por el celador cuando escanea el QR del usuario.
+   * Recibe el UUID del QR y devuelve la información del usuario + sus vehículos.
+   *
+   * NOTA: Por ahora es público para facilitar la integración con la app del celador.
+   * Cuando el equipo implemente el login del celador, se debe proteger con un guard
+   * que verifique idTipoUsr=3 (Personal Operativo).
+   */
+  @Get('qr/:uuid')
+  buscarPorQR(@Param('uuid') uuid: string) {
+    return this.usuarioService.buscarPorQR(uuid);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get()
   findAll() {
