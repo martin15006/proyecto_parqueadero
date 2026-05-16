@@ -20,6 +20,7 @@ import FadeInView from '../components/FadeInView';
 import Footer from '../components/Footer';
 import OtpModal from '../components/OtpModal';
 import { Usuario } from '../types/usuario';
+import BotonTema from '../components/BotonTema';
 
 export default function LoginScreen({ navigation }: any) {
   const { iniciarSesion } = useAuth();
@@ -68,9 +69,9 @@ export default function LoginScreen({ navigation }: any) {
           <>
             <View style={styles.auroraTop} />
             <View style={styles.auroraBottom} />
-            <View style={styles.patronPuntos} />
           </>
         )}
+        <BotonTema />
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -79,17 +80,21 @@ export default function LoginScreen({ navigation }: any) {
           <ScrollView
             contentContainerStyle={styles.scroll}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
+            {/* LOGO con wrapper para centrar correctamente */}
             <FadeInView style={styles.logoContainer}>
-              {/* Círculos decorativos detrás del logo */}
-              {esOscuro && (
-                <>
-                  <View style={styles.anilloExterno} />
-                  <View style={styles.anilloInterno} />
-                </>
-              )}
-              <View style={[styles.logoBox, esOscuro && styles.logoBoxGlow]}>
-                <AnimatedLogo size={100} />
+              <View style={styles.logoWrapper}>
+                {/* Círculos decorativos detrás del logo (solo en oscuro) */}
+                {esOscuro && (
+                  <>
+                    <View style={styles.anilloExterno} />
+                    <View style={styles.anilloInterno} />
+                  </>
+                )}
+                <View style={[styles.logoBox, esOscuro && styles.logoBoxGlow]}>
+                  <AnimatedLogo size={90} />
+                </View>
               </View>
             </FadeInView>
 
@@ -97,7 +102,12 @@ export default function LoginScreen({ navigation }: any) {
               <View style={styles.badgeContainer}>
                 <View style={[styles.badge, esOscuro && styles.badgeGlass]}>
                   <View style={styles.badgeDot} />
-                  <Text style={[styles.badgeText, { color: esOscuro ? '#b0f08a' : colores.verdeOscuro }]}>
+                  <Text
+                    style={[
+                      styles.badgeText,
+                      { color: esOscuro ? '#b0f08a' : colores.verdeOscuro },
+                    ]}
+                  >
                     Sistema Activo
                   </Text>
                 </View>
@@ -106,7 +116,9 @@ export default function LoginScreen({ navigation }: any) {
               <Text style={[styles.titulo, { color: colores.textoPrimario }]}>
                 Bienvenido
               </Text>
-              <Text style={[styles.subtitulo, { color: colores.textoSecundario }]}>
+              <Text
+                style={[styles.subtitulo, { color: colores.textoSecundario }]}
+              >
                 Inicia sesión para acceder al parqueadero
               </Text>
 
@@ -145,12 +157,27 @@ export default function LoginScreen({ navigation }: any) {
                   />
                 </View>
 
+                <TouchableOpacity
+                  style={styles.linkOlvido}
+                  onPress={() => navigation.navigate('RecuperarContrasena')}
+                >
+                  <Text
+                    style={[styles.linkOlvidoTexto, { color: colores.verde }]}
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </Text>
+                </TouchableOpacity>
+
                 <View style={styles.filaInferior}>
-                  <Text style={[styles.textoNormal, { color: colores.textoTenue }]}>
+                  <Text
+                    style={[styles.textoNormal, { color: colores.textoTenue }]}
+                  >
                     ¿No tienes cuenta?
                   </Text>
                   <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-                    <Text style={[styles.enlace, { color: colores.verde }]}>Regístrate</Text>
+                    <Text style={[styles.enlace, { color: colores.verde }]}>
+                      Regístrate
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -195,38 +222,46 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,120,50,0.20)',
     opacity: 0.5,
   },
-  patronPuntos: {
-    position: 'absolute',
-    inset: 0,
-    opacity: 0.3,
-  },
   scroll: {
     flexGrow: 1,
     paddingHorizontal: espacios.grande,
     paddingTop: espacios.enorme * 2,
     paddingBottom: espacios.grande,
   },
+
+  // ─── LOGO CENTRADO CORRECTAMENTE ───
   logoContainer: {
     alignItems: 'center',
-    marginBottom: espacios.grande,
+    justifyContent: 'center',
+    marginBottom: espacios.medio,
+  },
+  logoWrapper: {
+    width: 220,
+    height: 220,
+    justifyContent: 'center',
+    alignItems: 'center',
     position: 'relative',
   },
   anilloExterno: {
     position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
     borderWidth: 1.5,
-    borderColor: 'rgba(95,217,36,0.20)',
+    borderColor: 'rgba(95,217,36,0.25)',
     borderStyle: 'dashed',
+    top: 0,
+    left: 0,
   },
   anilloInterno: {
     position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 175,
+    height: 175,
+    borderRadius: 87.5,
     borderWidth: 1,
-    borderColor: 'rgba(95,217,36,0.30)',
+    borderColor: 'rgba(95,217,36,0.35)',
+    top: 22.5,
+    left: 22.5,
   },
   logoBox: {
     width: 120,
@@ -234,16 +269,22 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 2,
   },
   logoBoxGlow: {
-    backgroundColor: 'rgba(57,169,0,0.15)',
+    backgroundColor: 'rgba(57,169,0,0.20)',
     shadowColor: '#5fd924',
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
+    shadowOpacity: 0.7,
+    shadowRadius: 25,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 10,
+    elevation: 15,
   },
-  badgeContainer: { alignItems: 'center', marginBottom: espacios.medio },
+
+  // ─── BADGE "Sistema Activo" ───
+  badgeContainer: {
+    alignItems: 'center',
+    marginBottom: espacios.medio,
+  },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -273,6 +314,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
+
+  // ─── TÍTULOS ───
   titulo: {
     fontSize: fonts.enorme,
     fontWeight: '800',
@@ -285,6 +328,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: espacios.grande,
   },
+
+  // ─── FORM ───
   formContainer: { marginTop: espacios.pequeno },
   filaInferior: {
     flexDirection: 'row',
@@ -295,4 +340,16 @@ const styles = StyleSheet.create({
   },
   textoNormal: { fontSize: fonts.normal },
   enlace: { fontSize: fonts.normal, fontWeight: '700' },
+
+  linkOlvido: {
+    alignItems: 'center',
+    marginTop: espacios.normal,
+    marginBottom: espacios.pequeno,
+    padding: 4,
+  },
+  linkOlvidoTexto: {
+    fontSize: fonts.normal,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
 });

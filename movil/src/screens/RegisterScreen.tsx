@@ -19,6 +19,7 @@ import AnimatedLogo from '../components/AnimatedLogo';
 import FadeInView from '../components/FadeInView';
 import Footer from '../components/Footer';
 import SuccessCheck from '../components/SuccessCheck';
+import BotonTema from '../components/BotonTema';
 
 interface FormState {
   nombreCompleto: string;
@@ -162,6 +163,7 @@ export default function RegisterScreen({ navigation }: any) {
             <View style={styles.auroraBottom} />
           </>
         )}
+        <BotonTema />
 
         <KeyboardAwareScrollView
           contentContainerStyle={styles.scrollContainer}

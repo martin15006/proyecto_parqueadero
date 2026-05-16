@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, LessThan, MoreThan } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -26,7 +26,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
-  ) {}
+  ) { }
 
   /**
    * Paso 1 del login: valida credenciales y envía OTP al correo.
@@ -185,5 +185,152 @@ export class AuthService {
 
   private generarCodigo6Digitos(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+  /**
+ * Paso 1 — Recuperación de contraseña.
+ * Recibe el correo y, si está registrado, envía un OTP al correo.
+ * Por seguridad, devuelve siempre éxito (no revela si el correo existe o no).
+ */
+  async solicitarRecuperacion(correo: string): Promise<{ mensaje: string }> {
+    const usuario = await this.usuarioRepository.findOne({ where: { correo } });
+
+    // No revelamos si el correo existe (medida de seguridad contra enumeración)
+    if (!usuario) {
+      return {
+        mensaje:
+          'Si el correo está registrado, recibirás un código de verificación en breve.',
+      };
+    }
+
+    // Generar OTP de 6 dígitos
+    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiraEn = new Date(Date.now() + 5 * 60 * 1000); // 5 minutos
+
+    // Eliminar OTPs anteriores del usuario para este propósito
+    await this.otpRepository.delete({ documento: usuario.documento });
+
+    const otp = this.otpRepository.create({
+      documento: usuario.documento,
+      codigo,
+      expiraEn,
+      intentos: 0,
+      usado: false,
+    });
+    await this.otpRepository.save(otp);
+
+    // Enviar correo con el código
+    await this.mailService.enviarCodigoOtp(
+      correo,
+      codigo,
+      usuario.nombreCompleto,
+    );
+
+    return {
+      mensaje:
+        'Si el correo está registrado, recibirás un código de verificación en breve.',
+    };
+  }
+
+  /**
+   * Paso 2 — Verificar el OTP de recuperación.
+   * Solo valida que el código sea correcto; NO restablece la contraseña aún.
+   * Esto permite que el usuario vea la pantalla para escribir la nueva contraseña
+   * con la confianza de que el código ya fue verificado.
+   */
+  async verificarRecuperacion(
+    correo: string,
+    codigo: string,
+  ): Promise<{ mensaje: string; valido: boolean }> {
+    const usuario = await this.usuarioRepository.findOne({ where: { correo } });
+
+    if (!usuario) {
+      throw new UnauthorizedException('Código o correo incorrectos');
+    }
+
+    const otp = await this.otpRepository.findOne({
+      where: {
+        documento: usuario.documento,
+        usado: false,
+        expiraEn: MoreThan(new Date()),
+      },
+      order: { creadoEn: 'DESC' },
+    });
+
+    if (!otp) {
+      throw new BadRequestException('No hay código activo. Solicita uno nuevo.');
+    }
+
+    if (otp.intentos >= 3) {
+      throw new UnauthorizedException(
+        'Has agotado los intentos. Solicita un nuevo código.',
+      );
+    }
+
+    if (otp.codigo !== codigo) {
+      otp.intentos += 1;
+      await this.otpRepository.save(otp);
+      throw new UnauthorizedException('Código incorrecto');
+    }
+
+    // NO marcamos el OTP como usado todavía. Eso se hace al restablecer.
+    // Solo confirmamos que es válido.
+    return { mensaje: 'Código verificado correctamente', valido: true };
+  }
+
+  /**
+   * Paso 3 — Restablecer contraseña.
+   * Aquí se valida nuevamente el OTP (por seguridad) y se actualiza la contraseña.
+   * Después de esto, el OTP queda invalidado.
+   */
+  async restablecerContrasena(
+    correo: string,
+    codigo: string,
+    contraNueva: string,
+  ): Promise<{ mensaje: string }> {
+    const usuario = await this.usuarioRepository.findOne({ where: { correo } });
+
+    if (!usuario) {
+      throw new UnauthorizedException('Datos incorrectos');
+    }
+
+    const otp = await this.otpRepository.findOne({
+      where: {
+        documento: usuario.documento,
+        usado: false,
+        expiraEn: MoreThan(new Date()),
+      },
+      order: { creadoEn: 'DESC' },
+    });
+
+    if (!otp) {
+      throw new BadRequestException(
+        'No hay código activo. Solicita un nuevo código de recuperación.',
+      );
+    }
+
+    if (otp.codigo !== codigo) {
+      throw new UnauthorizedException('Código incorrecto');
+    }
+
+    // Validar que la nueva contraseña sea diferente a la actual
+    const esIgual = await bcrypt.compare(contraNueva, usuario.contra);
+    if (esIgual) {
+      throw new BadRequestException(
+        'La nueva contraseña debe ser diferente a la actual',
+      );
+    }
+
+    // Marcar el OTP como usado
+    otp.usado = true;
+    await this.otpRepository.save(otp);
+
+    // Actualizar la contraseña
+    const salt = await bcrypt.genSalt(10);
+    usuario.contra = await bcrypt.hash(contraNueva, salt);
+    await this.usuarioRepository.save(usuario);
+
+    return {
+      mensaje: 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.',
+    };
   }
 }

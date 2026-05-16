@@ -4,14 +4,16 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import RecuperarContrasenaScreen from '../screens/RecuperarContrasenaScreen';
 import AppDrawer from './AppDrawer';
 import { useAuth } from '../context/AuthContext';
-import { colors } from '../theme/senaTheme';
+import { useTheme } from '../context/ThemeContext';
 
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
   const { usuario, cargandoSesion } = useAuth();
+  const { colores } = useTheme();
 
   if (cargandoSesion) {
     return (
@@ -20,10 +22,10 @@ export default function AppNavigator() {
           flex: 1,
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: colors.blanco,
+          backgroundColor: colores.fondo,
         }}
       >
-        <ActivityIndicator size="large" color={colors.verde} />
+        <ActivityIndicator size="large" color={colores.verde} />
       </View>
     );
   }
@@ -42,6 +44,10 @@ export default function AppNavigator() {
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen
+              name="RecuperarContrasena"
+              component={RecuperarContrasenaScreen}
+            />
           </>
         )}
       </Stack.Navigator>

@@ -6,10 +6,13 @@ import { ReenviarOtpDto } from './dto/reenviar-otp.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { SolicitarRecuperacionDto } from './dto/recuperar-contrasena.dto';
+import { VerificarRecuperacionDto } from './dto/verificar-recuperacion.dto';
+import { RestablecerContrasenaDto } from './dto/restablecer-contrasena.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   /**
    * Paso 1 del login: el usuario manda correo + contraseña.
@@ -49,5 +52,24 @@ export class AuthController {
   @Get('me')
   obtenerPerfil(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
     return usuario;
+  }
+
+  @Post('recuperar/solicitar')
+  solicitarRecuperacion(@Body() dto: SolicitarRecuperacionDto) {
+    return this.authService.solicitarRecuperacion(dto.correo);
+  }
+
+  @Post('recuperar/verificar')
+  verificarRecuperacion(@Body() dto: VerificarRecuperacionDto) {
+    return this.authService.verificarRecuperacion(dto.correo, dto.codigo);
+  }
+
+  @Post('recuperar/restablecer')
+  restablecerContrasena(@Body() dto: RestablecerContrasenaDto) {
+    return this.authService.restablecerContrasena(
+      dto.correo,
+      dto.codigo,
+      dto.contraNueva,
+    );
   }
 }
