@@ -10,6 +10,8 @@ import AnimatedButton from '../components/AnimatedButton';
 import FadeInView from '../components/FadeInView';
 import SuccessCheck from '../components/SuccessCheck';
 import { usuarioService } from '../services/usuarioService';
+import MedidorContrasena from '../components/MedidorContrasena';
+import { validarContrasenaSegura } from '../utils/validacionContrasena';
 
 // Logo SENA importado correctamente como recurso
 const logoSena = require('../../assets/logoSena.png');
@@ -26,8 +28,8 @@ export default function CambiarContrasenaScreen({ navigation }: any) {
   const validar = (): boolean => {
     const e: any = {};
     if (!contraActual) e.contraActual = 'Obligatoria';
-    if (!contraNueva) e.contraNueva = 'Obligatoria';
-    else if (contraNueva.length < 6) e.contraNueva = 'Mínimo 6 caracteres';
+    const errorContra = validarContrasenaSegura(contraNueva);
+    if (errorContra) e.contraNueva = errorContra;
     if (contraNueva !== confirmarContra) e.confirmarContra = 'No coinciden';
     if (contraActual && contraActual === contraNueva)
       e.contraNueva = 'Debe ser diferente a la actual';
@@ -130,7 +132,7 @@ export default function CambiarContrasenaScreen({ navigation }: any) {
 
           <AnimatedInput
             label="Nueva Contraseña"
-            placeholder="Mínimo 6 caracteres"
+            placeholder="Crea una contraseña segura"
             secureTextEntry
             value={contraNueva}
             error={errores.contraNueva}
@@ -140,6 +142,9 @@ export default function CambiarContrasenaScreen({ navigation }: any) {
                 setErrores({ ...errores, contraNueva: undefined });
             }}
           />
+
+          {/* Medidor visual de fortaleza */}
+          <MedidorContrasena contrasena={contraNueva} />
 
           <AnimatedInput
             label="Confirmar Nueva Contraseña"

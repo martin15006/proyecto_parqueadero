@@ -20,6 +20,8 @@ import OtpInput from '../components/OtpInput';
 import SuccessCheck from '../components/SuccessCheck';
 import { authService } from '../services/authService';
 import BotonTema from '../components/BotonTema';
+import MedidorContrasena from '../components/MedidorContrasena';
+import { validarContrasenaSegura } from '../utils/validacionContrasena';
 
 type Paso = 'correo' | 'codigo' | 'nueva';
 
@@ -86,11 +88,10 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
     // PASO 3
     const handleRestablecer = async () => {
         const e: any = {};
-        if (!contraNueva) e.contraNueva = 'Obligatoria';
-        else if (contraNueva.length < 6) e.contraNueva = 'Mínimo 6 caracteres';
+        const errorContra = validarContrasenaSegura(contraNueva);
+        if (errorContra) e.contraNueva = errorContra;
         if (contraNueva !== confirmarContra)
             e.confirmarContra = 'Las contraseñas no coinciden';
-        setErrores(e);
         if (Object.keys(e).length > 0) return;
 
         setCargando(true);
@@ -294,7 +295,7 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
 
                                 <AnimatedInput
                                     label="Nueva Contraseña"
-                                    placeholder="Mínimo 6 caracteres"
+                                    placeholder="Crea una contraseña segura"
                                     secureTextEntry
                                     value={contraNueva}
                                     error={errores.contraNueva}
@@ -304,6 +305,9 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
                                             setErrores({ ...errores, contraNueva: undefined });
                                     }}
                                 />
+
+                                {/* Medidor visual de fortaleza */}
+                                <MedidorContrasena contrasena={contraNueva} />
 
                                 <AnimatedInput
                                     label="Confirmar Contraseña"

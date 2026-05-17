@@ -1,4 +1,5 @@
-import { IsEmail, IsNotEmpty, MinLength, Length } from 'class-validator';
+import { IsEmail, IsNotEmpty, Length, IsString } from 'class-validator';
+import { ContrasenaSegura } from '../../common/validators/contrasena-segura.validator';
 
 export class RestablecerContrasenaDto {
   @IsEmail()
@@ -9,7 +10,8 @@ export class RestablecerContrasenaDto {
   @Length(6, 6, { message: 'El código debe tener 6 dígitos' })
   codigo: string;
 
+  @IsString()
   @IsNotEmpty()
-  @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
+  @ContrasenaSegura()
   contraNueva: string;
 }

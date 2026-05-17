@@ -6,6 +6,8 @@ import {
   Alert,
   Image,
   StyleSheet,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as ImagePicker from 'expo-image-picker';
@@ -20,6 +22,8 @@ import FadeInView from '../components/FadeInView';
 import Footer from '../components/Footer';
 import SuccessCheck from '../components/SuccessCheck';
 import BotonTema from '../components/BotonTema';
+import MedidorContrasena from '../components/MedidorContrasena';
+import { validarContrasenaSegura } from '../utils/validacionContrasena';
 
 interface FormState {
   nombreCompleto: string;
@@ -51,6 +55,8 @@ export default function RegisterScreen({ navigation }: any) {
   const [cargando, setCargando] = useState(false);
   const [mensajeCargando, setMensajeCargando] = useState('');
   const [exitoVisible, setExitoVisible] = useState(false);
+  const paddingTopSeguro =
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 50;
 
   const actualizarCampo = (campo: keyof FormState, valor: string) => {
     setForm({ ...form, [campo]: valor });
@@ -110,8 +116,8 @@ export default function RegisterScreen({ navigation }: any) {
     if (!form.correo.trim()) e.correo = 'El correo es obligatorio';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo))
       e.correo = 'Formato inválido';
-    if (!form.contra) e.contra = 'La contraseña es obligatoria';
-    else if (form.contra.length < 6) e.contra = 'Mínimo 6 caracteres';
+    const errorContra = validarContrasenaSegura(form.contra);
+    if (errorContra) e.contra = errorContra;
     if (form.contra !== form.confirmarContra) e.confirmarContra = 'No coinciden';
     if (!form.numTelf.trim()) e.numTelf = 'El teléfono es obligatorio';
     else if (!/^[0-9]{10}$/.test(form.numTelf)) e.numTelf = '10 dígitos';
@@ -171,11 +177,10 @@ export default function RegisterScreen({ navigation }: any) {
           enableOnAndroid={true}
           extraScrollHeight={20}
         >
-          <View style={styles.container}>
+          <View style={[styles.container, { paddingTop: paddingTopSeguro }]}>
             <FadeInView style={styles.logoContainer}>
               <AnimatedLogo size={70} pulse={false} />
             </FadeInView>
-
             <FadeInView delay={150}>
               <Text style={[styles.titulo, { color: colores.textoPrimario }]}>Registro</Text>
 
@@ -244,24 +249,6 @@ export default function RegisterScreen({ navigation }: any) {
               />
 
               <AnimatedInput
-                label="Contraseña"
-                placeholder="Mínimo 6 caracteres"
-                secureTextEntry
-                value={form.contra}
-                error={errores.contra}
-                onChangeText={(v) => actualizarCampo('contra', v)}
-              />
-
-              <AnimatedInput
-                label="Confirmar Contraseña"
-                placeholder="Repite la contraseña"
-                secureTextEntry
-                value={form.confirmarContra}
-                error={errores.confirmarContra}
-                onChangeText={(v) => actualizarCampo('confirmarContra', v)}
-              />
-
-              <AnimatedInput
                 label="Número Telefónico"
                 placeholder="3001234567"
                 keyboardType="phone-pad"
@@ -289,6 +276,28 @@ export default function RegisterScreen({ navigation }: any) {
                 value={form.idFormacion}
                 error={errores.idFormacion}
                 onChangeText={(v) => actualizarCampo('idFormacion', v)}
+              />
+
+              {/* ─── CONTRASEÑAS AL FINAL ─── */}
+              <AnimatedInput
+                label="Contraseña"
+                placeholder="Crea una contraseña segura"
+                secureTextEntry
+                value={form.contra}
+                error={errores.contra}
+                onChangeText={(v) => actualizarCampo('contra', v)}
+              />
+
+              {/* Medidor de fortaleza - solo aparece al escribir */}
+              <MedidorContrasena contrasena={form.contra} />
+
+              <AnimatedInput
+                label="Confirmar Contraseña"
+                placeholder="Repite la contraseña"
+                secureTextEntry
+                value={form.confirmarContra}
+                error={errores.confirmarContra}
+                onChangeText={(v) => actualizarCampo('confirmarContra', v)}
               />
 
               <View style={{ marginTop: 16 }}>
@@ -339,7 +348,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,120,50,0.15)',
   },
   scrollContainer: { flexGrow: 1 },
-  container: { padding: espacios.grande, paddingTop: espacios.enorme },
+  container: {
+    paddingHorizontal: espacios.grande,
+    paddingBottom: espacios.grande,
+  },
   logoContainer: { alignItems: 'center', marginBottom: espacios.medio },
   titulo: {
     fontSize: fonts.enorme,

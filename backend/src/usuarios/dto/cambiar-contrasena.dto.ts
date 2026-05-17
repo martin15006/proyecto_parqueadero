@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, MinLength } from 'class-validator';
+import { IsString, IsNotEmpty } from 'class-validator';
+import { ContrasenaSegura } from '../../common/validators/contrasena-segura.validator';
 
 export class CambiarContrasenaDto {
   @IsString()
@@ -6,7 +7,7 @@ export class CambiarContrasenaDto {
   contraActual: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'La nueva contraseña es obligatoria' })
-  @MinLength(6, { message: 'La nueva contraseña debe tener al menos 6 caracteres' })
+  @IsNotEmpty()
+  @ContrasenaSegura()
   contraNueva: string;
 }

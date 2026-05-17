@@ -7,6 +7,10 @@ import {
   IsOptional,
   MinLength,
 } from 'class-validator';
+import { ContrasenaSegura } from '../../common/validators/contrasena-segura.validator';
+
+// ...dentro de la clase del DTO:
+
 
 export class CreateUsuarioDto {
   @IsString()
@@ -43,8 +47,8 @@ export class CreateUsuarioDto {
   correo: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'La contraseña es obligatoria' })
-  @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
+  @IsNotEmpty()
+  @ContrasenaSegura()
   contra: string;
 
   @IsString()

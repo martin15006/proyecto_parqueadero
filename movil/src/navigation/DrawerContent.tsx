@@ -174,7 +174,6 @@ export default function DrawerContent(props: any) {
           onPress={handleLogout}
           activeOpacity={0.7}
         >
-          <Text style={styles.iconoCerrar}>🚪</Text>
           <Text style={[styles.textoCerrar, { color: colores.error }]}>
             Cerrar Sesión
           </Text>
@@ -300,6 +299,5 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 12,
   },
-  iconoCerrar: { fontSize: 22, marginRight: espacios.normal },
   textoCerrar: { fontSize: fonts.medio, fontWeight: 'bold' },
 });

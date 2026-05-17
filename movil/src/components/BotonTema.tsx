@@ -3,6 +3,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  Text,
   Platform,
   StatusBar,
 } from 'react-native';
@@ -50,25 +51,16 @@ export default function BotonTema() {
     <Animated.View
       style={[
         styles.contenedor,
-        {
-          top: topSeguro,
-          transform: [{ scale: escala }],
-        },
+        { top: topSeguro, transform: [{ scale: escala }] },
       ]}
     >
       <TouchableOpacity
         onPress={handlePress}
         activeOpacity={0.7}
-        style={[
-          styles.boton,
-          esOscuro ? styles.botonOscuro : styles.botonClaro,
-        ]}
+        style={[styles.boton, esOscuro ? styles.botonOscuro : styles.botonClaro]}
       >
         <Animated.Text
-          style={[
-            styles.emoji,
-            { transform: [{ rotate: rotacionInterpolada }] },
-          ]}
+          style={[styles.emoji, { transform: [{ rotate: rotacionInterpolada }] }]}
         >
           {esOscuro ? '🌙' : '☀️'}
         </Animated.Text>
@@ -91,7 +83,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1.5,
   },
-  // Modo claro: fondo BLANCO con borde verde sutil
   botonClaro: {
     backgroundColor: '#ffffff',
     borderColor: 'rgba(57,169,0,0.25)',
@@ -101,7 +92,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
   },
-  // Modo oscuro: fondo verde semitransparente con borde verde brillante
   botonOscuro: {
     backgroundColor: 'rgba(95,217,36,0.15)',
     borderColor: 'rgba(95,217,36,0.50)',

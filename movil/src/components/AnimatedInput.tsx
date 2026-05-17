@@ -1,10 +1,11 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
-  TextInput,
   View,
   Text,
-  Animated,
+  TextInput,
   StyleSheet,
+  Animated,
+  TouchableOpacity,
   TextInputProps,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
@@ -15,104 +16,119 @@ interface Props extends TextInputProps {
   error?: string;
 }
 
-export default function AnimatedInput({ label, error, ...rest }: Props) {
+export default function AnimatedInput({
+  label,
+  error,
+  secureTextEntry,
+  value,
+  ...rest
+}: Props) {
   const { colores, esOscuro } = useTheme();
-  const [focused, setFocused] = useState(false);
-  const lineAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(lineAnim, {
-      toValue: focused ? 1 : 0,
-      duration: 250,
-      useNativeDriver: false,
-    }).start();
-  }, [focused]);
+  const [focused, setFocused] = useState(false);
+  const [mostrarContrasena, setMostrarContrasena] = useState(false);
 
   useEffect(() => {
     if (error) {
       Animated.sequence([
-        Animated.timing(shakeAnim, { toValue: 8, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -8, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 6, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -6, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
         Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
       ]).start();
     }
   }, [error]);
 
+  const esContrasena = !!secureTextEntry;
+  const secureFinal = esContrasena && !mostrarContrasena;
+
+  const borderColor = error
+    ? colores.error
+    : focused
+      ? colores.verde
+      : colores.borde;
+
+  const renderOjito = () => {
+    if (!esContrasena) return null;
+    return (
+      <TouchableOpacity
+        style={styles.ojitoBoton}
+        onPress={() => setMostrarContrasena(!mostrarContrasena)}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Text style={styles.ojitoEmoji}>{mostrarContrasena ? '🫣' : '🙈'}</Text>
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <Animated.View style={[styles.container, { transform: [{ translateX: shakeAnim }] }]}>
-      <Text style={[styles.label, { color: error ? colores.error : colores.textoSecundario }]}>
-        {label}
-      </Text>
+    <Animated.View style={[styles.contenedor, { transform: [{ translateX: shakeAnim }] }]}>
+      <Text style={[styles.label, { color: colores.textoPrimario }]}>{label}</Text>
       <View
         style={[
-          styles.inputWrapper,
+          styles.inputContainer,
           {
             backgroundColor: esOscuro ? colores.glassFondo : colores.superficie,
-            borderColor: error
-              ? colores.error
-              : focused
-                ? colores.verde
-                : colores.borde,
+            borderColor: borderColor,
+            borderWidth: focused || error ? 2 : 1,
           },
         ]}
       >
         <TextInput
-          style={[styles.input, { color: colores.textoPrimario }]}
-          placeholderTextColor={colores.textoTenue}
+          {...rest}
+          value={value}
+          secureTextEntry={secureFinal}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          {...rest}
-        />
-        <Animated.View
+          placeholderTextColor={colores.textoTenue}
           style={[
-            styles.lineaFocus,
+            styles.input,
             {
-              backgroundColor: error ? colores.error : colores.verde,
-              width: lineAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0%', '100%'],
-              }),
+              color: colores.textoPrimario,
+              paddingRight: esContrasena ? 44 : espacios.normal,
             },
           ]}
         />
+        {renderOjito()}
       </View>
-      {error && (
-        <Text style={[styles.textoError, { color: colores.error }]}>{error}</Text>
-      )}
+      {error ? <Text style={[styles.error, { color: colores.error }]}>{error}</Text> : null}
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { marginBottom: espacios.medio },
-  label: {
-    fontSize: fonts.pequeno,
-    marginBottom: 6,
-    fontWeight: '600',
-    letterSpacing: 0.3,
+  contenedor: {
+    marginBottom: espacios.normal,
   },
-  inputWrapper: {
+  label: {
+    fontSize: fonts.normal,
+    fontWeight: '600',
+    marginBottom: 6,
+    marginLeft: 4,
+  },
+  inputContainer: {
     borderRadius: 12,
-    borderWidth: 1.5,
-    overflow: 'hidden',
     position: 'relative',
+    justifyContent: 'center',
   },
   input: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: espacios.normal,
+    paddingVertical: 14,
     fontSize: fonts.normal,
-    fontFamily: undefined,
   },
-  lineaFocus: {
+  ojitoBoton: {
     position: 'absolute',
+    right: 12,
+    top: 0,
     bottom: 0,
-    left: 0,
-    height: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 32,
   },
-  textoError: {
+  ojitoEmoji: {
+    fontSize: 20,
+  },
+  error: {
     fontSize: fonts.pequeno,
     marginTop: 4,
     marginLeft: 4,
