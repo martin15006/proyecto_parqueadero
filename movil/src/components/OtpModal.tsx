@@ -10,11 +10,15 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import OtpInput from './OtpInput';
 import { useTheme } from '../context/ThemeContext';
 import { fonts, espacios, animaciones } from '../theme/senaTheme';
 import { authService } from '../services/authService';
+
+// Logo SENA importado correctamente como recurso
+const logoSena = require('../../assets/logoSena.png');
 
 interface Props {
   visible: boolean;
@@ -161,17 +165,23 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
               ]}
             />
 
+            {/* ─── LOGO SENA con círculo blanco y borde verde ─── */}
             <View
               style={[
                 styles.iconoCircular,
                 {
-                  backgroundColor: colores.verde,
+                  backgroundColor: '#ffffff',
                   shadowColor: colores.verde,
                   shadowOpacity: esOscuro ? 0.6 : 0.4,
+                  borderColor: colores.verde,
                 },
               ]}
             >
-              <Text style={styles.iconoEmoji}>📧</Text>
+              <Image
+                source={logoSena}
+                style={styles.iconoImagen}
+                resizeMode="contain"
+              />
             </View>
 
             <Text style={[styles.titulo, { color: colores.textoPrimario }]}>
@@ -276,18 +286,24 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
   },
+  // ─── ICONO ACTUALIZADO PARA EL LOGO SENA ───
   iconoCircular: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: espacios.normal,
     elevation: 5,
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 8,
+    borderWidth: 2.5,
+    padding: 8,
   },
-  iconoEmoji: { fontSize: 32 },
+  iconoImagen: {
+    width: '100%',
+    height: '100%',
+  },
   titulo: {
     fontSize: fonts.titulo,
     fontWeight: '800',
