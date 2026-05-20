@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { Module, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -15,6 +16,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
+      envFilePath: path.resolve(__dirname, '..', '..', '.env'),
       isGlobal: true,
     }),
     TypeOrmModule.forRootAsync({
@@ -25,7 +27,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
         host: configService.get<string>('DB_HOST'),
         port: parseInt(configService.get<string>('DB_PORT') ?? '5432', 10),
         username: configService.get<string>('DB_USERNAME'),
-        password: String(configService.get('DB_PASSWORD') ?? ''),
+        password: String(configService.get<string>('DB_PASSWORD') ?? ''),
         database: configService.get<string>('DB_NAME'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false,

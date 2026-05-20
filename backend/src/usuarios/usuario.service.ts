@@ -19,7 +19,6 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { MailService } from '../mail/mail.service';
 import { VehiculosService } from '../vehiculos/vehiculos.service';
 
-const ID_TIPO_USUARIO_APP = 1;
 const OTP_EXPIRA_MINUTOS = 5;
 
 @Injectable()
@@ -58,7 +57,8 @@ export class UsuarioService {
       const nuevoUsuario = this.usuarioRepository.create({
         ...createUsuarioDto,
         contra: hashedPassword,
-        idTipoUsr: ID_TIPO_USUARIO_APP,
+        idTipoUsr: createUsuarioDto.idTipoUsr,
+        idFormacion: createUsuarioDto.idFormacion ?? null,
         QR: qrValue,
       });
 

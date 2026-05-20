@@ -6,12 +6,14 @@ import { Usuario } from './entities/usuario.entity';
 import { CodigoOtp } from './entities/codigo-otp.entity';
 import { MailModule } from '../mail/mail.module';
 import { VehiculosModule } from '../vehiculos/vehiculos.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Usuario, CodigoOtp]),
     MailModule,
     forwardRef(() => VehiculosModule),
+    AuthModule,
   ],
   controllers: [UsuariosController],
   providers: [UsuarioService],

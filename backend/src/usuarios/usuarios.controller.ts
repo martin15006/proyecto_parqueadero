@@ -6,8 +6,12 @@ import {
   Param,
   UseGuards,
   Patch,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { UsuarioService } from './usuario.service';
+import { AuthService } from '../auth/auth.service';
+import { LoginDto } from './dto/login.dto';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { CambiarContrasenaDto } from './dto/cambiar-contrasena.dto';
 import { ActualizarPerfilDto } from './dto/actualizar-perfil.dto';
@@ -19,11 +23,20 @@ import { Usuario } from './entities/usuario.entity';
 
 @Controller('usuarios')
 export class UsuariosController {
-  constructor(private readonly usuarioService: UsuarioService) {}
+  constructor(
+    private readonly usuarioService: UsuarioService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Post()
   create(@Body() createUsuarioDto: CreateUsuarioDto) {
     return this.usuarioService.create(createUsuarioDto);
+  }
+
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  login(@Body() loginDto: LoginDto) {
+    return this.authService.loginPaso1(loginDto);
   }
 
   @UseGuards(JwtAuthGuard)

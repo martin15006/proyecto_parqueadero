@@ -6,15 +6,45 @@ import * as nodemailer from 'nodemailer';
 export class MailService {
   private readonly logger = new Logger(MailService.name);
   private transporter: nodemailer.Transporter;
+  private disabled = false;
 
   constructor(private readonly configService: ConfigService) {
-    this.transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: this.configService.get<string>('MAIL_USER'),
-        pass: this.configService.get<string>('MAIL_PASSWORD'),
-      },
-    });
+    const disableEnv = this.configService.get<string>('DISABLE_EMAILS') ?? this.configService.get<boolean>('DISABLE_EMAILS');
+    this.disabled = disableEnv === 'true' || disableEnv === true;
+
+    const mailUser = this.configService.get<string>('MAIL_USER');
+    const mailPassword = this.configService.get<string>('MAIL_PASSWORD');
+    const mailHost = this.configService.get<string>('MAIL_HOST');
+    const mailPort = this.configService.get<number>('MAIL_PORT');
+    const mailSecure = this.configService.get<boolean>('MAIL_SECURE');
+
+    if (this.disabled || !mailUser || !mailPassword) {
+      this.disabled = true;
+      this.logger.log(
+        'Modo de desarrollo activado: envío de correos deshabilitado porque faltan credenciales SMTP o DISABLE_EMAILS=true.',
+      );
+      return;
+    }
+
+    const transportOptions: any = mailHost
+      ? {
+          host: mailHost,
+          port: mailPort ?? 587,
+          secure: mailSecure ?? false,
+          auth: {
+            user: mailUser,
+            pass: mailPassword,
+          },
+        }
+      : {
+          service: 'gmail',
+          auth: {
+            user: mailUser,
+            pass: mailPassword,
+          },
+        };
+
+    this.transporter = nodemailer.createTransport(transportOptions);
   }
 
   /**
@@ -25,6 +55,12 @@ export class MailService {
     const remitenteCorreo = this.configService.get<string>('MAIL_USER');
 
     const html = this.plantillaHtml(codigo, nombreUsuario);
+
+    if (this.disabled) {
+      // En entorno de desarrollo no enviamos correos: registramos el OTP en logs.
+      this.logger.log(`DEV MAIL - OTP para ${destinatario}: ${codigo}`);
+      return;
+    }
 
     try {
       await this.transporter.sendMail({

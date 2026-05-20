@@ -1,3 +1,4 @@
+import { Transform, Type } from 'class-transformer';
 import {
   IsString,
   IsEmail,
@@ -6,6 +7,8 @@ import {
   Matches,
   IsOptional,
   MinLength,
+  IsInt,
+  Min,
 } from 'class-validator';
 import { ContrasenaSegura } from '../../common/validators/contrasena-segura.validator';
 
@@ -52,8 +55,22 @@ export class CreateUsuarioDto {
   contra: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'La ficha es obligatoria' })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      const trimmedValue = value.trim();
+      return trimmedValue === '' ? undefined : trimmedValue;
+    }
+    return value;
+  })
   @Length(7, 7, { message: 'La ficha debe tener exactamente 7 caracteres' })
   @Matches(/^[0-9]+$/, { message: 'La ficha solo puede contener números' })
-  idFormacion: string;
+  idFormacion?: string;
+
+  @Type(() => Number)
+  @IsInt({ message: 'El tipo de usuario debe ser un número válido' })
+  @Min(1, { message: 'El tipo de usuario debe ser mayor o igual a 1' })
+  @IsNotEmpty({ message: 'El tipo de usuario es obligatorio' })
+  idTipoUsr: number;
+
 }
