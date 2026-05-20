@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "typeorm-ts-node-commonjs": "^0.3.20"
+  }
+}
