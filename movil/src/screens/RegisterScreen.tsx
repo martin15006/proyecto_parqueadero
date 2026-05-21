@@ -24,6 +24,9 @@ import SuccessCheck from '../components/SuccessCheck';
 import BotonTema from '../components/BotonTema';
 import MedidorContrasena from '../components/MedidorContrasena';
 import { validarContrasenaSegura } from '../utils/validacionContrasena';
+import OtpModal from '../components/OtpModal';
+import { useAuth } from '../context/AuthContext';
+import { Usuario } from '../types/usuario';
 
 interface FormState {
   nombreCompleto: string;
@@ -55,6 +58,9 @@ export default function RegisterScreen({ navigation }: any) {
   const [cargando, setCargando] = useState(false);
   const [mensajeCargando, setMensajeCargando] = useState('');
   const [exitoVisible, setExitoVisible] = useState(false);
+  const { iniciarSesion } = useAuth();
+  const [modalOtpVisible, setModalOtpVisible] = useState(false);
+  const [correoRegistrado, setCorreoRegistrado] = useState('');
   const paddingTopSeguro =
     Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 50;
 
@@ -136,6 +142,7 @@ export default function RegisterScreen({ navigation }: any) {
     try {
       setMensajeCargando('Subiendo foto...');
       const urlFoto = await subirImagen(fotoLocal!);
+
       setMensajeCargando('Registrando...');
       await usuarioService.registrar({
         documento: form.documento,
@@ -147,17 +154,37 @@ export default function RegisterScreen({ navigation }: any) {
         contra: form.contra,
         idFormacion: form.idFormacion,
       });
-      setExitoVisible(true);
-      setTimeout(() => {
-        setExitoVisible(false);
-        navigation.navigate('Login');
-      }, 1800);
+
+      // ─── Abrir el modal para verificar que el correo existe ───
+      setCorreoRegistrado(form.correo);
+      setModalOtpVisible(true);
     } catch (error: any) {
       Alert.alert('Error en el registro', error.message);
     } finally {
       setCargando(false);
       setMensajeCargando('');
     }
+  };
+
+  // Cuando se verifica el OTP correctamente, iniciar sesión automáticamente
+  const handleOtpExito = async (token: string, usuarioData: Usuario) => {
+    setModalOtpVisible(false);
+    await iniciarSesion(usuarioData, token);
+  };
+
+  // Si el usuario cancela el OTP
+  const handleOtpCerrar = () => {
+    setModalOtpVisible(false);
+    Alert.alert(
+      'Verificación pendiente',
+      'Tu cuenta fue creada pero debes verificar tu correo. Inicia sesión cuando quieras completar la verificación.',
+      [
+        {
+          text: 'Ir a Login',
+          onPress: () => navigation.navigate('Login'),
+        },
+      ],
+    );
   };
 
   return (
@@ -323,6 +350,14 @@ export default function RegisterScreen({ navigation }: any) {
         </KeyboardAwareScrollView>
       </View>
       <SuccessCheck visible={exitoVisible} mensaje="¡Registro exitoso!" />
+
+      {/* Modal del OTP para verificar el correo */}
+      <OtpModal
+        visible={modalOtpVisible}
+        correo={correoRegistrado}
+        onCerrar={handleOtpCerrar}
+        onExito={handleOtpExito}
+      />
     </>
   );
 }
