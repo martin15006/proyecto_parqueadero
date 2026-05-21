@@ -1,14 +1,6 @@
--- ════════════════════════════════════════════════════════════════════════
--- BASE DE DATOS: parqueadero
--- Proyecto: Parqueadero SENA
--- Versión: 1.1 (Incluye codigo_otp para autenticación 2FA)
--- ════════════════════════════════════════════════════════════════════════
+
 
 CREATE DATABASE parqueadero;
-
--- ════════════════════════════════════════════════════════════════════════
--- TIPOS ENUM
--- ════════════════════════════════════════════════════════════════════════
 
 CREATE TYPE jornadas AS ENUM (
     'MAÑANA',
@@ -20,10 +12,6 @@ CREATE TYPE estado_mov AS ENUM (
     'ADENTRO',
     'SALIDA'
 );
-
--- ════════════════════════════════════════════════════════════════════════
--- TABLAS DE CATÁLOGO (tipos)
--- ════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE tipo_bahia (
     idTipoB SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -44,10 +32,6 @@ CREATE TABLE tipo_usuario (
     idTipoUsr SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     tipoUsr VARCHAR(20) UNIQUE NOT NULL
 );
-
--- ════════════════════════════════════════════════════════════════════════
--- TABLAS PRINCIPALES
--- ════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE formacion (
     ficha VARCHAR(7) PRIMARY KEY,
@@ -146,10 +130,6 @@ CREATE TABLE movimiento_vehiculo (
     ON UPDATE CASCADE
 );
 
--- ════════════════════════════════════════════════════════════════════════
--- TABLA DE CÓDIGOS OTP (autenticación 2FA por correo)
--- ════════════════════════════════════════════════════════════════════════
-
 CREATE TABLE codigo_otp (
     idOtp INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     documento VARCHAR(10) NOT NULL,
@@ -165,9 +145,4 @@ CREATE TABLE codigo_otp (
     ON UPDATE CASCADE
 );
 
--- Índice para acelerar la búsqueda del OTP más reciente por usuario
 CREATE INDEX idx_otp_documento ON codigo_otp(documento);
-
--- ════════════════════════════════════════════════════════════════════════
--- DATOS SEED (datos mínimos para que la app funcione)
--- ════════════════════════════════════════════════════════════════════════
