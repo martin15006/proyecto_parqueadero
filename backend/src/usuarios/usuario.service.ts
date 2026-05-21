@@ -19,6 +19,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { MailService } from '../mail/mail.service';
 import { VehiculosService } from '../vehiculos/vehiculos.service';
 
+const ID_TIPO_USUARIO_APP = 1;
 const OTP_EXPIRA_MINUTOS = 5;
 
 @Injectable()
@@ -34,6 +35,11 @@ export class UsuarioService {
     private readonly vehiculosService: VehiculosService,
   ) {}
 
+  /**
+   * Crea un nuevo usuario y envía un código OTP a su correo para verificarlo.
+   * El usuario queda creado en la BD pero debe verificar el OTP antes de
+   * poder iniciar sesión.
+   */
   async create(createUsuarioDto: CreateUsuarioDto): Promise<Omit<Usuario, 'contra'>> {
     const usuarioExistenteDoc = await this.usuarioRepository.findOne({
       where: { documento: createUsuarioDto.documento },
@@ -57,12 +63,31 @@ export class UsuarioService {
       const nuevoUsuario = this.usuarioRepository.create({
         ...createUsuarioDto,
         contra: hashedPassword,
-        idTipoUsr: createUsuarioDto.idTipoUsr,
-        idFormacion: createUsuarioDto.idFormacion ?? null,
+        idTipoUsr: ID_TIPO_USUARIO_APP,
         QR: qrValue,
       });
 
       const usuarioGuardado = await this.usuarioRepository.save(nuevoUsuario);
+
+      // ─── Generar y enviar OTP de verificación al correo recién registrado ───
+      const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiraEn = new Date(Date.now() + OTP_EXPIRA_MINUTOS * 60 * 1000);
+
+      const otp = this.otpRepository.create({
+        documento: usuarioGuardado.documento,
+        codigo,
+        expiraEn,
+        intentos: 0,
+        usado: false,
+      });
+      await this.otpRepository.save(otp);
+
+      await this.mailService.enviarCodigoOtp(
+        usuarioGuardado.correo,
+        codigo,
+        usuarioGuardado.nombreCompleto,
+      );
+
       const { contra, ...usuarioSinContrasena } = usuarioGuardado;
       return usuarioSinContrasena;
     } catch (error: any) {
@@ -203,13 +228,9 @@ export class UsuarioService {
 
   /**
    * Busca un usuario por el UUID guardado en su QR.
-   * Devuelve toda la información que el celador necesita para verificar
-   * la identidad y conocer los vehículos del usuario al escanear su QR.
-   *
-   * Este endpoint es consumido por la app del celador.
+   * Endpoint consumido por la app del celador.
    */
   async buscarPorQR(qr: string): Promise<any> {
-    // Validar formato básico del UUID (mejora seguridad)
     if (!qr || qr.length < 10) {
       throw new BadRequestException('Código QR no válido');
     }
@@ -222,11 +243,8 @@ export class UsuarioService {
       throw new NotFoundException('QR no válido o usuario no registrado');
     }
 
-    // Obtener vehículos del usuario reutilizando el método existente
     const vehiculos = await this.vehiculosService.listarMisVehiculos(usuario.documento);
 
-    // Devolver SOLO la información que el celador necesita
-    // No incluimos: contraseña, OTPs, datos de admin
     return {
       documento: usuario.documento,
       nombreCompleto: usuario.nombreCompleto,
