@@ -1,8 +1,9 @@
-import { Controller, Post, Body, UseGuards, Get, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, HttpCode, HttpStatus, Request } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from '../usuarios/dto/login.dto';
 import { VerificarOtpDto } from './dto/verificar-otp.dto';
 import { ReenviarOtpDto } from './dto/reenviar-otp.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -26,7 +27,8 @@ export class AuthController {
 
   /**
    * Paso 2 del login: el usuario manda el código OTP.
-   * Si es correcto, se le devuelve el JWT.
+   * MOBILE_API: Al verificar con éxito, devuelve tokens de larga duración para mobile.
+   * SERIALIZATION: Excluye datos sensibles del objeto 'usuario' retornado.
    */
   @Post('verificar-otp')
   @HttpCode(HttpStatus.OK)
@@ -44,9 +46,35 @@ export class AuthController {
   }
 
   /**
+   * Renueva el Access Token usando un Refresh Token válido.
+   * MOBILE_API: Endpoint vital para persistencia de sesión sin fricción (Silent Refresh).
+   */
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.renovarToken(dto.refreshToken);
+  }
+
+  /**
+   * Cierra la sesión revocando el Refresh Token y el Access Token actual.
+   * MOBILE_API: Limpia la sesión tanto en servidor como en el almacenamiento del dispositivo.
+   */
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(@Body() dto: RefreshTokenDto, @Request() req: any) {
+    // Revocar Access Token si se proporciona en el header
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      const token = authHeader.split(' ')[1];
+      await this.authService.revocarAccessToken(token);
+    }
+    
+    return this.authService.logout(dto.refreshToken);
+  }
+
+  /**
    * Endpoint protegido para verificar si el JWT sigue siendo válido.
-   * Devuelve los datos del usuario logueado.
-   * Útil para que la app verifique al iniciar si la sesión sigue activa.
+   * MOBILE_API: Usado en el splash screen o App State para validar sesión al despertar la app.
    */
   @UseGuards(JwtAuthGuard)
   @Get('me')

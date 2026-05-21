@@ -1,10 +1,24 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
+import { Vehiculo } from './vehiculo.entity';
 
 @Entity({ name: 'tipo_vehiculo' })
 export class TipoVehiculo {
-  @PrimaryGeneratedColumn({ name: 'idtipov' })
+  @PrimaryGeneratedColumn({ type: 'smallint' })
   idTipoV: number;
 
-  @Column({ name: 'tipovehiculo', type: 'varchar', length: 30 })
+  @Column({ length: 30 })
   tipoVehiculo: string;
+
+  // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
+  @CreateDateColumn({ type: 'timestamptz' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updatedAt: Date;
+
+  @DeleteDateColumn({ type: 'timestamptz', nullable: true })
+  deletedAt: Date;
+
+  @OneToMany(() => Vehiculo, (vehiculo) => vehiculo.tipoVehiculo)
+  vehiculos: Vehiculo[];
 }

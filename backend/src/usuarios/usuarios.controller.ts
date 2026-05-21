@@ -8,7 +8,9 @@ import {
   Patch,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UsuarioService } from './usuario.service';
 import { AuthService } from '../auth/auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -20,7 +22,11 @@ import { ConfirmarCambioCorreoDto } from './dto/confirmar-cambio-correo.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Usuario } from './entities/usuario.entity';
+import { Roles } from '../common/decorators/roles.decorator';
+import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
+import type { IJwtPayload } from '../common/interfaces/auth.interface';
 
+@ApiTags('usuarios')
 @Controller('usuarios')
 export class UsuariosController {
   constructor(
@@ -29,6 +35,8 @@ export class UsuariosController {
   ) {}
 
   @Post()
+  @ApiOperation({ summary: 'Registrar un nuevo usuario' })
+  @ApiResponse({ status: 201, description: 'Usuario creado exitosamente' })
   create(@Body() createUsuarioDto: CreateUsuarioDto) {
     return this.usuarioService.create(createUsuarioDto);
   }
@@ -42,11 +50,11 @@ export class UsuariosController {
   @UseGuards(JwtAuthGuard)
   @Patch('cambiar-contrasena')
   cambiarContrasena(
-    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @CurrentUser() usuario: IJwtPayload,
     @Body() dto: CambiarContrasenaDto,
   ) {
     return this.usuarioService.cambiarContrasena(
-      usuario.documento,
+      usuario.sub,
       dto.contraActual,
       dto.contraNueva,
     );
@@ -55,54 +63,71 @@ export class UsuariosController {
   @UseGuards(JwtAuthGuard)
   @Patch('perfil')
   actualizarPerfil(
-    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @CurrentUser() usuario: IJwtPayload,
     @Body() dto: ActualizarPerfilDto,
   ) {
-    return this.usuarioService.actualizarPerfil(usuario.documento, dto);
+    return this.usuarioService.actualizarPerfil(usuario.sub, dto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('correo/solicitar')
   solicitarCambioCorreo(
-    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @CurrentUser() usuario: IJwtPayload,
     @Body() dto: SolicitarCambioCorreoDto,
   ) {
-    return this.usuarioService.solicitarCambioCorreo(usuario.documento, dto.nuevoCorreo);
+    return this.usuarioService.solicitarCambioCorreo(usuario.sub, dto.nuevoCorreo);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('correo/confirmar')
   confirmarCambioCorreo(
-    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @CurrentUser() usuario: IJwtPayload,
     @Body() dto: ConfirmarCambioCorreoDto,
   ) {
     return this.usuarioService.confirmarCambioCorreo(
-      usuario.documento,
+      usuario.sub,
       dto.nuevoCorreo,
       dto.codigo,
     );
   }
 
-  /**
-   * Endpoint consumido por el celador cuando escanea el QR del usuario.
-   * Recibe el UUID del QR y devuelve la información del usuario + sus vehículos.
-   *
-   * NOTA: Por ahora es público para facilitar la integración con la app del celador.
-   * Cuando el equipo implemente el login del celador, se debe proteger con un guard
-   * que verifique idTipoUsr=3 (Personal Operativo).
-   */
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('qr/regenerar')
+  @ApiOperation({ summary: 'Regenerar el código QR del usuario (Seguridad Dinámica)' })
+  regenerarQr(@CurrentUser() usuario: IJwtPayload) {
+    return this.usuarioService.regenerarQr(usuario.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('push-token')
+  @ApiOperation({ summary: 'Actualizar token de notificaciones push (Firebase)' })
+  actualizarTokenPush(@CurrentUser() usuario: IJwtPayload, @Body('token') token: string) {
+    return this.usuarioService.actualizarTokenPush(usuario.sub, token);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Roles(TipoUsuarioEnum.ADMIN)
+  @ApiBearerAuth()
+  @Get()
+  @ApiOperation({ summary: 'Obtener lista de usuarios con paginación (Solo Admin)' })
+  findAll(@Query('page') page: number = 1, @Query('limit') limit: number = 10) {
+    return this.usuarioService.findAll(page, limit);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
+  @ApiBearerAuth()
   @Get('qr/:uuid')
+  @ApiOperation({ summary: 'Buscar usuario por código QR (Admin/Operativo)' })
   buscarPorQR(@Param('uuid') uuid: string) {
     return this.usuarioService.buscarPorQR(uuid);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get()
-  findAll() {
-    return this.usuarioService.findAll();
-  }
-
-  @UseGuards(JwtAuthGuard)
+  @Roles(TipoUsuarioEnum.ADMIN)
+  @ApiBearerAuth()
   @Get(':documento')
   findOne(@Param('documento') documento: string) {
     return this.usuarioService.findOne(documento);

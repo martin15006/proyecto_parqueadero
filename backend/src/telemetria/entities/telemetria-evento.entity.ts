@@ -3,6 +3,8 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
 } from 'typeorm';
 
 @Entity('telemetria_evento')
@@ -19,6 +21,12 @@ export class TelemetriaEvento {
   @Column({ type: 'json', nullable: true })
   payload: Record<string, any>;
 
-  @CreateDateColumn()
-  fechaEvento: Date;
+  @CreateDateColumn({ type: 'timestamptz' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updatedAt: Date;
+
+  @DeleteDateColumn({ type: 'timestamptz', nullable: true })
+  deletedAt: Date;
 }

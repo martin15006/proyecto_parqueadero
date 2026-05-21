@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Body, Get, UseGuards, Delete, Param, Patch,
+  Controller, Post, Body, Get, UseGuards, Delete, Param, Patch, Query,
 } from '@nestjs/common';
 import { VehiculosService } from './vehiculos.service';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
@@ -7,10 +7,25 @@ import { ActualizarVehiculoDto } from './dto/actualizar-vehiculo.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { Roles } from '../common/decorators/roles.decorator';
+import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
+import { RolesGuard } from '../common/guards/roles.guard';
 
 @Controller('vehiculos')
 export class VehiculosController {
   constructor(private readonly vehiculosService: VehiculosService) {}
+
+  /**
+   * Lista todos los vehículos registrados con paginación.
+   * MOBILE_API: Usado por administradores para supervisar la flota total.
+   * PAGINATION: Query params 'page' y 'limit' admitidos.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(TipoUsuarioEnum.ADMIN)
+  @Get()
+  findAll(@Query('page') page: number = 1, @Query('limit') limit: number = 10) {
+    return this.vehiculosService.findAll(page, limit);
+  }
 
   @Get('tipos')
   listarTipos() {

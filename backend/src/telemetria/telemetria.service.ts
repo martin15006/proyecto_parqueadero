@@ -1,0 +1,155 @@
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Sensor } from './entities/sensor.entity';
+import { TelemetriaEvento } from './entities/telemetria-evento.entity';
+import { AlertaSistema } from './entities/alerta-sistema.entity';
+import { EventosGateway } from '../gateway/eventos.gateway';
+import { BahiasService } from '../bahias/bahias.service';
+import { TelemetryPayloadDto } from './dto/telemetry-payload.dto';
+import { IotStatusEnum } from '../common/enums/iot-status.enum';
+
+@Injectable()
+export class TelemetriaService {
+  private readonly logger = new Logger(TelemetriaService.name);
+  
+  // ESTRATEGIA ANTI-SATURACIÓN: Almacena en memoria el último estado reportado por cada sensor
+  private cacheLecturas: Map<string, { status: IotStatusEnum; timestamp: number }> = new Map();
+
+  constructor(
+    @InjectRepository(Sensor)
+    private readonly sensorRepository: Repository<Sensor>,
+    @InjectRepository(TelemetriaEvento)
+    private readonly eventoRepository: Repository<TelemetriaEvento>,
+    @InjectRepository(AlertaSistema)
+    private readonly alertaRepository: Repository<AlertaSistema>,
+    private readonly gateway: EventosGateway,
+    private readonly bahiasService: BahiasService,
+  ) {}
+
+  /**
+   * Procesa la telemetría enviada por el hardware.
+   * IOT_CONTRACT: Espera un JSON validado por TelemetryPayloadDto.
+   * PERFORMANCE: Implementa Throttling en memoria para evitar escrituras redundantes en DB.
+   */
+  async procesarLectura(dto: TelemetryPayloadDto) {
+    const { sensorId, status, battery, rssi } = dto;
+
+    // 1. Validación de Throttling: ¿El estado ha cambiado realmente?
+    const ultimaLectura = this.cacheLecturas.get(sensorId);
+    if (ultimaLectura && ultimaLectura.status === status) {
+      const tiempoTranscurrido = Date.now() - ultimaLectura.timestamp;
+      // PERFORMANCE: Si el estado es el mismo y pasaron menos de 30s, ignoramos el guardado en DB
+      if (tiempoTranscurrido < 30000) {
+        return { ok: true, mensaje: 'Lectura duplicada ignorada (Throttling)' };
+      }
+    }
+
+    // 2. Localizar sensor en infraestructura
+    const sensor = await this.sensorRepository.findOne({ where: { codigo: sensorId } });
+    if (!sensor) {
+      this.logger.error(`[IOT ERROR] Dispositivo no registrado intentando reportar: ${sensorId}`);
+      throw new BadRequestException('Dispositivo IoT no reconocido');
+    }
+
+    // 3. Actualizar estado del sensor
+    const estadoAnterior = sensor.estadoActual;
+    sensor.estadoActual = status;
+    sensor.bateria = battery ?? sensor.bateria;
+    sensor.ultimaLectura = new Date();
+    sensor.metadata = { ...sensor.metadata, rssi, lastUpdate: sensor.ultimaLectura };
+    
+    await this.sensorRepository.save(sensor);
+    
+    // Actualizar cache en memoria
+    this.cacheLecturas.set(sensorId, { status, timestamp: Date.now() });
+
+    // 4. Auditoría Técnica: Registro del evento histórico
+    const evento = this.eventoRepository.create({
+      idSensor: sensor.idSensor,
+      tipoEvento: status,
+      payload: { battery, rssi, previousStatus: estadoAnterior },
+    });
+    await this.eventoRepository.save(evento);
+
+    // 5. Lógica de Negocio y Notificaciones Realtime
+    await this.gestionarImpactoOperativo(sensor, status);
+
+    return { ok: true, mensaje: 'Telemetría procesada exitosamente' };
+  }
+
+  /**
+   * Determina las acciones a tomar según el nuevo estado del sensor.
+   * REALTIME_EMIT: Notifica al frontend sobre cambios críticos.
+   */
+  private async gestionarImpactoOperativo(sensor: Sensor, status: IotStatusEnum) {
+    // REALTIME_EMIT: Actualización visual del mapa de bahías
+    this.gateway.emitirBahiaActualizada({
+      idBahia: sensor.idBahia,
+      ocupada: status === IotStatusEnum.OCCUPIED,
+      sensor: sensor.codigo,
+    });
+
+    // REALTIME_EMIT: Alertas críticas por falla de hardware
+    if (status === IotStatusEnum.ERROR) {
+      const mensaje = `¡ALERTA TÉCNICA! El sensor ${sensor.codigo} (Bahía ${sensor.idBahia}) reporta un error crítico.`;
+      
+      await this.registrarAlertaSistema('FALLA_HARDWARE', mensaje);
+      
+      this.gateway.emitirAlertaParqueadero({
+        tipo: 'ERROR_IOT',
+        mensaje,
+        fecha: new Date(),
+      });
+    }
+
+    // Sincronización global de ocupación
+    const ocupacion = await this.bahiasService.obtenerOcupacion();
+    this.gateway.emitirOcupacionActualizada(ocupacion);
+  }
+
+  /**
+   * Persiste una alerta crítica en el historial del sistema.
+   */
+  private async registrarAlertaSistema(tipo: string, mensaje: string) {
+    const alerta = this.alertaRepository.create({ tipo, mensaje });
+    await this.alertaRepository.save(alerta);
+  }
+
+  /**
+   * Tarea programada para detectar dispositivos que han dejado de reportar.
+   * REALTIME_EMIT: Notifica cuando un sensor pasa a estado OFFLINE.
+   */
+  async monitorizarSensores() {
+    const hace5Minutos = new Date(Date.now() - 5 * 60000);
+    
+    const sensoresDesconectados = await this.sensorRepository.createQueryBuilder('sensor')
+      .where('sensor.activo = :activo', { activo: true })
+      .andWhere('sensor.estadoActual != :offline', { offline: IotStatusEnum.OFFLINE })
+      .andWhere('sensor.ultimaLectura < :hace5Minutos', { hace5Minutos })
+      .getMany();
+
+    for (const sensor of sensoresDesconectados) {
+      sensor.estadoActual = IotStatusEnum.OFFLINE;
+      await this.sensorRepository.save(sensor);
+      
+      const mensaje = `Pérdida de señal con sensor ${sensor.codigo} (Bahía ${sensor.idBahia}). Posible fallo de red o batería.`;
+      
+      this.gateway.emitirSensorOffline({
+        sensorId: sensor.codigo,
+        idBahia: sensor.idBahia,
+        fecha: new Date(),
+      });
+
+      this.logger.warn(`[IOT OFFLINE] Sensor ${sensor.codigo} marcado como desconectado.`);
+    }
+
+    return { ok: true, totalDetectados: sensoresDesconectados.length };
+  }
+
+  async findAllSensores() {
+    return await this.sensorRepository.find({
+      order: { idBahia: 'ASC' },
+    });
+  }
+}

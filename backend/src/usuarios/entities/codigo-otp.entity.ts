@@ -1,25 +1,37 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
+import { Usuario } from './usuario.entity';
 
 @Entity({ name: 'codigo_otp' })
 export class CodigoOtp {
-  @PrimaryGeneratedColumn({ name: 'idotp' })
+  @PrimaryGeneratedColumn()
   idOtp: number;
 
-  @Column({ name: 'documento', type: 'varchar', length: 10 })
+  @Column({ length: 10 })
   documento: string;
 
-  @Column({ name: 'codigo', type: 'varchar', length: 6 })
+  @Column({ length: 6 })
   codigo: string;
 
-  @Column({ name: 'expiraen', type: 'timestamp' })
+  @Column({ type: 'timestamp' })
   expiraEn: Date;
 
-  @Column({ name: 'intentos', type: 'smallint', default: 0 })
+  @Column({ type: 'smallint', default: 0 })
   intentos: number;
 
-  @Column({ name: 'usado', type: 'boolean', default: false })
+  @Column({ default: false })
   usado: boolean;
 
-  @CreateDateColumn({ name: 'creadoen', type: 'timestamp' })
-  creadoEn: Date;
+  @CreateDateColumn({ type: 'timestamptz' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updatedAt: Date;
+
+  @DeleteDateColumn({ type: 'timestamptz', nullable: true })
+  deletedAt: Date;
+
+  // FIX: zj9up6 - agregada relación bidireccional faltante usuario <-> codigoOtp
+  @ManyToOne(() => Usuario, (usuario) => usuario.otps)
+  @JoinColumn({ name: 'documento' })
+  usuario: Usuario;
 }

@@ -7,6 +7,7 @@ import { CodigoOtp } from './entities/codigo-otp.entity';
 import { MailModule } from '../mail/mail.module';
 import { VehiculosModule } from '../vehiculos/vehiculos.module';
 import { AuthModule } from '../auth/auth.module';
+import { AuditoriaModule } from '../auditoria/auditoria.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { AuthModule } from '../auth/auth.module';
     MailModule,
     forwardRef(() => VehiculosModule),
     AuthModule,
+    AuditoriaModule,
   ],
   controllers: [UsuariosController],
   providers: [UsuarioService],

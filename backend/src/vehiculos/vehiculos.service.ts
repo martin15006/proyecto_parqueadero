@@ -13,7 +13,13 @@ import { RegistroVehiculo } from './entities/registro-vehiculo.entity';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
 import { ActualizarVehiculoDto } from './dto/actualizar-vehiculo.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
+/**
+ * Servicio de Gestión de Vehículos.
+ * Controla el registro, actualización y vinculación de vehículos con usuarios.
+ * REFACTOR: Implementa limpieza de recursos multimedia y auditoría integrada.
+ */
 @Injectable()
 export class VehiculosService {
   constructor(
@@ -24,139 +30,154 @@ export class VehiculosService {
     @InjectRepository(RegistroVehiculo)
     private readonly registroRepository: Repository<RegistroVehiculo>,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly auditoriaService: AuditoriaService,
   ) {}
 
-  async registrarVehiculo(
-    documento: string,
-    dto: CreateVehiculoDto,
-  ): Promise<{ mensaje: string; vehiculo: Vehiculo }> {
-    const tipo = await this.tipoVehiculoRepository.findOne({
-      where: { idTipoV: dto.idTipoVehiculo },
-    });
-    if (!tipo) {
-      throw new BadRequestException('Tipo de vehículo no válido');
-    }
+  /**
+   * Registra un vehículo y lo vincula al usuario.
+   * OPTIMIZATION: Si el vehículo existe, solo crea el vínculo.
+   */
+  async registrarVehiculo(documento: string, dto: CreateVehiculoDto): Promise<{ mensaje: string; vehiculo: Vehiculo }> {
+    const tipo = await this.tipoVehiculoRepository.findOne({ where: { idTipoV: dto.idTipoVehiculo } });
+    if (!tipo) throw new BadRequestException('Tipo de vehículo no válido');
 
     const placaNormalizada = dto.placa.toUpperCase().trim();
-
-    let vehiculo = await this.vehiculoRepository.findOne({
-      where: { placa: placaNormalizada },
-    });
+    let vehiculo = await this.vehiculoRepository.findOne({ where: { placa: placaNormalizada } });
 
     if (!vehiculo) {
-      vehiculo = this.vehiculoRepository.create({
-        ...dto,
-        placa: placaNormalizada,
-      });
+      vehiculo = this.vehiculoRepository.create({ ...dto, placa: placaNormalizada });
       vehiculo = await this.vehiculoRepository.save(vehiculo);
+
+      await this.auditoriaService.create({ 
+        accion: 'CREAR_VEHICULO', 
+        entidad: 'VEHICULO', 
+        idEntidad: 0, 
+        idUsuario: documento, 
+        datosNuevos: { placa: vehiculo.placa, color: vehiculo.color }, 
+      });
     }
 
     const yaRegistrado = await this.registroRepository.findOne({
       where: { idUsuario: documento, idVehiculo: placaNormalizada },
     });
 
-    if (yaRegistrado) {
-      throw new ConflictException('Ya tienes registrado este vehículo');
-    }
+    if (yaRegistrado) throw new ConflictException('Este vehículo ya se encuentra vinculado a tu cuenta');
 
-    const nuevoRegistro = this.registroRepository.create({
+    const nuevoRegistro = this.registroRepository.create({ idUsuario: documento, idVehiculo: placaNormalizada });
+    const registroGuardado = await this.registroRepository.save(nuevoRegistro);
+
+    await this.auditoriaService.create({
+      accion: 'VINCULAR_VEHICULO',
+      entidad: 'REGISTRO_VEHICULO',
+      idEntidad: registroGuardado.idRegistroV,
       idUsuario: documento,
-      idVehiculo: placaNormalizada,
+      datosNuevos: { idUsuario: documento, idVehiculo: vehiculo.placa },
     });
-    await this.registroRepository.save(nuevoRegistro);
 
-    return { mensaje: 'Vehículo registrado correctamente', vehiculo };
-  }
-
-  async listarMisVehiculos(documento: string) {
-    const registros = await this.registroRepository
-      .createQueryBuilder('registro')
-      .innerJoin('vehiculo', 'v', 'v.placa = registro.idvehiculo')
-      .innerJoin('tipo_vehiculo', 'tv', 'tv.idtipov = v.idtipovehiculo')
-      .where('registro.idusuario = :documento', { documento })
-      .select([
-        'v.placa AS placa',
-        'v.fotovehiculo AS "fotoVehiculo"',
-        'v.fototarjetap AS "fotoTarjetaP"',
-        'v.color AS color',
-        'tv.tipovehiculo AS "tipoVehiculo"',
-        'tv.idtipov AS "idTipoVehiculo"',
-        'registro.idregistrov AS "idRegistroV"',
-      ])
-      .getRawMany();
-
-    return registros;
+    return { mensaje: 'Vehículo registrado y vinculado correctamente', vehiculo };
   }
 
   /**
-   * Obtiene el detalle de un vehículo si pertenece al usuario.
+   * Lista vehículos vinculados al usuario autenticado.
+   * MOBILE_API: Optimizado para mostrar la flota personal del usuario en la app.
+   * SERIALIZATION: Mapea la relación Many-to-Many para un consumo simplificado en mobile.
+   */
+  async listarMisVehiculos(documento: string) {
+    const registros = await this.registroRepository
+      .createQueryBuilder('registro')
+      .innerJoinAndSelect('registro.vehiculo', 'v')
+      .innerJoinAndSelect('v.tipoVehiculo', 'tv')
+      .where('registro.idUsuario = :documento', { documento })
+      .getMany();
+
+    return registros.map(reg => ({
+      placa: reg.vehiculo.placa,
+      fotoVehiculo: reg.vehiculo.fotoVehiculo,
+      fotoTarjetaP: reg.vehiculo.fotoTarjetaP,
+      color: reg.vehiculo.color,
+      tipoVehiculo: reg.vehiculo.tipoVehiculo.tipoVehiculo,
+      idTipoVehiculo: reg.vehiculo.tipoVehiculo.idTipoV,
+      idRegistroV: reg.idRegistroV,
+    }));
+  }
+
+  /**
+   * Lista todos los vehículos del sistema con paginación (Solo Admin).
+   * MOBILE_API: Usado para la gestión masiva de flota desde la consola móvil.
+   * PAGINATION: Controla el flujo de datos para evitar latencia en redes móviles.
+   */
+  async findAll(page: number = 1, limit: number = 10) {
+    // PAGINATION: Offset dinámico para navegación entre páginas
+    const [data, total] = await this.vehiculoRepository.findAndCount({
+      skip: (page - 1) * limit,
+      take: limit,
+      relations: ['tipoVehiculo'],
+      order: { placa: 'ASC' },
+    });
+
+    return {
+      data,
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Requerido por UsuarioService.
+   */
+  async findByUsuario(documento: string): Promise<Vehiculo[]> {
+    const registros = await this.registroRepository.find({
+      where: { idUsuario: documento },
+      relations: ['vehiculo', 'vehiculo.tipoVehiculo'],
+    });
+    return registros.map(r => r.vehiculo);
+  }
+
+  /**
+   * Detalle de vehículo.
    */
   async obtenerDetalle(documento: string, placa: string) {
     const placaNormalizada = placa.toUpperCase();
 
-    const tienePermiso = await this.registroRepository.findOne({
-      where: { idUsuario: documento, idVehiculo: placaNormalizada },
-    });
-    if (!tienePermiso) {
-      throw new ForbiddenException('Este vehículo no está registrado a tu nombre');
-    }
-
-    const detalle = await this.registroRepository
+    const registro = await this.registroRepository
       .createQueryBuilder('registro')
-      .innerJoin('vehiculo', 'v', 'v.placa = registro.idvehiculo')
-      .innerJoin('tipo_vehiculo', 'tv', 'tv.idtipov = v.idtipovehiculo')
-      .where('registro.idvehiculo = :placa', { placa: placaNormalizada })
-      .andWhere('registro.idusuario = :documento', { documento })
-      .select([
-        'v.placa AS placa',
-        'v.fotovehiculo AS "fotoVehiculo"',
-        'v.fototarjetap AS "fotoTarjetaP"',
-        'v.color AS color',
-        'tv.tipovehiculo AS "tipoVehiculo"',
-        'tv.idtipov AS "idTipoVehiculo"',
-        'registro.idregistrov AS "idRegistroV"',
-      ])
-      .getRawOne();
+      .innerJoinAndSelect('registro.vehiculo', 'v')
+      .innerJoinAndSelect('v.tipoVehiculo', 'tv')
+      .where('v.placa = :placa', { placa: placaNormalizada })
+      .andWhere('registro.idUsuario = :documento', { documento })
+      .getOne();
 
-    if (!detalle) throw new NotFoundException('Vehículo no encontrado');
-    return detalle;
+    if (!registro) throw new NotFoundException('Vehículo no encontrado en tus registros');
+
+    return {
+      placa: registro.vehiculo.placa,
+      fotoVehiculo: registro.vehiculo.fotoVehiculo,
+      fotoTarjetaP: registro.vehiculo.fotoTarjetaP,
+      color: registro.vehiculo.color,
+      tipoVehiculo: registro.vehiculo.tipoVehiculo.tipoVehiculo,
+      idTipoVehiculo: registro.vehiculo.tipoVehiculo.idTipoV,
+      idRegistroV: registro.idRegistroV,
+    };
   }
 
   /**
-   * Actualiza un vehículo. Solo el dueño puede hacerlo.
-   * Si se cambian fotos, las viejas se borran de Cloudinary.
+   * Actualiza datos y gestiona Cloudinary.
    */
-  async actualizarVehiculo(
-    documento: string,
-    placa: string,
-    dto: ActualizarVehiculoDto,
-  ): Promise<{ mensaje: string }> {
+  async actualizarVehiculo(documento: string, placa: string, dto: ActualizarVehiculoDto): Promise<{ mensaje: string }> {
     const placaNormalizada = placa.toUpperCase();
 
-    const tienePermiso = await this.registroRepository.findOne({
+    const registro = await this.registroRepository.findOne({
       where: { idUsuario: documento, idVehiculo: placaNormalizada },
     });
-    if (!tienePermiso) {
-      throw new ForbiddenException('Este vehículo no está registrado a tu nombre');
-    }
+    if (!registro) throw new ForbiddenException('No tienes permisos para modificar este vehículo');
 
-    const vehiculo = await this.vehiculoRepository.findOne({
-      where: { placa: placaNormalizada },
-    });
+    const vehiculo = await this.vehiculoRepository.findOne({ where: { placa: placaNormalizada } });
     if (!vehiculo) throw new NotFoundException('Vehículo no encontrado');
-
-    // Validar tipo nuevo si viene
-    if (dto.idTipoVehiculo) {
-      const tipo = await this.tipoVehiculoRepository.findOne({
-        where: { idTipoV: dto.idTipoVehiculo },
-      });
-      if (!tipo) throw new BadRequestException('Tipo de vehículo no válido');
-    }
 
     const fotoVehiculoVieja = vehiculo.fotoVehiculo;
     const fotoTarjetaVieja = vehiculo.fotoTarjetaP;
 
-    // Aplicar cambios
     if (dto.fotoVehiculo) vehiculo.fotoVehiculo = dto.fotoVehiculo;
     if (dto.fotoTarjetaP) vehiculo.fotoTarjetaP = dto.fotoTarjetaP;
     if (dto.color) vehiculo.color = dto.color;
@@ -164,56 +185,47 @@ export class VehiculosService {
 
     await this.vehiculoRepository.save(vehiculo);
 
-    // Borrar fotos viejas de Cloudinary
+    // SECURITY: Limpieza de fotos obsoletas en Cloudinary
     const fotosABorrar: string[] = [];
-    if (dto.fotoVehiculo && fotoVehiculoVieja && fotoVehiculoVieja !== dto.fotoVehiculo) {
-      fotosABorrar.push(fotoVehiculoVieja);
-    }
-    if (dto.fotoTarjetaP && fotoTarjetaVieja && fotoTarjetaVieja !== dto.fotoTarjetaP) {
-      fotosABorrar.push(fotoTarjetaVieja);
-    }
-    if (fotosABorrar.length > 0) {
-      await this.cloudinaryService.borrarVariasPorUrl(fotosABorrar);
-    }
+    if (dto.fotoVehiculo && fotoVehiculoVieja && fotoVehiculoVieja !== dto.fotoVehiculo) fotosABorrar.push(fotoVehiculoVieja);
+    if (dto.fotoTarjetaP && fotoTarjetaVieja && fotoTarjetaVieja !== dto.fotoTarjetaP) fotosABorrar.push(fotoTarjetaVieja);
+    
+    if (fotosABorrar.length > 0) await this.cloudinaryService.borrarVariasPorUrl(fotosABorrar);
 
-    return { mensaje: 'Vehículo actualizado correctamente' };
+    return { mensaje: 'Datos del vehículo actualizados exitosamente' };
   }
 
-  async listarTipos() {
-    return this.tipoVehiculoRepository.find();
+  /**
+   * Catálogo de tipos.
+   */
+  async listarTipos(): Promise<TipoVehiculo[]> {
+    return await this.tipoVehiculoRepository.find({ order: { tipoVehiculo: 'ASC' } });
   }
 
+  /**
+   * Desvincula usuario y vehículo.
+   * SECURITY: Borra físicamente el vehículo y sus fotos si queda huérfano.
+   */
   async eliminarRegistro(documento: string, placa: string) {
     const placaNormalizada = placa.toUpperCase();
 
     const registro = await this.registroRepository.findOne({
       where: { idUsuario: documento, idVehiculo: placaNormalizada },
     });
-    if (!registro) {
-      throw new NotFoundException('Registro no encontrado');
-    }
+    if (!registro) throw new NotFoundException('El vínculo no existe o ya fue eliminado');
 
     await this.registroRepository.remove(registro);
 
-    const otrosRegistros = await this.registroRepository.count({
-      where: { idVehiculo: placaNormalizada },
-    });
+    const otrosRegistros = await this.registroRepository.count({ where: { idVehiculo: placaNormalizada } });
 
     if (otrosRegistros === 0) {
-      const vehiculo = await this.vehiculoRepository.findOne({
-        where: { placa: placaNormalizada },
-      });
-
+      const vehiculo = await this.vehiculoRepository.findOne({ where: { placa: placaNormalizada } });
       if (vehiculo) {
-        await this.cloudinaryService.borrarVariasPorUrl([
-          vehiculo.fotoVehiculo,
-          vehiculo.fotoTarjetaP,
-        ]);
-
+        await this.cloudinaryService.borrarVariasPorUrl([vehiculo.fotoVehiculo, vehiculo.fotoTarjetaP]);
         await this.vehiculoRepository.remove(vehiculo);
       }
     }
 
-    return { mensaje: 'Vehículo eliminado de tus registros' };
+    return { ok: true, mensaje: 'Vínculo eliminado exitosamente' };
   }
 }

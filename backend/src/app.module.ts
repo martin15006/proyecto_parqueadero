@@ -3,6 +3,7 @@ import { Module, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
 import { AppController } from './app.controller';
@@ -31,14 +32,32 @@ import { AlertaSistema } from './telemetria/entities/alerta-sistema.entity';
 // Módulo de WebSocket
 import { GatewayModule } from './gateway/gateway.module';
 import { OperativoModule } from './operativo/operativo.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { TelemetriaModule } from './telemetria/telemetria.module';
+
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      // Si tu archivo .env está en backend/.env
       envFilePath: path.resolve(__dirname, '..', '.env'),
       isGlobal: true,
     }),
+
+    // SEGURIDAD: Rate Limiting global (Optimizado para Mobile)
+    ThrottlerModule.forRoot([{
+      name: 'short',
+      ttl: 1000,
+      limit: 3, // Máximo 3 peticiones por segundo
+    }, {
+      name: 'medium',
+      ttl: 10000,
+      limit: 20, // Máximo 20 peticiones cada 10 segundos
+    }, {
+      name: 'long',
+      ttl: 60000,
+      limit: 100, // Máximo 100 peticiones por minuto
+    }]),
 
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -53,15 +72,10 @@ import { OperativoModule } from './operativo/operativo.module';
 
         entities: [
           __dirname + '/**/*.entity{.ts,.js}',
-          Auditoria,
-          Contingencia,
-          Visitante,
-          Sensor,
-          TelemetriaEvento,
-          AlertaSistema,
         ],
 
         synchronize: false,
+        namingStrategy: new SnakeNamingStrategy(),
       }),
     }),
 
@@ -76,12 +90,20 @@ import { OperativoModule } from './operativo/operativo.module';
     // Fase 3: Auditoría
     AuditoriaModule,
     OperativoModule,
+    DashboardModule,
+    TelemetriaModule,
   ],
 
   controllers: [AppController],
 
   providers: [
     AppService,
+
+    // SEGURIDAD: ThrottlerGuard global
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
 
     // Guard global para control de roles
     {

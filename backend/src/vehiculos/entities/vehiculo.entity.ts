@@ -1,19 +1,50 @@
-import { Entity, PrimaryColumn, Column } from 'typeorm';
+import { 
+  Entity, 
+  PrimaryColumn, 
+  Column, 
+  ManyToOne, 
+  JoinColumn, 
+  OneToMany, 
+  CreateDateColumn, 
+  UpdateDateColumn, 
+  DeleteDateColumn,
+  Index
+} from 'typeorm';
+import { TipoVehiculo } from './tipo-vehiculo.entity';
+import { RegistroVehiculo } from './registro-vehiculo.entity';
 
 @Entity({ name: 'vehiculo' })
 export class Vehiculo {
-  @PrimaryColumn({ name: 'placa', type: 'varchar', length: 10 })
+  @PrimaryColumn({ length: 10 })
   placa: string;
 
-  @Column({ name: 'fotovehiculo', type: 'varchar', length: 255 })
+  @Column({ length: 255 })
   fotoVehiculo: string;
 
-  @Column({ name: 'fototarjetap', type: 'varchar', length: 255 })
+  @Column({ length: 255 })
   fotoTarjetaP: string;
 
-  @Column({ name: 'color', type: 'varchar', length: 50 })
+  @Column({ length: 50 })
   color: string;
 
-  @Column({ name: 'idtipovehiculo', type: 'smallint' })
+  @Index()
+  @Column({ type: 'smallint' })
   idTipoVehiculo: number;
+
+  // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
+  @CreateDateColumn({ type: 'timestamptz' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updatedAt: Date;
+
+  @DeleteDateColumn({ type: 'timestamptz', nullable: true })
+  deletedAt: Date;
+
+  @ManyToOne(() => TipoVehiculo, (tipo) => tipo.vehiculos)
+  @JoinColumn({ name: 'id_tipo_vehiculo' })
+  tipoVehiculo: TipoVehiculo;
+
+  @OneToMany(() => RegistroVehiculo, (registro) => registro.vehiculo)
+  registrosUsuarios: RegistroVehiculo[];
 }

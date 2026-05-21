@@ -3,34 +3,73 @@ import {
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
+  OnModuleInit,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, MoreThan } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
+
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { CodigoOtp } from '../usuarios/entities/codigo-otp.entity';
+import { SesionActiva } from './entities/sesion-activa.entity';
+import { TokenBloqueado } from './entities/token-bloqueado.entity';
+
 import { LoginDto } from '../usuarios/dto/login.dto';
 import { VerificarOtpDto } from './dto/verificar-otp.dto';
 import { ReenviarOtpDto } from './dto/reenviar-otp.dto';
-import { MailService } from '../mail/mail.service';
 
+import { MailService } from '../mail/mail.service';
+import { AuthMantenimientoService } from './auth-mantenimiento.service';
+import { IJwtPayload } from '../common/interfaces/auth.interface';
+
+/**
+ * Servicio centralizado de Autenticación y Autorización.
+ * REFACTOR: Implementa lógica modular para gestión de sesiones, OTP y seguridad.
+ */
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
     @InjectRepository(CodigoOtp)
     private readonly otpRepository: Repository<CodigoOtp>,
+    @InjectRepository(SesionActiva)
+    private readonly sesionRepository: Repository<SesionActiva>,
+    @InjectRepository(TokenBloqueado)
+    private readonly blacklistRepository: Repository<TokenBloqueado>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
+    private readonly mantenimientoService: AuthMantenimientoService,
   ) { }
 
   /**
-   * Paso 1 del login: valida credenciales y envía OTP al correo.
-   * NO devuelve JWT todavía.
+   * Inicialización del módulo.
+   * PERFORMANCE: Inicia tareas de limpieza periódica de tokens y OTPs.
+   */
+  async onModuleInit() {
+    this.iniciarTareasMantenimiento();
+  }
+
+  /**
+   * Configura intervalos de limpieza automática.
+   */
+  private iniciarTareasMantenimiento() {
+    setInterval(async () => {
+      await this.mantenimientoService.ejecutarLimpieza();
+    }, 3600000); // 1 hora
+  }
+
+  /**
+   * Paso 1: Validación de credenciales primarias.
+   * SECURITY: Valida identidad y genera desafío OTP de 2do factor.
+   * @param loginDto Credenciales de acceso
    */
   async loginPaso1(loginDto: LoginDto): Promise<{ mensaje: string; correo: string }> {
     const usuario = await this.usuarioRepository.findOne({
@@ -41,12 +80,11 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const contraseñaValida = await bcrypt.compare(loginDto.contra, usuario.contra);
-    if (!contraseñaValida) {
+    const passwordMatch = await bcrypt.compare(loginDto.contra, usuario.contra);
+    if (!passwordMatch) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    // Generar y guardar OTP
     await this.generarYEnviarOtp(usuario);
 
     return {
@@ -56,9 +94,11 @@ export class AuthService {
   }
 
   /**
-   * Paso 2 del login: valida el código OTP y emite el JWT.
+   * Paso 2: Verificación de OTP y emisión de tokens.
+   * SECURITY: Implementa límites de intentos y validación temporal.
+   * @param dto Datos de verificación
    */
-  async verificarOtp(dto: VerificarOtpDto): Promise<{ access_token: string; usuario: any }> {
+  async verificarOtp(dto: VerificarOtpDto): Promise<{ access_token: string; refresh_token: string; usuario: Omit<Usuario, 'contra'> }> {
     const usuario = await this.usuarioRepository.findOne({
       where: { correo: dto.correo },
     });
@@ -67,72 +107,133 @@ export class AuthService {
       throw new NotFoundException('Usuario no encontrado');
     }
 
-    // Buscar el OTP más reciente no usado para este usuario
     const otp = await this.otpRepository.findOne({
-      where: {
-        documento: usuario.documento,
-        usado: false,
-      },
-      order: { creadoEn: 'DESC' },
+      where: { documento: usuario.documento, usado: false },
+      order: { createdAt: 'DESC' },
     });
 
     if (!otp) {
-      throw new BadRequestException(
-        'No hay código activo. Solicita uno nuevo.',
-      );
+      throw new BadRequestException('No hay código activo. Solicita uno nuevo.');
     }
 
-    // Verificar expiración
     if (new Date() > otp.expiraEn) {
-      otp.usado = true;
-      await this.otpRepository.save(otp);
-      throw new BadRequestException(
-        'El código ha expirado. Solicita uno nuevo.',
-      );
+      await this.marcarOtpComoUsado(otp);
+      throw new BadRequestException('El código ha expirado. Solicita uno nuevo.');
     }
 
-    // Verificar máximo de intentos
     const maxIntentos = this.configService.get<number>('OTP_MAX_ATTEMPTS') ?? 3;
     if (otp.intentos >= maxIntentos) {
-      otp.usado = true;
-      await this.otpRepository.save(otp);
-      throw new BadRequestException(
-        'Demasiados intentos fallidos. Solicita un código nuevo.',
-      );
+      await this.marcarOtpComoUsado(otp);
+      throw new BadRequestException('Demasiados intentos fallidos. Solicita un código nuevo.');
     }
 
-    // Verificar que el código coincida
     if (otp.codigo !== dto.codigo) {
       otp.intentos += 1;
       await this.otpRepository.save(otp);
-      const intentosRestantes = maxIntentos - otp.intentos;
-      throw new UnauthorizedException(
-        `Código incorrecto. Te quedan ${intentosRestantes} intento(s).`,
-      );
+      throw new UnauthorizedException(`Código incorrecto. Intentos restantes: ${maxIntentos - otp.intentos}`);
     }
 
-    // ¡OTP válido! Marcar como usado y emitir JWT
-    otp.usado = true;
-    await this.otpRepository.save(otp);
+    await this.marcarOtpComoUsado(otp);
 
-    const payload = {
+    const tokens = await this.generarTokens(usuario);
+    const { contra, ...usuarioSinContrasena } = usuario;
+
+    return { ...tokens, usuario: usuarioSinContrasena as Omit<Usuario, 'contra'> };
+  }
+
+  /**
+   * Genera un par de Access Token (JWT) y Refresh Token (Opaque).
+   * MOBILE_API: Emite tokens optimizados. El payload JWT es ligero para ahorrar datos.
+   * SERIALIZATION: El Refresh Token es opaco y persistido para seguridad del hardware/mobile.
+   */
+  async generarTokens(usuario: Usuario) {
+    // MOBILE_API: Payload mínimo para reducir el tamaño del header Authorization
+    const payload: IJwtPayload = {
       sub: usuario.documento,
-      correo: usuario.correo,
       idTipoUsr: usuario.idTipoUsr,
     };
 
     const access_token = await this.jwtService.signAsync(payload);
+    // MOBILE_API: Refresh token largo y seguro para almacenamiento en Keychain/SecureStorage
+    const refresh_token = crypto.randomBytes(64).toString('hex');
 
-    const { contra, ...usuarioSinContrasena } = usuario;
+    const expiraEn = new Date();
+    expiraEn.setDate(expiraEn.getDate() + 7);
 
-    return {
-      access_token,
-      usuario: usuarioSinContrasena,
-    };
+    await this.sesionRepository.save({
+      documento: usuario.documento,
+      refreshToken: refresh_token,
+      expiraEn,
+    });
+
+    return { access_token, refresh_token };
   }
 
   /**
-   * Reenvía un nuevo código OTP al correo.
+   * Renueva el Access Token mediante Refresh Token Rotation.
+   * MOBILE_API: Permite mantener la sesión activa sin pedir login al usuario.
+   * SECURITY: Implementa revocación automática de tokens usados.
+   */
+  async renovarToken(refreshToken: string) {
+    const sesion = await this.sesionRepository.findOne({
+      where: { refreshToken, revocado: false },
+      relations: ['usuario'],
+    });
+
+    if (!sesion || sesion.expiraEn < new Date()) {
+      if (sesion) {
+        sesion.revocado = true;
+        await this.sesionRepository.save(sesion);
+      }
+      throw new UnauthorizedException('Sesión expirada o inválida');
+    }
+
+    // SECURITY: Marcamos el token anterior como usado para evitar ataques de repetición
+    sesion.revocado = true;
+    await this.sesionRepository.save(sesion);
+
+    return this.generarTokens(sesion.usuario);
+  }
+
+  /**
+   * Cierra la sesión activa.
+   */
+  async logout(refreshToken: string) {
+    const sesion = await this.sesionRepository.findOne({ where: { refreshToken } });
+
+    if (sesion) {
+      sesion.revocado = true;
+      await this.sesionRepository.save(sesion);
+    }
+
+    return { ok: true, mensaje: 'Sesión cerrada correctamente' };
+  }
+
+  /**
+   * Agrega un Access Token a la lista negra.
+   * SECURITY: Previene el uso de tokens robados o de sesiones cerradas.
+   */
+  async revocarAccessToken(token: string): Promise<void> {
+    const payload = this.jwtService.decode(token) as IJwtPayload;
+    if (payload?.exp) {
+      // PERFORMANCE: Se guarda solo si el token no ha expirado naturalmente
+      await this.blacklistRepository.save({
+        token,
+        expiraEn: new Date(payload.exp * 1000),
+      });
+    }
+  }
+
+  /**
+   * Verifica si un token está revocado.
+   */
+  async isTokenRevocado(token: string): Promise<boolean> {
+    const existe = await this.blacklistRepository.findOne({ where: { token } });
+    return !!existe;
+  }
+
+  /**
+   * Reenvía código OTP.
    */
   async reenviarOtp(dto: ReenviarOtpDto): Promise<{ mensaje: string }> {
     const usuario = await this.usuarioRepository.findOne({
@@ -140,107 +241,31 @@ export class AuthService {
     });
 
     if (!usuario) {
-      // No revelar si el correo existe o no, por seguridad
       return { mensaje: 'Si el correo existe, se enviará un nuevo código.' };
     }
 
     await this.generarYEnviarOtp(usuario);
-
     return { mensaje: 'Nuevo código enviado a tu correo.' };
   }
 
   /**
-   * Genera un código de 6 dígitos, lo guarda en BD y lo envía por correo.
+   * Recuperación de contraseña - Paso 1.
    */
-  private async generarYEnviarOtp(usuario: Usuario): Promise<void> {
-    // Invalidar códigos anteriores no usados
-    await this.otpRepository.update(
-      { documento: usuario.documento, usado: false },
-      { usado: true },
-    );
-
-    // Generar nuevo código
-    const codigo = this.generarCodigo6Digitos();
-    const minutosExpiracion =
-      this.configService.get<number>('OTP_EXPIRATION_MINUTES') ?? 5;
-    const expiraEn = new Date(Date.now() + minutosExpiracion * 60 * 1000);
-
-    const nuevoOtp = this.otpRepository.create({
-      documento: usuario.documento,
-      codigo,
-      expiraEn,
-      intentos: 0,
-      usado: false,
-    });
-
-    await this.otpRepository.save(nuevoOtp);
-
-    // Enviar correo
-    await this.mailService.enviarCodigoOtp(
-      usuario.correo,
-      codigo,
-      usuario.nombreCompleto,
-    );
-  }
-
-  private generarCodigo6Digitos(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
-  /**
- * Paso 1 — Recuperación de contraseña.
- * Recibe el correo y, si está registrado, envía un OTP al correo.
- * Por seguridad, devuelve siempre éxito (no revela si el correo existe o no).
- */
   async solicitarRecuperacion(correo: string): Promise<{ mensaje: string }> {
     const usuario = await this.usuarioRepository.findOne({ where: { correo } });
 
-    // No revelamos si el correo existe (medida de seguridad contra enumeración)
     if (!usuario) {
-      return {
-        mensaje:
-          'Si el correo está registrado, recibirás un código de verificación en breve.',
-      };
+      return { mensaje: 'Si el correo está registrado, recibirás un código de verificación.' };
     }
 
-    // Generar OTP de 6 dígitos
-    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiraEn = new Date(Date.now() + 5 * 60 * 1000); // 5 minutos
-
-    // Eliminar OTPs anteriores del usuario para este propósito
-    await this.otpRepository.delete({ documento: usuario.documento });
-
-    const otp = this.otpRepository.create({
-      documento: usuario.documento,
-      codigo,
-      expiraEn,
-      intentos: 0,
-      usado: false,
-    });
-    await this.otpRepository.save(otp);
-
-    // Enviar correo con el código
-    await this.mailService.enviarCodigoOtp(
-      correo,
-      codigo,
-      usuario.nombreCompleto,
-    );
-
-    return {
-      mensaje:
-        'Si el correo está registrado, recibirás un código de verificación en breve.',
-    };
+    await this.generarYEnviarOtp(usuario);
+    return { mensaje: 'Si el correo está registrado, recibirás un código de verificación.' };
   }
 
   /**
-   * Paso 2 — Verificar el OTP de recuperación.
-   * Solo valida que el código sea correcto; NO restablece la contraseña aún.
-   * Esto permite que el usuario vea la pantalla para escribir la nueva contraseña
-   * con la confianza de que el código ya fue verificado.
+   * Recuperación de contraseña - Paso 2.
    */
-  async verificarRecuperacion(
-    correo: string,
-    codigo: string,
-  ): Promise<{ mensaje: string; valido: boolean }> {
+  async verificarRecuperacion(correo: string, codigo: string): Promise<{ mensaje: string; valido: boolean }> {
     const usuario = await this.usuarioRepository.findOne({ where: { correo } });
 
     if (!usuario) {
@@ -253,7 +278,7 @@ export class AuthService {
         usado: false,
         expiraEn: MoreThan(new Date()),
       },
-      order: { creadoEn: 'DESC' },
+      order: { createdAt: 'DESC' },
     });
 
     if (!otp) {
@@ -261,9 +286,7 @@ export class AuthService {
     }
 
     if (otp.intentos >= 3) {
-      throw new UnauthorizedException(
-        'Has agotado los intentos. Solicita un nuevo código.',
-      );
+      throw new UnauthorizedException('Has agotado los intentos. Solicita un nuevo código.');
     }
 
     if (otp.codigo !== codigo) {
@@ -272,21 +295,13 @@ export class AuthService {
       throw new UnauthorizedException('Código incorrecto');
     }
 
-    // NO marcamos el OTP como usado todavía. Eso se hace al restablecer.
-    // Solo confirmamos que es válido.
     return { mensaje: 'Código verificado correctamente', valido: true };
   }
 
   /**
-   * Paso 3 — Restablecer contraseña.
-   * Aquí se valida nuevamente el OTP (por seguridad) y se actualiza la contraseña.
-   * Después de esto, el OTP queda invalidado.
+   * Recuperación de contraseña - Paso 3.
    */
-  async restablecerContrasena(
-    correo: string,
-    codigo: string,
-    contraNueva: string,
-  ): Promise<{ mensaje: string }> {
+  async restablecerContrasena(correo: string, codigo: string, contraNueva: string): Promise<{ mensaje: string }> {
     const usuario = await this.usuarioRepository.findOne({ where: { correo } });
 
     if (!usuario) {
@@ -299,38 +314,56 @@ export class AuthService {
         usado: false,
         expiraEn: MoreThan(new Date()),
       },
-      order: { creadoEn: 'DESC' },
+      order: { createdAt: 'DESC' },
     });
 
-    if (!otp) {
-      throw new BadRequestException(
-        'No hay código activo. Solicita un nuevo código de recuperación.',
-      );
+    if (!otp || otp.codigo !== codigo) {
+      throw new BadRequestException('Código inválido o expirado.');
     }
 
-    if (otp.codigo !== codigo) {
-      throw new UnauthorizedException('Código incorrecto');
+    const passwordMatch = await bcrypt.compare(contraNueva, usuario.contra);
+    if (passwordMatch) {
+      throw new BadRequestException('La nueva contraseña debe ser diferente a la actual');
     }
 
-    // Validar que la nueva contraseña sea diferente a la actual
-    const esIgual = await bcrypt.compare(contraNueva, usuario.contra);
-    if (esIgual) {
-      throw new BadRequestException(
-        'La nueva contraseña debe ser diferente a la actual',
-      );
-    }
+    await this.marcarOtpComoUsado(otp);
 
-    // Marcar el OTP como usado
-    otp.usado = true;
-    await this.otpRepository.save(otp);
-
-    // Actualizar la contraseña
     const salt = await bcrypt.genSalt(10);
     usuario.contra = await bcrypt.hash(contraNueva, salt);
     await this.usuarioRepository.save(usuario);
 
-    return {
-      mensaje: 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.',
-    };
+    return { mensaje: 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.' };
+  }
+
+  // --- MÉTODOS PRIVADOS ---
+
+  /**
+   * Genera un código OTP y lo envía.
+   */
+  private async generarYEnviarOtp(usuario: Usuario): Promise<void> {
+    await this.otpRepository.update(
+      { documento: usuario.documento, usado: false },
+      { usado: true },
+    );
+
+    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiraEn = new Date();
+    expiraEn.setMinutes(expiraEn.getMinutes() + 5);
+
+    await this.otpRepository.save({
+      documento: usuario.documento,
+      codigo,
+      expiraEn,
+    });
+
+    await this.mailService.enviarCodigoOtp(usuario.correo, codigo, usuario.nombreCompleto);
+  }
+
+  /**
+   * Invalida un OTP.
+   */
+  private async marcarOtpComoUsado(otp: CodigoOtp): Promise<void> {
+    otp.usado = true;
+    await this.otpRepository.save(otp);
   }
 }

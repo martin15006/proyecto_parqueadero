@@ -3,6 +3,9 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  Index,
 } from 'typeorm';
 
 @Entity('auditoria')
@@ -10,23 +13,27 @@ export class Auditoria {
   @PrimaryGeneratedColumn()
   idAuditoria: number;
 
+  @Index() // PERFORMANCE: Acelera el filtrado por tipo de acción administrativa
   @Column({ length: 100 })
   accion: string;
 
+  @Index() // PERFORMANCE: Acelera el filtrado por tabla/módulo afectado
   @Column({ length: 100 })
   entidad: string;
 
-  @Column({ nullable: true })
-  idEntidad: number;
+  @Index() // PERFORMANCE: Permite rastrear cambios en un registro específico rápidamente
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  idEntidad: string;
 
   @Column({ type: 'json', nullable: true })
-  datosAnteriores: Record<string, any>;
+  datosAnteriores: Record<string, unknown>;
 
   @Column({ type: 'json', nullable: true })
-  datosNuevos: Record<string, any>;
+  datosNuevos: Record<string, unknown>;
 
-  @Column()
-  idUsuario: number;
+  @Index() // PERFORMANCE: Acelera la búsqueda de acciones realizadas por un usuario
+  @Column({ length: 10 })
+  idUsuario: string;
 
   @Column({ length: 45, nullable: true })
   ip: string;
@@ -34,6 +41,13 @@ export class Auditoria {
   @Column({ length: 255, nullable: true })
   userAgent: string;
 
-  @CreateDateColumn()
-  fechaCreacion: Date;
+  @Index() // PERFORMANCE: Crucial para reportes de auditoría por rango de fechas
+  @CreateDateColumn({ type: 'timestamptz' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updatedAt: Date;
+
+  @DeleteDateColumn({ type: 'timestamptz', nullable: true })
+  deletedAt: Date;
 }
