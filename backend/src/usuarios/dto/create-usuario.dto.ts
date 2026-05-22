@@ -1,19 +1,11 @@
-import { Transform, Type } from 'class-transformer';
 import {
   IsString,
   IsEmail,
   IsNotEmpty,
   Length,
   Matches,
-  IsOptional,
-  MinLength,
-  IsInt,
-  Min,
 } from 'class-validator';
 import { ContrasenaSegura } from '../../common/validators/contrasena-segura.validator';
-
-// ...dentro de la clase del DTO:
-
 
 export class CreateUsuarioDto {
   @IsString()
@@ -55,22 +47,12 @@ export class CreateUsuarioDto {
   contra: string;
 
   @IsString()
-  @IsOptional()
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      const trimmedValue = value.trim();
-      return trimmedValue === '' ? undefined : trimmedValue;
-    }
-    return value;
-  })
+  @IsNotEmpty({ message: 'La ficha es obligatoria' })
   @Length(7, 7, { message: 'La ficha debe tener exactamente 7 caracteres' })
   @Matches(/^[0-9]+$/, { message: 'La ficha solo puede contener números' })
-  idFormacion?: string;
+  idFormacion: string;
 
-  @Type(() => Number)
-  @IsInt({ message: 'El tipo de usuario debe ser un número válido' })
-  @Min(1, { message: 'El tipo de usuario debe ser mayor o igual a 1' })
-  @IsNotEmpty({ message: 'El tipo de usuario es obligatorio' })
-  idTipoUsr: number;
-
+  // ⚠️ NO se incluye idTipoUsr aquí.
+  // El backend lo asigna automáticamente como 1 (Usuario aprendiz) en el service.
+  // Para crear admins/celadores se debe usar un endpoint SEPARADO y PROTEGIDO.
 }
