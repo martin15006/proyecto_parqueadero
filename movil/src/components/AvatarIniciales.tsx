@@ -1,79 +1,118 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ViewStyle, StyleProp, Image } from 'react-native';
+import React from 'react';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { fonts } from '../theme/senaTheme';
 
 interface Props {
-  nombre: string;
+  nombre?: string | null;
   fotoUrl?: string | null;
   size?: number;
-  style?: StyleProp<ViewStyle>;
-  bordeBlanco?: boolean;
+}
+
+/**
+ * Obtiene las iniciales de un nombre completo de forma segura.
+ * Si el nombre es null/undefined/vacío, devuelve "?".
+ */
+function obtenerIniciales(nombre?: string | null): string {
+  // Protección triple: null, undefined, vacío
+  if (!nombre || typeof nombre !== 'string') return '?';
+
+  const limpio = nombre.trim();
+  if (limpio.length === 0) return '?';
+
+  const partes = limpio.split(' ').filter((p) => p.length > 0);
+  if (partes.length === 0) return '?';
+
+  if (partes.length === 1) {
+    return partes[0].charAt(0).toUpperCase();
+  }
+
+  const primera = partes[0].charAt(0).toUpperCase();
+  const ultima = partes[partes.length - 1].charAt(0).toUpperCase();
+  return `${primera}${ultima}`;
+}
+
+/**
+ * Genera un color de fondo consistente basado en el nombre.
+ */
+function generarColor(nombre?: string | null): string {
+  const colores = ['#39A900', '#007832', '#00304D', '#71277A', '#5fd924'];
+
+  if (!nombre || typeof nombre !== 'string' || nombre.length === 0) {
+    return colores[0];
+  }
+
+  let suma = 0;
+  for (let i = 0; i < nombre.length; i++) {
+    suma += nombre.charCodeAt(i);
+  }
+  return colores[suma % colores.length];
 }
 
 export default function AvatarIniciales({
   nombre,
   fotoUrl,
   size = 80,
-  style,
-  bordeBlanco = true,
 }: Props) {
   const { colores } = useTheme();
-  const [errorFoto, setErrorFoto] = useState(false);
 
-  const obtenerIniciales = (nombreCompleto: string): string => {
-    const partes = nombreCompleto.trim().split(/\s+/);
-    if (partes.length === 0) return '?';
-    if (partes.length === 1) return partes[0].charAt(0).toUpperCase();
-    return (partes[0].charAt(0) + partes[partes.length - 1].charAt(0)).toUpperCase();
-  };
+  // Si hay foto válida (URL no vacía), mostrarla
+  if (fotoUrl && typeof fotoUrl === 'string' && fotoUrl.trim().length > 0) {
+    return (
+      <Image
+        source={{ uri: fotoUrl }}
+        style={[
+          styles.imagen,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            borderColor: '#ffffff',
+          },
+        ]}
+      />
+    );
+  }
 
-  const mostrarFoto = fotoUrl && !errorFoto;
+  // Sino, mostrar iniciales con color de fondo
+  const iniciales = obtenerIniciales(nombre);
+  const colorFondo = generarColor(nombre);
 
   return (
     <View
       style={[
-        styles.contenedor,
+        styles.circulo,
         {
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: colores.verde,
-          borderWidth: bordeBlanco ? 3 : 0,
-          borderColor: '#ffffff',
+          backgroundColor: colorFondo,
         },
-        style,
       ]}
     >
-      {mostrarFoto ? (
-        <Image
-          source={{ uri: fotoUrl! }}
-          style={{
-            width: size - (bordeBlanco ? 6 : 0),
-            height: size - (bordeBlanco ? 6 : 0),
-            borderRadius: (size - (bordeBlanco ? 6 : 0)) / 2,
-          }}
-          onError={() => setErrorFoto(true)}
-        />
-      ) : (
-        <Text style={[styles.iniciales, { fontSize: size * 0.4 }]}>
-          {obtenerIniciales(nombre)}
-        </Text>
-      )}
+      <Text
+        style={[
+          styles.iniciales,
+          {
+            fontSize: size * 0.4,
+          },
+        ]}
+      >
+        {iniciales}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  contenedor: {
+  imagen: {
+    borderWidth: 3,
+  },
+  circulo: {
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    borderWidth: 3,
+    borderColor: '#ffffff',
   },
   iniciales: {
     color: '#ffffff',

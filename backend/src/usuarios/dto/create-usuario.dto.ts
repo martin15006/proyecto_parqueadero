@@ -1,19 +1,11 @@
-import { Transform, Type } from 'class-transformer';
 import {
   IsString,
   IsEmail,
   IsNotEmpty,
   Length,
   Matches,
-  IsOptional,
-  MinLength,
-  IsInt,
-  Min,
 } from 'class-validator';
 import { ContrasenaSegura } from '../../common/validators/contrasena-segura.validator';
-
-// ...dentro de la clase del DTO:
-
 
 export class CreateUsuarioDto {
   @IsString()

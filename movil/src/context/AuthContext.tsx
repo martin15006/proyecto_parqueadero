@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Usuario } from '../types/usuario';
 import { sessionService } from '../services/sessionService';
 import { authService } from '../services/authService';
+import { configurarManejoSesionInvalida } from '../services/api';
 
 interface AuthContextType {
   usuario: Usuario | null;
@@ -15,6 +16,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [cargandoSesion, setCargandoSesion] = useState(true);
+
+  // Configurar manejo de sesión inválida (token expirado, FK error, etc.)
+  useEffect(() => {
+    configurarManejoSesionInvalida(() => {
+      // Cuando el api detecta sesión inválida, cerrar sesión
+      setUsuario(null);
+    });
+  }, []);
 
   // Al iniciar la app, intentar recuperar la sesión guardada
   // Y verificar con el backend que el JWT siga válido.

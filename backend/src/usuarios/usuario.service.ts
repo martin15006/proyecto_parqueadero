@@ -21,6 +21,7 @@ import { VehiculosService } from '../vehiculos/vehiculos.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 
+const ID_TIPO_USUARIO_APP = 1;
 const OTP_EXPIRA_MINUTOS = 5;
 
 /**

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as ImagePicker from 'expo-image-picker';
@@ -26,6 +27,8 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
   const [color, setColor] = useState('');
   const [tipoSeleccionado, setTipoSeleccionado] = useState<number | null>(null);
   const [tipos, setTipos] = useState<TipoVehiculo[]>([]);
+  const [cargandoTipos, setCargandoTipos] = useState(true);
+  const [errorTipos, setErrorTipos] = useState(false);
   const [fotoVehiculo, setFotoVehiculo] = useState<string | null>(null);
   const [fotoTarjeta, setFotoTarjeta] = useState<string | null>(null);
   const [errores, setErrores] = useState<any>({});
@@ -38,11 +41,30 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
   }, []);
 
   const cargarTipos = async () => {
+    setCargandoTipos(true);
+    setErrorTipos(false);
     try {
       const datos = await vehiculoService.listarTipos();
-      setTipos(datos);
+      console.log('Tipos recibidos:', datos);
+
+      if (!datos || datos.length === 0) {
+        setErrorTipos(true);
+        Alert.alert(
+          'Sin tipos',
+          'No hay tipos de vehículo disponibles. Contacta al administrador.',
+        );
+      } else {
+        setTipos(datos);
+      }
     } catch (error: any) {
-      Alert.alert('Error', 'No se pudieron cargar los tipos de vehículo');
+      console.log('Error al cargar tipos:', error);
+      setErrorTipos(true);
+      Alert.alert(
+        'Error',
+        `No se pudieron cargar los tipos de vehículo: ${error.message}`,
+      );
+    } finally {
+      setCargandoTipos(false);
     }
   };
 
@@ -54,7 +76,10 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
     ]);
   };
 
-  const abrir = async (cual: 'vehiculo' | 'tarjeta', origen: 'camara' | 'galeria') => {
+  const abrir = async (
+    cual: 'vehiculo' | 'tarjeta',
+    origen: 'camara' | 'galeria',
+  ) => {
     const permiso =
       origen === 'camara'
         ? await ImagePicker.requestCameraPermissionsAsync()
@@ -67,15 +92,15 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
     const result =
       origen === 'camara'
         ? await ImagePicker.launchCameraAsync({
-          mediaTypes: ['images'],
-          allowsEditing: false,
-          quality: 0.7,
-        })
+            mediaTypes: ['images'],
+            allowsEditing: false,
+            quality: 0.7,
+          })
         : await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'],
-          allowsEditing: false,
-          quality: 0.7,
-        });
+            mediaTypes: ['images'],
+            allowsEditing: false,
+            quality: 0.7,
+          });
 
     if (!result.canceled && result.assets.length > 0) {
       if (cual === 'vehiculo') setFotoVehiculo(result.assets[0].uri);
@@ -86,7 +111,8 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
   const validar = (): boolean => {
     const e: any = {};
     if (!placa.trim()) e.placa = 'La placa es obligatoria';
-    else if (placa.length < 5 || placa.length > 10) e.placa = 'Entre 5 y 10 caracteres';
+    else if (placa.length < 5 || placa.length > 10)
+      e.placa = 'Entre 5 y 10 caracteres';
     if (!color.trim()) e.color = 'El color es obligatorio';
     if (!tipoSeleccionado) e.tipo = 'Selecciona un tipo';
     if (!fotoVehiculo) e.fotoVehiculo = 'Foto del vehículo obligatoria';
@@ -142,7 +168,9 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
         extraScrollHeight={20}
       >
         <FadeInView>
-          <Text style={[styles.label, { color: colores.verde }]}>Foto del Vehículo</Text>
+          <Text style={[styles.label, { color: colores.verde }]}>
+            Foto del Vehículo
+          </Text>
           <TouchableOpacity
             style={[
               styles.fotoBox,
@@ -156,16 +184,22 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
             {fotoVehiculo ? (
               <Image source={{ uri: fotoVehiculo }} style={styles.fotoImg} />
             ) : (
-              <Text style={[styles.fotoPlaceholder, { color: colores.textoTenue }]}>
+              <Text
+                style={[styles.fotoPlaceholder, { color: colores.textoTenue }]}
+              >
                 📷 Toca para agregar
               </Text>
             )}
           </TouchableOpacity>
           {errores.fotoVehiculo && (
-            <Text style={[styles.error, { color: colores.error }]}>{errores.fotoVehiculo}</Text>
+            <Text style={[styles.error, { color: colores.error }]}>
+              {errores.fotoVehiculo}
+            </Text>
           )}
 
-          <Text style={[styles.label, { color: colores.verde }]}>Foto Tarjeta de Propiedad</Text>
+          <Text style={[styles.label, { color: colores.verde }]}>
+            Foto Tarjeta de Propiedad
+          </Text>
           <TouchableOpacity
             style={[
               styles.fotoBox,
@@ -179,13 +213,17 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
             {fotoTarjeta ? (
               <Image source={{ uri: fotoTarjeta }} style={styles.fotoImg} />
             ) : (
-              <Text style={[styles.fotoPlaceholder, { color: colores.textoTenue }]}>
+              <Text
+                style={[styles.fotoPlaceholder, { color: colores.textoTenue }]}
+              >
                 📷 Toca para agregar
               </Text>
             )}
           </TouchableOpacity>
           {errores.fotoTarjeta && (
-            <Text style={[styles.error, { color: colores.error }]}>{errores.fotoTarjeta}</Text>
+            <Text style={[styles.error, { color: colores.error }]}>
+              {errores.fotoTarjeta}
+            </Text>
           )}
 
           <AnimatedInput
@@ -211,52 +249,85 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
             }}
           />
 
-          <Text style={[styles.label, { color: colores.verde }]}>Tipo de Vehículo</Text>
-          <View style={styles.tiposContainer}>
-            {tipos.map((tipo) => (
-              <TouchableOpacity
-                key={tipo.idTipoV}
-                style={[
-                  styles.tipoChip,
-                  {
-                    backgroundColor:
-                      tipoSeleccionado === tipo.idTipoV
-                        ? esOscuro
-                          ? 'rgba(95,217,36,0.20)'
-                          : colores.verdeMuyClaro
-                        : esOscuro
-                          ? colores.glassFondo
-                          : '#f4f6f4',
-                    borderColor:
-                      tipoSeleccionado === tipo.idTipoV
-                        ? colores.verde
-                        : colores.borde,
-                  },
-                ]}
-                onPress={() => {
-                  setTipoSeleccionado(tipo.idTipoV);
-                  if (errores.tipo) setErrores({ ...errores, tipo: undefined });
-                }}
+          <Text style={[styles.label, { color: colores.verde }]}>
+            Tipo de Vehículo
+          </Text>
+
+          {/* ─── Lista de tipos con manejo de estados ─── */}
+          {cargandoTipos ? (
+            <View style={styles.tiposEstado}>
+              <ActivityIndicator size="small" color={colores.verde} />
+              <Text
+                style={[styles.tiposEstadoTexto, { color: colores.textoTenue }]}
               >
-                <Text
-                  style={[
-                    styles.tipoChipTexto,
-                    {
-                      color:
-                        tipoSeleccionado === tipo.idTipoV
-                          ? colores.verde
-                          : colores.textoSecundario,
-                      fontWeight: tipoSeleccionado === tipo.idTipoV ? 'bold' : '500',
-                    },
-                  ]}
-                >
-                  {tipo.tipoVehiculo}
+                Cargando tipos...
+              </Text>
+            </View>
+          ) : errorTipos || tipos.length === 0 ? (
+            <View style={styles.tiposEstado}>
+              <Text
+                style={[styles.tiposEstadoTexto, { color: colores.error }]}
+              >
+                No hay tipos disponibles
+              </Text>
+              <TouchableOpacity onPress={cargarTipos} style={styles.botonReintentar}>
+                <Text style={{ color: colores.verde, fontWeight: '700' }}>
+                  Reintentar
                 </Text>
               </TouchableOpacity>
-            ))}
-          </View>
+            </View>
+          ) : (
+            <View style={styles.tiposContainer}>
+              {tipos.map((tipo) => (
+                <TouchableOpacity
+                  key={tipo.idTipoV}
+                  style={[
+                    styles.tipoChip,
+                    {
+                      backgroundColor:
+                        tipoSeleccionado === tipo.idTipoV
+                          ? esOscuro
+                            ? 'rgba(95,217,36,0.20)'
+                            : colores.verdeMuyClaro
+                          : esOscuro
+                            ? colores.glassFondo
+                            : '#f4f6f4',
+                      borderColor:
+                        tipoSeleccionado === tipo.idTipoV
+                          ? colores.verde
+                          : colores.borde,
+                    },
+                  ]}
+                  onPress={() => {
+                    setTipoSeleccionado(tipo.idTipoV);
+                    if (errores.tipo)
+                      setErrores({ ...errores, tipo: undefined });
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.tipoChipTexto,
+                      {
+                        color:
+                          tipoSeleccionado === tipo.idTipoV
+                            ? colores.verde
+                            : colores.textoSecundario,
+                        fontWeight:
+                          tipoSeleccionado === tipo.idTipoV ? 'bold' : '500',
+                      },
+                    ]}
+                  >
+                    {tipo.tipoVehiculo}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
           {errores.tipo && (
-            <Text style={[styles.error, { color: colores.error }]}>{errores.tipo}</Text>
+            <Text style={[styles.error, { color: colores.error }]}>
+              {errores.tipo}
+            </Text>
           )}
 
           <View style={{ marginTop: espacios.medio }}>
@@ -309,7 +380,12 @@ const styles = StyleSheet.create({
   fotoImg: { width: '100%', height: '100%' },
   fotoPlaceholder: { fontSize: fonts.medio },
   error: { fontSize: fonts.pequeno, marginTop: 4 },
-  tiposContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  tiposContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
   tipoChip: {
     paddingHorizontal: espacios.normal,
     paddingVertical: 10,
@@ -317,4 +393,20 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   tipoChipTexto: { fontSize: fonts.normal },
+  tiposEstado: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: espacios.normal,
+    gap: 8,
+  },
+  tiposEstadoTexto: {
+    fontSize: fonts.normal,
+    fontStyle: 'italic',
+  },
+  botonReintentar: {
+    marginLeft: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
 });

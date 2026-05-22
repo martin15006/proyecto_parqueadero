@@ -1,4 +1,15 @@
-// Lo que la app envía al backend para registrar un usuario
+export interface Usuario {
+  documento: string;
+  fotoPersona: string;
+  nombreCompleto: string;
+  numTelf: string;
+  contactoEmerg: string;
+  correo: string;
+  idTipoUsr: number;
+  idFormacion?: string | null;
+  QR?: string | null;
+}
+
 export interface CreateUsuarioDto {
   documento: string;
   fotoPersona: string;
@@ -8,19 +19,6 @@ export interface CreateUsuarioDto {
   correo: string;
   contra: string;
   idFormacion: string;
-}
-
-// Lo que el backend devuelve (sin contraseña)
-export interface Usuario {
-  documento: string;
-  fotoPersona: string;
-  nombreCompleto: string;
-  numTelf: string;
-  contactoEmerg: string;
-  correo: string;
-  idTipoUsr: number;
-  idFormacion: string | null;
-  QR: string | null;
 }
 
 // Para el paso 1 del login (correo + contraseña)

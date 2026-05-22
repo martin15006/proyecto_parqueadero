@@ -32,13 +32,24 @@ export const sessionService = {
    * Obtiene el token JWT guardado, o null si no hay sesión.
    */
   async obtenerToken(): Promise<string | null> {
-    return AsyncStorage.getItem(TOKEN_KEY);
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    console.log('🔑 TOKEN:', token);
+    return token;
   },
 
   /**
    * Borra completamente la sesión actual (logout).
+   * Esta función la llaman tanto el logout manual como el automático
+   * cuando se detecta sesión inválida.
    */
   async cerrarSesion(): Promise<void> {
+    await AsyncStorage.multiRemove([USUARIO_KEY, TOKEN_KEY]);
+  },
+
+  /**
+   * Alias de `cerrarSesion` (lo usa el api.ts para mantener consistencia).
+   */
+  async eliminarSesion(): Promise<void> {
     await AsyncStorage.multiRemove([USUARIO_KEY, TOKEN_KEY]);
   },
 };
