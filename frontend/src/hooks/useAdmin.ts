@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { dashboardService } from '../services/operativo.service';
 import { socketService } from '../services/socket.service';
 import type { DashboardStats } from '../types';
@@ -15,14 +15,21 @@ export const useAdmin = () => {
   const [heatmap, setHeatmap] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isFetching = useRef(false);
 
   /**
    * Orquestador de carga de datos masiva desde la API de analíticas.
    * API: Consumo de endpoints de analíticas del DashboardController.
    */
   const loadAdminData = useCallback(async () => {
+    // EVITAR CARGAS SIMULTÁNEAS
+    if (isFetching.current) return;
+
     try {
+      isFetching.current = true;
       setLoading(true);
+      setError(null);
+
       const [res, traf, ocup, estad, heat] = await Promise.all([
         dashboardService.getResumen(),
         dashboardService.getTraficoHoras(),
@@ -36,12 +43,19 @@ export const useAdmin = () => {
       setOcupacionTipo(ocup);
       setTendencia(estad);
       setHeatmap(heat);
-      setError(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error crítico en carga de analíticas:', err);
-      setError('No se pudo establecer conexión con el motor de analíticas.');
+      
+      if (err.response?.status === 429) {
+        setError('Demasiadas solicitudes. Por favor, espera un momento.');
+      } else if (err.response?.status === 403) {
+        setError('No tienes permisos suficientes para acceder a estas analíticas.');
+      } else {
+        setError('No se pudo establecer conexión con el motor de analíticas.');
+      }
     } finally {
       setLoading(false);
+      isFetching.current = false;
     }
   }, []);
 

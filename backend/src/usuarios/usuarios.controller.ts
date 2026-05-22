@@ -20,6 +20,7 @@ import { ActualizarPerfilDto } from './dto/actualizar-perfil.dto';
 import { SolicitarCambioCorreoDto } from './dto/solicitar-cambio-correo.dto';
 import { ConfirmarCambioCorreoDto } from './dto/confirmar-cambio-correo.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Usuario } from './entities/usuario.entity';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -38,6 +39,11 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Registrar un nuevo usuario' })
   @ApiResponse({ status: 201, description: 'Usuario creado exitosamente' })
   create(@Body() createUsuarioDto: CreateUsuarioDto) {
+    // SECURITY: Se permite el rol del DTO si viene especificado (para desarrollo/pruebas), 
+    // de lo contrario por defecto es APRENDIZ.
+    if (!createUsuarioDto.idTipoUsr) {
+      createUsuarioDto.idTipoUsr = TipoUsuarioEnum.APRENDIZ;
+    }
     return this.usuarioService.create(createUsuarioDto);
   }
 
@@ -107,7 +113,7 @@ export class UsuariosController {
     return this.usuarioService.actualizarTokenPush(usuario.sub, token);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(TipoUsuarioEnum.ADMIN)
   @ApiBearerAuth()
   @Get()
@@ -116,7 +122,7 @@ export class UsuariosController {
     return this.usuarioService.findAll(page, limit);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
   @ApiBearerAuth()
   @Get('qr/:uuid')
@@ -125,7 +131,7 @@ export class UsuariosController {
     return this.usuarioService.buscarPorQR(uuid);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(TipoUsuarioEnum.ADMIN)
   @ApiBearerAuth()
   @Get(':documento')

@@ -16,18 +16,26 @@ async function bootstrap() {
     contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
   }));
 
-  // SEGURIDAD: CORS configurado restrictivamente
+  // SEGURIDAD: CORS configurado para permitir el frontend y manejar credenciales
   app.enableCors({
     origin: (origin, callback) => {
-      const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
-      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.length === 0 || allowedOrigins.includes('*')) {
+      const allowedOrigins = [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
+        ...(process.env.ALLOWED_ORIGINS?.split(',') || []),
+      ];
+      
+      if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
       }
     },
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'x-iot-api-key'],
   });
 
   // Versionamiento de API

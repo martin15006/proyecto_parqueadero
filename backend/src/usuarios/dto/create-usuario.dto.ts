@@ -24,7 +24,7 @@ export class CreateUsuarioDto {
 
   @IsString()
   @IsNotEmpty({ message: 'La foto es obligatoria' })
-  @Length(1, 255)
+  @Length(1, 255, { message: 'La URL de la foto es demasiado larga' })
   fotoPersona: string;
 
   @IsString()
@@ -46,22 +46,21 @@ export class CreateUsuarioDto {
 
   @IsEmail({}, { message: 'El correo no tiene un formato válido' })
   @IsNotEmpty({ message: 'El correo es obligatorio' })
-  @Length(1, 50)
+  @Length(1, 50, { message: 'El correo debe tener máximo 50 caracteres' })
   correo: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'La contraseña es obligatoria' })
   @ContrasenaSegura()
   contra: string;
 
   @IsString()
   @IsOptional()
   @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      const trimmedValue = value.trim();
-      return trimmedValue === '' ? undefined : trimmedValue;
+    if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) {
+      return undefined;
     }
-    return value;
+    return typeof value === 'string' ? value.trim() : value;
   })
   @Length(7, 7, { message: 'La ficha debe tener exactamente 7 caracteres' })
   @Matches(/^[0-9]+$/, { message: 'La ficha solo puede contener números' })
@@ -70,7 +69,7 @@ export class CreateUsuarioDto {
   @Type(() => Number)
   @IsInt({ message: 'El tipo de usuario debe ser un número válido' })
   @Min(1, { message: 'El tipo de usuario debe ser mayor o igual a 1' })
-  @IsNotEmpty({ message: 'El tipo de usuario es obligatorio' })
-  idTipoUsr: number;
+  @IsOptional()
+  idTipoUsr?: number;
 
 }

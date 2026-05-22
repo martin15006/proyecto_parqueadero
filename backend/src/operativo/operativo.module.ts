@@ -19,6 +19,7 @@ import { GatewayModule } from '../gateway/gateway.module';
 import { Vehiculo } from '../vehiculos/entities/vehiculo.entity';
 import { RegistroVehiculo } from '../vehiculos/entities/registro-vehiculo.entity';
 import { MovimientoVehiculo } from '../vehiculos/entities/movimiento-vehiculo.entity';
+import { Contingencia } from '../contingencia/entities/contingencia.entity';
 
 @Module({
   imports: [
@@ -29,7 +30,7 @@ import { MovimientoVehiculo } from '../vehiculos/entities/movimiento-vehiculo.en
     BahiasModule,
     GatewayModule, // ← necesario para inyectar EventosGateway
     // FIX: Auditoría técnica - registrado TypeOrmModule.forFeature para Vehiculo, RegistroVehiculo y MovimientoVehiculo
-    TypeOrmModule.forFeature([Vehiculo, RegistroVehiculo, MovimientoVehiculo]),
+    TypeOrmModule.forFeature([Vehiculo, RegistroVehiculo, MovimientoVehiculo, Contingencia]),
   ],
   controllers: [OperativoController],
   providers: [OperativoService],

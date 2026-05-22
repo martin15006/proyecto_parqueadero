@@ -1,149 +1,281 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { operativoService } from '../services/operativo.service';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { Badge } from './ui/Badge';
+import { Search, LogIn, LogOut, AlertCircle, ScanLine, FileText } from 'lucide-react';
 
 interface MovementFormProps {
   onSuccess: (msg: string) => void;
   onError: (msg: string) => void;
 }
 
-// FIX: MovementForm - Control de ingresos/salidas con validaciones y loading states
+interface FeedbackState {
+  type: 'success' | 'error' | 'loading' | null;
+  message: string;
+}
+
+interface OperativoResponse {
+  ok: boolean;
+  mensaje: string;
+  bahia: string;
+  movimiento?: unknown;
+}
+
+interface QrResponse {
+  usuario: {
+    nombreCompleto: string;
+  };
+  vehiculos: Array<{
+    placa: string;
+  }>;
+}
+
+/**
+ * FEATURE: MovementForm - Control de ingresos/salidas con escaneo híbrido y contingencia (RF33, RF34)
+ * REFACTOR: Eliminación de placeholders y conexión real a backend con feedback visual profesional.
+ */
 export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }) => {
-  const [placa, setPlaca] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [showContingencia, setShowContingencia] = useState(false);
+  const [feedback, setFeedback] = useState<FeedbackState>({ type: null, message: '' });
+  
+  // UX: Referencia para el input de escaneo (simula lector de barras/QR USB)
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleEntrada = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!placa) return onError('La placa es obligatoria');
+  /**
+   * UX: Auto-foco permanente para operación manos libres (RF33)
+   * Los lectores físicos USB emulan un teclado rápido + 'Enter'.
+   */
+  useEffect(() => {
+    const focusInput = () => {
+      // Solo enfocar si no se está escribiendo el motivo de contingencia
+      if (!showContingencia) {
+        inputRef.current?.focus();
+      }
+    };
     
-    setLoading(true);
-    try {
-      const res = await operativoService.registrarEntrada(placa);
-      onSuccess(`Ingreso exitoso: Bahía ${res.bahia}`);
-      setPlaca('');
-    } catch (error: any) {
-      onError(error.response?.data?.message || 'Error al registrar entrada');
-    } finally {
-      setLoading(false);
+    focusInput();
+    
+    // Re-enfocar si el usuario hace clic en el contenedor principal o vuelve a la pestaña
+    const handleGlobalFocus = () => focusInput();
+    window.addEventListener('focus', handleGlobalFocus);
+    
+    // Limpieza de feedback automático después de 5 segundos si es éxito
+    let timeout: ReturnType<typeof setTimeout>;
+    if (feedback.type === 'success') {
+      timeout = setTimeout(() => setFeedback({ type: null, message: '' }), 5000);
     }
+
+    return () => {
+      window.removeEventListener('focus', handleGlobalFocus);
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [feedback.type, showContingencia]);
+
+  const clearState = () => {
+    setInputValue('');
+    setMotivo('');
+    setShowContingencia(false);
+    setFeedback({ type: null, message: '' });
+    // Pequeño delay para asegurar que el DOM se actualice antes del foco
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
-  const handleSalida = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!placa) return onError('La placa es obligatoria');
-
-    setLoading(true);
-    try {
-      await operativoService.registrarSalida(placa);
-      onSuccess(`Salida registrada correctamente para ${placa}`);
-      setPlaca('');
-    } catch (error: any) {
-      onError(error.response?.data?.message || 'Error al registrar salida');
-    } finally {
-      setLoading(false);
+  /**
+   * Orquestador de acciones operativas.
+   * Conecta con los endpoints reales del backend.
+   */
+  const handleAction = async (action: 'entrada' | 'salida' | 'manual' | 'qr', value?: string) => {
+    const targetValue = (value || inputValue).trim();
+    
+    if (!targetValue && action !== 'qr') {
+      setFeedback({ type: 'error', message: 'LA PLACA O CÓDIGO ES OBLIGATORIO' });
+      return;
     }
-  };
 
-  const handleScanQr = async () => {
-    const qr = window.prompt('Escanee el código QR del usuario (Simulado):');
-    if (!qr) return;
-
-    setLoading(true);
+    setFeedback({ type: 'loading', message: 'COMUNICANDO WITH SERVIDOR...' });
+    
     try {
-      const res = await operativoService.escanearQr(qr);
-      if (res.vehiculos && res.vehiculos.length > 0) {
-        const selectedPlaca = res.vehiculos[0].placa;
-        setPlaca(selectedPlaca);
-        onSuccess(`QR válido: Usuario ${res.usuario.nombre}. Vehículo detectado: ${selectedPlaca}`);
-      } else {
-        onSuccess(`QR válido: Usuario ${res.usuario.nombre}, pero no tiene vehículos registrados.`);
+      switch (action) {
+        case 'entrada':
+          const resEntrada: OperativoResponse = await operativoService.registrarEntrada(targetValue);
+          setFeedback({ 
+            type: 'success', 
+            message: `¡INGRESO AUTORIZADO! Bahía Asignada: ${resEntrada.bahia}` 
+          });
+          onSuccess(`Ingreso: ${targetValue} -> ${resEntrada.bahia}`);
+          clearState();
+          break;
+
+        case 'salida':
+          await operativoService.registrarSalida(targetValue);
+          setFeedback({ 
+            type: 'success', 
+            message: `¡SALIDA REGISTRADA! Vehículo ${targetValue} retirado.` 
+          });
+          onSuccess(`Salida: ${targetValue}`);
+          clearState();
+          break;
+
+        case 'manual':
+          if (!motivo || motivo.length < 10) {
+            throw new Error('EL MOTIVO DEBE TENER AL MENOS 10 CARACTERES');
+          }
+          const resManual: OperativoResponse = await operativoService.registrarIngresoManual(targetValue, motivo);
+          setFeedback({ 
+            type: 'success', 
+            message: `¡CONTINGENCIA REGISTRADA! Bahía: ${resManual.bahia}` 
+          });
+          onSuccess(`Manual: ${targetValue} -> ${resManual.bahia}`);
+          clearState();
+          break;
+
+        case 'qr':
+          const resQr: QrResponse = await operativoService.escanearQr(targetValue);
+          if (resQr.vehiculos && resQr.vehiculos.length > 0) {
+            const qrPlaca = resQr.vehiculos[0].placa;
+            setInputValue(qrPlaca);
+            setFeedback({ 
+              type: 'success', 
+              message: `QR VÁLIDO: ${resQr.usuario.nombreCompleto}. PLACA: ${qrPlaca}` 
+            });
+          } else {
+            setFeedback({ 
+              type: 'error', 
+              message: `USUARIO ${resQr.usuario.nombreCompleto} SIN VEHÍCULOS REGISTRADOS` 
+            });
+            setInputValue('');
+          }
+          break;
       }
     } catch (error: any) {
-      onError(error.response?.data?.message || 'Código QR inválido o no encontrado');
-    } finally {
-      setLoading(false);
+      const errorMsg = error.message || 'ERROR EN LA OPERACIÓN';
+      setFeedback({ type: 'error', message: errorMsg.toUpperCase() });
+      onError(errorMsg);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      if (inputValue.length > 15 || inputValue.startsWith('QR_')) {
+        handleAction('qr');
+      } else if (inputValue.length >= 4) {
+        handleAction('entrada');
+      }
     }
   };
 
   const handleEmergencia = async () => {
-    if (!window.confirm('¿CONFIRMA SALIDA DE EMERGENCIA GLOBAL? Se liberarán todas las bahías.')) return;
-    
-    setLoading(true);
+    if (!window.confirm('¿CONFIRMA SALIDA DE EMERGENCIA GLOBAL?')) return;
+    setFeedback({ type: 'loading', message: 'ACTIVANDO PROTOCOLO DE EMERGENCIA...' });
     try {
       await operativoService.salidaEmergencia();
-      onSuccess('PROTOCOLO DE EMERGENCIA ACTIVADO: Todas las bahías liberadas');
+      setFeedback({ type: 'success', message: '¡EMERGENCIA! TODAS LAS BAHÍAS LIBERADAS.' });
+      onSuccess('Protocolo de emergencia ejecutado');
+      clearState();
     } catch (error: any) {
-      onError('Error al activar protocolo de emergencia');
-    } finally {
-      setLoading(false);
+      setFeedback({ type: 'error', message: 'ERROR AL ACTIVAR EMERGENCIA' });
     }
   };
 
   return (
-    <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl">
-      <h3 className="text-gray-400 text-xs font-bold uppercase mb-6 flex items-center gap-2">
-        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-        Control de Movimientos
-      </h3>
+    <div 
+      className="bg-gray-900 border border-gray-800 p-8 rounded-[3rem] relative overflow-hidden shadow-2xl transition-all"
+      onClick={() => !showContingencia && inputRef.current?.focus()}
+    >
+      {/* Feedback Banners */}
+      {feedback.type && (
+        <div className={`absolute top-0 left-0 w-full p-4 text-center text-[10px] font-black z-20 animate-slide-down border-b shadow-2xl transition-all ${
+          feedback.type === 'success' ? 'bg-green-500 text-white border-green-400' :
+          feedback.type === 'error' ? 'bg-red-600 text-white border-red-500' :
+          'bg-blue-600 text-white border-blue-500'
+        }`}>
+          {feedback.message}
+        </div>
+      )}
 
       <div className="space-y-6">
-        <div>
-          <label className="text-[10px] text-gray-500 font-bold uppercase mb-2 block tracking-widest">
-            Placa del Vehículo
-          </label>
-          <input 
-            type="text" 
-            value={placa}
-            onChange={(e) => setPlaca(e.target.value.toUpperCase())}
-            placeholder="PVP-000"
-            className="w-full bg-black border border-gray-800 rounded-xl px-4 py-4 text-3xl font-black text-center tracking-[0.2em] focus:border-blue-500 outline-none transition-all placeholder:text-gray-800"
-            maxLength={7}
+        <header className="flex justify-between items-center">
+          <div>
+            <h3 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+              <ScanLine size={24} className="text-blue-500" /> Control de Acceso
+            </h3>
+            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-1">Escaneo Híbrido Activo</p>
+          </div>
+          <Badge variant={feedback.type === 'loading' ? 'info' : 'success'}>
+            {feedback.type === 'loading' ? 'Sincronizando' : 'Sistema Listo'}
+          </Badge>
+        </header>
+
+        <div className="space-y-4">
+          <Input 
+            ref={inputRef}
+            placeholder="Escanear QR o Digitar Placa..."
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value.toUpperCase())}
+            onKeyDown={handleKeyDown}
+            disabled={feedback.type === 'loading'}
+            icon={<Search size={20} className="text-gray-400" />}
+            className="!bg-gray-800 !border-gray-700 !text-white !placeholder-gray-600 !h-16 !text-lg !rounded-3xl focus:!border-blue-600"
           />
+
+          <div className="grid grid-cols-2 gap-4">
+            <Button 
+              variant="primary" 
+              className="h-16 text-sm"
+              onClick={() => handleAction('entrada')}
+              isLoading={feedback.type === 'loading'}
+            >
+              <LogIn size={20} className="mr-2" /> ENTRADA
+            </Button>
+            <Button 
+              variant="secondary" 
+              className="h-16 text-sm border border-gray-700"
+              onClick={() => handleAction('salida')}
+              isLoading={feedback.type === 'loading'}
+            >
+              <LogOut size={20} className="mr-2" /> SALIDA
+            </Button>
+          </div>
+
+          <div className="pt-4 flex flex-col gap-3">
+            <button 
+              onClick={() => setShowContingencia(!showContingencia)}
+              className="text-[10px] font-black text-gray-500 uppercase tracking-widest hover:text-blue-500 transition-colors flex items-center justify-center gap-2"
+            >
+              <FileText size={14} /> {showContingencia ? 'Ocultar Contingencia' : '¿Problemas con el sensor? Registro Manual'}
+            </button>
+
+            {showContingencia && (
+              <div className="space-y-3 animate-fade-in p-6 bg-gray-800/50 rounded-[2rem] border border-gray-700/50">
+                <Input 
+                  label="Motivo de la Contingencia"
+                  placeholder="Mínimo 10 caracteres..."
+                  value={motivo}
+                  onChange={(e) => setMotivo(e.target.value)}
+                  className="!bg-gray-900 !border-gray-800 !text-white"
+                />
+                <Button 
+                  variant="outline" 
+                  className="w-full !border-orange-500/50 !text-orange-500 hover:!bg-orange-500/10"
+                  onClick={() => handleAction('manual')}
+                  isLoading={feedback.type === 'loading'}
+                >
+                  Confirmar Registro Manual
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <button 
-            onClick={handleEntrada}
-            disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-4 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg shadow-blue-600/20"
-          >
-            {loading ? '...' : 'REGISTRAR ENTRADA'}
-          </button>
-          <button 
-            onClick={handleSalida}
-            disabled={loading}
-            className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white py-4 rounded-xl font-black text-sm transition-all active:scale-95 border border-gray-700"
-          >
-            {loading ? '...' : 'REGISTRAR SALIDA'}
-          </button>
-        </div>
-
-        <button 
-          onClick={handleScanQr}
-          disabled={loading}
-          className="w-full bg-white text-black py-3 rounded-xl font-black text-xs transition-all active:scale-95 flex items-center justify-center gap-2 hover:bg-gray-200"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 17h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-          </svg>
-          ESCANEAR CÓDIGO QR
-        </button>
-
-        <div className="pt-4 border-t border-gray-800 flex flex-col gap-3">
-          <button 
-            className="w-full bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white py-3 rounded-xl font-bold text-xs transition-all border border-orange-500/20"
-            onClick={() => alert('Función de escaneo QR pendiente de integración con cámara')}
-          >
-            ESCANEAR QR USUARIO
-          </button>
+        <div className="pt-6 border-t border-gray-800">
           <button 
             onClick={handleEmergencia}
-            disabled={loading}
-            className="w-full bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white py-3 rounded-xl font-black text-xs transition-all active:scale-95 border border-red-600/20 flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-2xl border-2 border-red-500/20 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all flex items-center justify-center gap-2"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            SALIDA DE EMERGENCIA GLOBAL
+            <AlertCircle size={16} /> Protocolo de Emergencia
           </button>
         </div>
       </div>

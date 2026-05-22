@@ -12,7 +12,8 @@ class SocketService {
   connect() {
     if (!this.socket) {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const token = user.access_token || user.token;
+      // FIX: Soportar ambos formatos de token tras normalización global
+      const token = user.accessToken || user.access_token || user.token;
       
       this.socket = io(this.URL, {
         reconnectionAttempts: 5,

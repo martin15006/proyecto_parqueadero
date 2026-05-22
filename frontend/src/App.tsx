@@ -3,6 +3,7 @@ import Login from './login';
 import Registro from './registro';
 import ProtectedRoute from './ProtectedRoute';
 import { AuthProvider, useAuth } from './AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import { OperativoDashboard } from './pages/OperativoDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminLayout } from './layouts/AdminLayout';
@@ -16,36 +17,40 @@ import { TelemetriaPage } from './pages/admin/TelemetriaPage';
 function Saludo() {
   const { user, logout } = useAuth();
   
-  // Desempaquetamos de forma segura los datos del usuario
-  const datosReales = user?.user || user?.usuario || user;
-  const nombreReal = datosReales?.nombreCompleto || datosReales?.nombrecompleto || 'Usuario';
-  const rol = parseInt(datosReales?.idTipoUsr || datosReales?.idtipousr || '1', 10);
+  // REFACTOR: Acceso seguro al perfil tras tipado estricto de AuthData
+  const perfil = user?.usuario;
+  const nombreReal = perfil?.nombreCompleto || 'Usuario';
+  const idRol = parseInt(String(perfil?.idTipoUsr || 0), 10);
+  
+  const isAdmin = idRol === 2;
+  const isOperativo = idRol === 3;
+  const isAprendiz = idRol === 1;
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6 font-sans">
-      <div className="bg-white p-12 rounded-[3rem] shadow-2xl max-w-lg w-full text-center space-y-8">
-        <div className="w-24 h-24 bg-blue-600 rounded-[2.5rem] flex items-center justify-center text-white text-4xl font-black mx-auto shadow-xl shadow-blue-600/20">
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6 font-sans">
+      <div className="bg-white p-12 rounded-[3.5rem] shadow-2xl max-w-lg w-full text-center space-y-8 border border-gray-100">
+        <div className="w-24 h-24 bg-blue-600 rounded-[2.5rem] flex items-center justify-center text-white text-4xl font-black mx-auto shadow-2xl shadow-blue-600/30">
           {nombreReal.substring(0,1)}
         </div>
         
         <div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight mb-2">¡Hola, {nombreReal}!</h1>
-          <p className="text-gray-500 font-medium uppercase tracking-widest text-xs">Bienvenido al Ecosistema de Gestión</p>
+          <p className="text-gray-500 font-medium uppercase tracking-widest text-[10px]">Bienvenido al Ecosistema de Gestión</p>
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-          {(rol === 2) && (
-            <a href="/appadmin" className="bg-blue-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-600/20">
+          {isAdmin && (
+            <a href="/appadmin" className="bg-blue-600 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-xl shadow-blue-600/20">
               Panel Administrador
             </a>
           )}
-          {(rol === 3) && (
-            <a href="/appperop" className="bg-gray-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all active:scale-95 shadow-lg">
+          {isOperativo && (
+            <a href="/appperop" className="bg-gray-900 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-black transition-all active:scale-95 shadow-xl shadow-gray-900/20">
               Panel Operativo
             </a>
           )}
-          {(rol === 1) && (
-            <a href="/app" className="bg-green-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-green-700 transition-all active:scale-95 shadow-lg shadow-green-600/20">
+          {isAprendiz && (
+            <a href="/app" className="bg-green-600 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-green-700 transition-all active:scale-95 shadow-xl shadow-green-600/20">
               Panel Aprendiz
             </a>
           )}
@@ -79,31 +84,33 @@ function PanelAprendiz() {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/registro" element={<Registro />} />
-          
-          <Route path="/" element={<ProtectedRoute><Saludo /></ProtectedRoute>} />
+    <NotificationProvider>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/registro" element={<Registro />} />
+            
+            <Route path="/" element={<ProtectedRoute><Saludo /></ProtectedRoute>} />
 
-          {/* Rutas Admin con Layout */}
-          <Route path="/appadmin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="usuarios" element={<UsuariosPage />} />
-            <Route path="vehiculos" element={<VehiculosPage />} />
-            <Route path="bahias" element={<BahiasPage />} />
-            <Route path="auditoria" element={<AuditoriaPage />} />
-            <Route path="telemetria" element={<TelemetriaPage />} />
-          </Route>
+            {/* Rutas Admin con Layout */}
+            <Route path="/appadmin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="usuarios" element={<UsuariosPage />} />
+              <Route path="vehiculos" element={<VehiculosPage />} />
+              <Route path="bahias" element={<BahiasPage />} />
+              <Route path="auditoria" element={<AuditoriaPage />} />
+              <Route path="telemetria" element={<TelemetriaPage />} />
+            </Route>
 
-          <Route path="/appperop" element={<ProtectedRoute><OperativoDashboard /></ProtectedRoute>} />
-          <Route path="/app" element={<ProtectedRoute><PanelAprendiz /></ProtectedRoute>} />
+            <Route path="/appperop" element={<ProtectedRoute><OperativoDashboard /></ProtectedRoute>} />
+            <Route path="/app" element={<ProtectedRoute><PanelAprendiz /></ProtectedRoute>} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </NotificationProvider>
   );
 }
 

@@ -30,8 +30,8 @@ export class Visitante {
   @Column({ type: 'text', nullable: true })
   descripcion: string;
 
-  @Column()
-  idOperativo: number;
+  @Column({ length: 10 })
+  idOperativo: string;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

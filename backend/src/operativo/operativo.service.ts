@@ -18,8 +18,10 @@ import { Vehiculo } from '../vehiculos/entities/vehiculo.entity';
 import { RegistroVehiculo } from '../vehiculos/entities/registro-vehiculo.entity';
 import { MovimientoVehiculo, EstadoMovimiento } from '../vehiculos/entities/movimiento-vehiculo.entity';
 import { Bahia } from '../bahias/entities/bahia.entity';
+import { Contingencia } from '../contingencia/entities/contingencia.entity';
 
 import { LoginOperativoDto } from './dto/login-operativo.dto';
+import { RegistrarIngresoManualDto } from './dto/registrar-ingreso-manual.dto';
 import { IJwtPayload } from '../common/interfaces/auth.interface';
 
 /**
@@ -100,6 +102,56 @@ export class OperativoService {
         ok: true,
         mensaje: 'Ingreso procesado exitosamente',
         movimiento: guardado,
+        bahia: bahia.nombreBahia,
+      };
+    });
+  }
+
+  /**
+   * Registro Manual de Contingencia (RF34).
+   * Permite el ingreso de vehículos cuando fallan los sistemas automáticos o por casos especiales.
+   * PERFORMANCE: Mantiene Pessimistic Write Lock y transaccionalidad completa.
+   * @param dto Datos del ingreso y motivo de contingencia
+   * @param operador Datos del operario responsable
+   */
+  async registrarIngresoManual(dto: RegistrarIngresoManualDto, operador: IJwtPayload & { ip: string }) {
+    return await this.movimientoRepository.manager.transaction(async (manager) => {
+      // 1. Validaciones de existencia (Se permite placa o documento)
+      const { registro } = await this.validarVehiculoYRegistro(dto.placa, manager);
+      await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
+
+      // 2. Asignación de infraestructura con Pessimistic Lock (Garantiza exclusión mutua)
+      const bahia = await this.asignarBahiaDisponible(manager);
+
+      // 3. Registro formal del movimiento marcado como manual
+      const nuevoMovimiento = manager.create(MovimientoVehiculo, {
+        horaIngreso: new Date(),
+        idRegistroVehiculo: registro.idRegistroV,
+        idBahia: bahia.idBahia,
+        estado: EstadoMovimiento.ADENTRO,
+        esManual: true, // Flag de contingencia
+      });
+
+      const movimientoGuardado = await manager.save(nuevoMovimiento);
+
+      // 4. Registro formal de la contingencia para auditoría RF34
+      const contingencia = manager.create(Contingencia, {
+        tipoOperacion: 'INGRESO',
+        placa: dto.placa,
+        motivo: dto.motivo,
+        idOperativo: operador.sub, // Documento del operario
+        idMovimiento: movimientoGuardado.idMovimiento,
+      });
+
+      await manager.save(contingencia);
+
+      // 5. Ejecutar procesos post-ingreso (Auditoría, Sockets, etc.)
+      await this.ejecutarPostIngreso(movimientoGuardado, dto.placa, bahia.nombreBahia, operador);
+
+      return {
+        ok: true,
+        mensaje: 'Ingreso manual por contingencia registrado correctamente',
+        idMovimiento: movimientoGuardado.idMovimiento,
         bahia: bahia.nombreBahia,
       };
     });

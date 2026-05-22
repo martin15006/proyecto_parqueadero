@@ -36,6 +36,9 @@ export class MovimientoVehiculo {
   })
   estado: EstadoMovimiento;
 
+  @Column({ default: false })
+  esManual: boolean;
+
   // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

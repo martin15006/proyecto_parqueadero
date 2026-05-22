@@ -23,10 +23,15 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
-    if (!user || user.idTipoUsr === undefined) {
+    // FIX: Normalización de roles para soportar camelCase (Entity) y snake_case (DB/DTO)
+    // SECURITY: Validación estricta de presencia de rol para evitar bypass
+    const idRol = user?.idTipoUsr ?? user?.id_tipo_usr;
+
+    if (!user || idRol === undefined || idRol === null) {
       return false;
     }
 
-    return requiredRoles.includes(user.idTipoUsr);
+    // Aseguramos comparación numérica ya que los enums son números
+    return requiredRoles.includes(Number(idRol));
   }
 }

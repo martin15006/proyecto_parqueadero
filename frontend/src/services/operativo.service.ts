@@ -25,6 +25,16 @@ export const operativoService = {
   salidaEmergencia: async () => {
     const response = await api.post('/operativo/salida-emergencia');
     return response.data;
+  },
+
+  /**
+   * Registro Manual de Contingencia (RF34).
+   * @param placa Placa o documento del vehículo.
+   * @param motivo Razón obligatoria de la contingencia.
+   */
+  registrarIngresoManual: async (placa: string, motivo: string) => {
+    const response = await api.post('/operativo/registrar-ingreso-manual', { placa, motivo });
+    return response.data;
   }
 };
 

@@ -63,11 +63,11 @@ export const AdminLayout: React.FC = () => {
         <div className="mt-auto p-8 border-t border-gray-50">
           <div className="flex items-center gap-4 mb-6">
             <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500 font-black text-xs uppercase">
-              {user?.nombreCompleto?.substring(0, 2) || 'AD'}
+              {user?.usuario?.nombreCompleto?.substring(0, 2) || 'AD'}
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="text-xs font-black text-gray-900 truncate">{user?.nombreCompleto || 'Administrador'}</p>
-              <p className="text-[9px] font-bold text-gray-400 uppercase truncate">{user?.correo}</p>
+              <p className="text-xs font-black text-gray-900 truncate">{user?.usuario?.nombreCompleto || 'Administrador'}</p>
+              <p className="text-[9px] font-bold text-gray-400 uppercase truncate">{user?.usuario?.correo}</p>
             </div>
           </div>
           

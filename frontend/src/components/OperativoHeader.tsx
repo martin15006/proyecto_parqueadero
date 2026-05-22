@@ -11,9 +11,9 @@ export const OperativoHeader: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Manejo de datos de usuario según estructura detectada
-  const userData = user?.user || user?.usuario || user;
-  const nombre = userData?.nombreCompleto || userData?.nombrecompleto || 'Operador';
+  // REFACTOR: Acceso seguro al perfil tras tipado estricto
+  const userData = user?.usuario;
+  const nombre = userData?.nombreCompleto || 'Operador';
 
   return (
     <header className="bg-gray-900 border-b border-gray-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50">

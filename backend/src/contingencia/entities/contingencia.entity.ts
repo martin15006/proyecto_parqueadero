@@ -21,8 +21,11 @@ export class Contingencia {
   @Column({ type: 'text' })
   motivo: string;
 
-  @Column()
-  idOperativo: number;
+  @Column({ length: 10 })
+  idOperativo: string;
+
+  @Column({ nullable: true })
+  idMovimiento: number;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

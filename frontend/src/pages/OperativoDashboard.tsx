@@ -6,6 +6,7 @@ import { ParkingGrid } from '../components/ParkingGrid';
 import { ActiveVehiclesTable } from '../components/ActiveVehiclesTable';
 import { AlertPanel } from '../components/AlertPanel';
 import { MovementForm } from '../components/MovementForm';
+import { useNotification } from '../contexts/NotificationContext';
 
 /**
  * Dashboard Operativo (Vista Principal).
@@ -19,14 +20,14 @@ export const OperativoDashboard: React.FC = () => {
     vehiculos, 
     alerts, 
     loading,
-    toast, 
-    showToast, 
     handleQuickSalida 
   } = useOperativo();
 
+  const { showNotification } = useNotification();
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center space-y-4">
+      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
         <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest animate-pulse">Sincronizando Sistema...</p>
       </div>
@@ -34,20 +35,10 @@ export const OperativoDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-gray-100 flex flex-col font-sans selection:bg-blue-500/30 overflow-x-hidden">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col font-sans selection:bg-blue-500/30 overflow-x-hidden">
       <OperativoHeader />
 
       <main className="flex-1 p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto w-full">
-        {/* FEATURE: Sistema de Notificaciones Toast Dinámico */}
-        {toast && (
-          <div className={`fixed bottom-6 right-6 z-[100] px-6 py-4 rounded-2xl shadow-2xl border flex items-center gap-3 animate-in fade-in slide-in-from-bottom-5 duration-300 ${
-            toast.tipo === 'success' ? 'bg-green-500/10 border-green-500/50 text-green-500' : 'bg-red-500/10 border-red-500/50 text-red-500'
-          }`}>
-            <div className={`w-2 h-2 rounded-full ${toast.tipo === 'success' ? 'bg-green-500 animate-pulse' : 'bg-red-500 animate-ping'}`}></div>
-            <p className="text-sm font-black uppercase tracking-tight">{toast.msg}</p>
-          </div>
-        )}
-
         {/* FEATURE: Indicadores de Rendimiento (KPIs) en tiempo real */}
         <ParkingStats {...stats} />
 
@@ -55,8 +46,8 @@ export const OperativoDashboard: React.FC = () => {
           {/* FEATURE: Panel de Control y Monitoreo de Seguridad */}
           <div className="xl:col-span-4 space-y-6 flex flex-col">
             <MovementForm 
-              onSuccess={(msg) => showToast(msg, 'success')} 
-              onError={(msg) => showToast(msg, 'error')} 
+              onSuccess={(msg) => showNotification(msg, 'success')} 
+              onError={(msg) => showNotification(msg, 'error')} 
             />
             
             {/* FEATURE: Panel de Alertas y Eventos Críticos */}

@@ -19,6 +19,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { MailService } from '../mail/mail.service';
 import { VehiculosService } from '../vehiculos/vehiculos.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 
 const OTP_EXPIRA_MINUTOS = 5;
 

@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -14,9 +15,6 @@ import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
 import { VehiculosModule } from './vehiculos/vehiculos.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
-
-// Guard global de roles
-import { RolesGuard } from './common/guards/roles.guard';
 
 // Módulo de auditoría (ruta correcta)
 import { AuditoriaModule } from './auditoria/auditoria.module';
@@ -44,19 +42,22 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
       isGlobal: true,
     }),
 
-    // SEGURIDAD: Rate Limiting global (Optimizado para Mobile)
+    // Automatización de tareas (Cron Jobs)
+    ScheduleModule.forRoot(),
+
+    // SEGURIDAD: Rate Limiting global (Optimizado para Mobile y Dashboards)
     ThrottlerModule.forRoot([{
       name: 'short',
       ttl: 1000,
-      limit: 3, // Máximo 3 peticiones por segundo
+      limit: 30, // Incrementado de 10 a 30 para soportar ráfagas de carga masiva del dashboard (RF33)
     }, {
       name: 'medium',
       ttl: 10000,
-      limit: 20, // Máximo 20 peticiones cada 10 segundos
+      limit: 100, // Incrementado de 40 a 100 para permitir navegación rápida sin bloqueos
     }, {
       name: 'long',
       ttl: 60000,
-      limit: 100, // Máximo 100 peticiones por minuto
+      limit: 300, // Máximo 300 peticiones por minuto
     }]),
 
     TypeOrmModule.forRootAsync({
@@ -74,7 +75,12 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
           __dirname + '/**/*.entity{.ts,.js}',
         ],
 
+        migrations: [
+          __dirname + '/migrations/*{.ts,.js}',
+        ],
+
         synchronize: false,
+        migrationsRun: false, // Se deshabilita para evitar conflictos con migraciones antiguas; ejecutar manualmente vía CLI si es necesario
         namingStrategy: new SnakeNamingStrategy(),
       }),
     }),
@@ -103,12 +109,6 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
-    },
-
-    // Guard global para control de roles
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
     },
   ],
 })

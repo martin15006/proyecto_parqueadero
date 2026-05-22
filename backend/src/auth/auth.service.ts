@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository, MoreThan, EntityManager } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -17,6 +17,7 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
 import { CodigoOtp } from '../usuarios/entities/codigo-otp.entity';
 import { SesionActiva } from './entities/sesion-activa.entity';
 import { TokenBloqueado } from './entities/token-bloqueado.entity';
+import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 
 import { LoginDto } from '../usuarios/dto/login.dto';
 import { VerificarOtpDto } from './dto/verificar-otp.dto';
@@ -96,57 +97,100 @@ export class AuthService implements OnModuleInit {
   /**
    * Paso 2: Verificación de OTP y emisión de tokens.
    * SECURITY: Implementa límites de intentos y validación temporal.
+   * PERFORMANCE: Usa bloqueo pesimista para evitar condiciones de carrera en verificaciones simultáneas.
    * @param dto Datos de verificación
    */
-  async verificarOtp(dto: VerificarOtpDto): Promise<{ access_token: string; refresh_token: string; usuario: Omit<Usuario, 'contra'> }> {
-    const usuario = await this.usuarioRepository.findOne({
-      where: { correo: dto.correo },
+  async verificarOtp(dto: VerificarOtpDto): Promise<{ 
+    access_token: string; 
+    refresh_token: string; 
+    usuario: Omit<Usuario, 'contra'> & { rol: string } 
+  }> {
+    return await this.otpRepository.manager.transaction(async (manager) => {
+      const usuario = await manager.findOne(Usuario, {
+        where: { correo: dto.correo },
+      });
+
+      if (!usuario) {
+        throw new NotFoundException('Usuario no encontrado');
+      }
+
+      // SECURITY: Bloqueo pesimista para evitar que dos hilos procesen el mismo OTP simultáneamente
+      const otp = await manager.findOne(CodigoOtp, {
+        where: { documento: usuario.documento, usado: false },
+        order: { createdAt: 'DESC' },
+        lock: { mode: 'pessimistic_write' }
+      });
+
+      if (!otp) {
+        // REFACTOR: Si no hay OTP activo, verificamos si se usó uno hace menos de 3 segundos
+        // para mitigar el error 400 en peticiones duplicadas del frontend.
+        const otpReciente = await manager.findOne(CodigoOtp, {
+          where: { documento: usuario.documento, usado: true },
+          order: { updatedAt: 'DESC' },
+        });
+
+        if (otpReciente && (new Date().getTime() - otpReciente.updatedAt.getTime() < 3000)) {
+          this.logger.warn(`Petición de verificación duplicada detectada para usuario: ${usuario.documento}. Ignorando.`);
+          // En lugar de lanzar error, podríamos intentar recuperar la última sesión, 
+          // pero por seguridad y simplicidad, el frontend debe manejar la redirección.
+          // Lanzamos un error específico que el frontend pueda identificar si fuera necesario,
+          // o simplemente mantenemos el 400 pero con un mensaje más claro.
+          throw new BadRequestException('Petición duplicada procesada exitosamente.');
+        }
+
+        throw new BadRequestException('No hay código activo. Solicita uno nuevo.');
+      }
+
+      if (new Date() > otp.expiraEn) {
+        otp.usado = true;
+        await manager.save(otp);
+        throw new BadRequestException('El código ha expirado. Solicita uno nuevo.');
+      }
+
+      const maxIntentos = this.configService.get<number>('OTP_MAX_ATTEMPTS') ?? 3;
+      if (otp.intentos >= maxIntentos) {
+        otp.usado = true;
+        await manager.save(otp);
+        throw new BadRequestException('Demasiados intentos fallidos. Solicita un código nuevo.');
+      }
+
+      if (otp.codigo !== dto.codigo) {
+        otp.intentos += 1;
+        await manager.save(otp);
+        throw new UnauthorizedException(`Código incorrecto. Intentos restantes: ${maxIntentos - otp.intentos}`);
+      }
+
+      // Marcamos como usado dentro de la transacción bloqueada
+      otp.usado = true;
+      await manager.save(otp);
+
+      const tokens = await this.generarTokens(usuario, manager);
+      
+      // SERIALIZATION: Aseguramos que el objeto enviado al cliente tenga los campos 
+      // con los nombres esperados por el frontend y que idTipoUsr esté presente.
+      const rolNombre = TipoUsuarioEnum[usuario.idTipoUsr] || 'APRENDIZ';
+
+      const { contra, ...usuarioSinContrasena } = usuario;
+
+      return { 
+        ...tokens, 
+        usuario: {
+          ...usuarioSinContrasena,
+          idTipoUsr: usuario.idTipoUsr,
+          rol: rolNombre
+        } 
+      };
     });
-
-    if (!usuario) {
-      throw new NotFoundException('Usuario no encontrado');
-    }
-
-    const otp = await this.otpRepository.findOne({
-      where: { documento: usuario.documento, usado: false },
-      order: { createdAt: 'DESC' },
-    });
-
-    if (!otp) {
-      throw new BadRequestException('No hay código activo. Solicita uno nuevo.');
-    }
-
-    if (new Date() > otp.expiraEn) {
-      await this.marcarOtpComoUsado(otp);
-      throw new BadRequestException('El código ha expirado. Solicita uno nuevo.');
-    }
-
-    const maxIntentos = this.configService.get<number>('OTP_MAX_ATTEMPTS') ?? 3;
-    if (otp.intentos >= maxIntentos) {
-      await this.marcarOtpComoUsado(otp);
-      throw new BadRequestException('Demasiados intentos fallidos. Solicita un código nuevo.');
-    }
-
-    if (otp.codigo !== dto.codigo) {
-      otp.intentos += 1;
-      await this.otpRepository.save(otp);
-      throw new UnauthorizedException(`Código incorrecto. Intentos restantes: ${maxIntentos - otp.intentos}`);
-    }
-
-    await this.marcarOtpComoUsado(otp);
-
-    const tokens = await this.generarTokens(usuario);
-    const { contra, ...usuarioSinContrasena } = usuario;
-
-    return { ...tokens, usuario: usuarioSinContrasena as Omit<Usuario, 'contra'> };
   }
 
   /**
    * Genera un par de Access Token (JWT) y Refresh Token (Opaque).
    * MOBILE_API: Emite tokens optimizados. El payload JWT es ligero para ahorrar datos.
    * SERIALIZATION: El Refresh Token es opaco y persistido para seguridad del hardware/mobile.
+   * @param usuario Usuario para el que se generan tokens
+   * @param manager Opcional: EntityManager para ejecutar dentro de una transacción
    */
-  async generarTokens(usuario: Usuario) {
+  async generarTokens(usuario: Usuario, manager?: EntityManager) {
     // MOBILE_API: Payload mínimo para reducir el tamaño del header Authorization
     const payload: IJwtPayload = {
       sub: usuario.documento,
@@ -160,7 +204,10 @@ export class AuthService implements OnModuleInit {
     const expiraEn = new Date();
     expiraEn.setDate(expiraEn.getDate() + 7);
 
-    await this.sesionRepository.save({
+    // Si hay un manager, usamos su repositorio para participar en la transacción
+    const sesionRepo = manager ? manager.getRepository(SesionActiva) : this.sesionRepository;
+
+    await sesionRepo.save({
       documento: usuario.documento,
       refreshToken: refresh_token,
       expiraEn,
@@ -192,7 +239,18 @@ export class AuthService implements OnModuleInit {
     sesion.revocado = true;
     await this.sesionRepository.save(sesion);
 
-    return this.generarTokens(sesion.usuario);
+    const tokens = await this.generarTokens(sesion.usuario);
+    const rolNombre = TipoUsuarioEnum[sesion.usuario.idTipoUsr] || 'APRENDIZ';
+    const { contra, ...usuarioSinContrasena } = sesion.usuario;
+
+    return {
+      ...tokens,
+      usuario: {
+        ...usuarioSinContrasena,
+        idTipoUsr: sesion.usuario.idTipoUsr,
+        rol: rolNombre
+      }
+    };
   }
 
   /**
@@ -339,8 +397,25 @@ export class AuthService implements OnModuleInit {
 
   /**
    * Genera un código OTP y lo envía.
+   * SECURITY: Implementa protección contra ráfagas (burst) y condiciones de carrera.
    */
   private async generarYEnviarOtp(usuario: Usuario): Promise<void> {
+    // SECURITY: Evitar generación masiva de OTPs (condiciones de carrera y spam)
+    const ultimoOtp = await this.otpRepository.findOne({
+      where: { documento: usuario.documento, usado: false },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (ultimoOtp) {
+      const UN_MINUTO = 60 * 1000;
+      const tiempoTranscurrido = Date.now() - ultimoOtp.createdAt.getTime();
+      
+      if (tiempoTranscurrido < UN_MINUTO) {
+        this.logger.warn(`Intento de generación de OTP bloqueado por rate-limit (1min) para usuario: ${usuario.documento}`);
+        throw new BadRequestException('Ya se envió un código recientemente. Espera 1 minuto antes de solicitar otro.');
+      }
+    }
+
     await this.otpRepository.update(
       { documento: usuario.documento, usado: false },
       { usado: true },

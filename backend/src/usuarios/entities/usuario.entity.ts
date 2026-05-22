@@ -72,7 +72,7 @@ export class Usuario {
    * Identificador del tipo de usuario (Roles: 1=Aprendiz, 2=Admin, 3=Operativo).
    */
   @Index()
-  @Column({ type: 'smallint' })
+  @Column({ name: 'id_tipo_usr', type: 'smallint' })
   idTipoUsr: number;
 
   /**

@@ -1,5 +1,9 @@
 import React from 'react';
 import type { Movement } from '../types';
+import { Table } from './ui/Table';
+import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
+import { Clock, Car } from 'lucide-react';
 
 interface ActiveVehiclesTableProps {
   vehiculos: Movement[];
@@ -12,67 +16,75 @@ interface ActiveVehiclesTableProps {
  * SOCKET: Se actualiza dinámicamente al detectar movimientos.
  */
 export const ActiveVehiclesTable: React.FC<ActiveVehiclesTableProps> = ({ vehiculos, onSalida }) => {
-  return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden flex flex-col h-full">
-      <div className="px-6 py-4 border-b border-gray-800 bg-gray-800/30 flex justify-between items-center">
-        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-          Vehículos en Sitio
-        </h3>
-        <span className="text-[10px] text-gray-500 font-black px-2 py-0.5 bg-black rounded-full border border-gray-800">
-          {vehiculos.length} TOTAL
-        </span>
-      </div>
+  const columns = [
+    {
+      header: 'Vehículo',
+      accessor: (v: Movement) => (
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gray-800 rounded-xl text-blue-500">
+            <Car size={16} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-blue-500 font-black tracking-widest text-lg leading-none">{v.placa}</span>
+            <span className="text-[9px] text-gray-500 font-bold uppercase mt-1">{v.usuario || 'Usuario General'}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: 'Ingreso',
+      accessor: (v: Movement) => (
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
+          <Clock size={14} className="text-gray-600" />
+          {new Date(v.horaIngreso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      ),
+    },
+    {
+      header: 'Bahía',
+      accessor: (v: Movement) => (
+        <Badge variant="info">{v.bahia}</Badge>
+      ),
+    },
+    {
+      header: 'Acción',
+      className: 'text-right',
+      accessor: (v: Movement) => (
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => onSalida(v.placa)}
+          className="!border-blue-500/30 !text-blue-500 hover:!bg-blue-600 hover:!text-white"
+        >
+          REGISTRAR SALIDA
+        </Button>
+      ),
+    },
+  ];
 
-      <div className="flex-1 overflow-x-auto overflow-y-auto max-h-[450px] custom-scrollbar">
-        <table className="w-full text-left border-collapse">
-          <thead className="sticky top-0 bg-gray-900 z-10 shadow-sm">
-            <tr>
-              <th className="px-6 py-3 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-800">Vehículo</th>
-              <th className="px-6 py-3 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-800">Ingreso</th>
-              <th className="px-6 py-3 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-800">Bahía</th>
-              <th className="px-6 py-3 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-800 text-right">Acción</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {vehiculos.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-6 py-20 text-center">
-                  <p className="text-xs font-bold text-gray-600 uppercase italic">No hay registros activos</p>
-                </td>
-              </tr>
-            ) : (
-              vehiculos.map((v) => (
-                <tr key={v.idMovimiento} className="hover:bg-gray-800/40 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="text-blue-500 font-black tracking-widest text-lg">{v.placa}</span>
-                      <span className="text-[9px] text-gray-600 font-bold uppercase">{v.usuario}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-xs font-bold text-gray-400">
-                      {new Date(v.horaIngreso).toLocaleTimeString()}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="px-2 py-1 bg-black border border-gray-800 rounded text-[10px] font-black text-gray-400">
-                      {v.bahia}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => onSalida(v.placa)}
-                      className="opacity-0 group-hover:opacity-100 bg-blue-600/10 text-blue-500 border border-blue-500/30 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-blue-600 hover:text-white transition-all"
-                    >
-                      Registrar Salida
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-[3rem] overflow-hidden flex flex-col h-full shadow-2xl">
+      <header className="px-8 py-6 border-b border-gray-800 bg-gray-800/30 flex justify-between items-center">
+        <div>
+          <h3 className="text-white text-sm font-black uppercase tracking-tight flex items-center gap-2">
+            <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
+            Vehículos en Sitio
+          </h3>
+          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Monitoreo de Activos</p>
+        </div>
+        <Badge variant="neutral" className="!bg-black !border-gray-800">
+          {vehiculos.length} TOTAL
+        </Badge>
+      </header>
+
+      <div className="flex-1 overflow-hidden p-4">
+        <div className="bg-transparent rounded-[2rem] overflow-hidden border border-gray-800">
+          <Table 
+            columns={columns}
+            data={vehiculos}
+            emptyMessage="No hay registros activos en este momento"
+          />
+        </div>
       </div>
     </div>
   );

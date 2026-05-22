@@ -14,6 +14,14 @@ export const vehiculosService = {
   },
 
   /**
+   * Lista los vehículos del sistema con paginación (Solo Admin).
+   */
+  findAll: async (page = 1, limit = 10) => {
+    const response = await api.get(`/vehiculos?page=${page}&limit=${limit}`);
+    return response.data;
+  },
+
+  /**
    * Obtiene los vehículos vinculados al usuario autenticado.
    */
   listarMios: async () => {

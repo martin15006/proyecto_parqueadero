@@ -23,16 +23,36 @@ function Login() {
   const [status, setStatus] = useState<{ msg: string; tipo: 'error' | 'success' | 'info' | null }>({ msg: '', tipo: null });
   const [loading, setLoading] = useState(false);
 
-  // 🔄 Redirección automática al detectar la sesión activa
+  // 🔄 Redirección automática al detectar la sesión activa con validación estricta
   useEffect(() => {
     if (isAuthenticated && user) {
-      const datosReales = user?.user || user?.usuario || user;
-      const rol = parseInt(datosReales?.idtipousr || datosReales?.idTipoUsr || '1', 10);
+      // REFACTOR: Uso de tipado estricto y normalización de datos
+      const perfil = user.usuario;
+      
+      if (!perfil) {
+        console.error('FIX: Estructura de perfil inválida en la sesión', { user });
+        return;
+      }
 
-      if (rol === 1) navigate('/app');
-      else if (rol === 3) navigate('/appperop'); // Rol 3 es Operativo según DB
-      else if (rol === 2) navigate('/appadmin'); // Rol 2 es Admin según DB
-      else navigate('/');
+      // NORMALIZACIÓN: Priorizamos 'idTipoUsr' (camelCase tras interceptor)
+      const idRol = parseInt(String(perfil.idTipoUsr || 0), 10);
+      
+      // Mapeo lógico manual basado en TipoUsuarioEnum
+      const rolNombre = idRol === 1 ? 'APRENDIZ' : (idRol === 2 ? 'ADMIN' : (idRol === 3 ? 'OPERATIVO' : ''));
+
+      console.log('Validando acceso para:', { rolNombre, idRol, perfil });
+
+      // Lógica de redirección basada en roles definidos
+      if (idRol === 2) {
+        navigate('/appadmin');
+      } else if (idRol === 3) {
+        navigate('/appperop');
+      } else if (idRol === 1) {
+        navigate('/app');
+      } else {
+        console.warn('SECURITY: Acceso denegado - Usuario sin rol válido', { idRol });
+        setStatus({ msg: 'Tu cuenta no tiene un rol asignado. Contacta al administrador.', tipo: 'error' });
+      }
     }
   }, [isAuthenticated, user, navigate]);
 
@@ -43,6 +63,8 @@ function Login() {
 
   const handleSubmitLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    
     setLoading(true);
     setStatus({ msg: 'Iniciando sesión...', tipo: 'info' });
     try {
@@ -51,7 +73,13 @@ function Login() {
       setMostrarOtp(true);
     } catch (error: any) {
       console.error('Error en el login:', error);
-      setStatus({ msg: `Error: ${error.response?.data?.message || 'Credenciales incorrectas'}`, tipo: 'error' });
+      
+      // Manejo robusto de errores de red/CORS
+      if (error.code === 'ERR_NETWORK' || !error.response) {
+        setStatus({ msg: 'Error de conexión con el servidor. Verifica que el backend esté corriendo.', tipo: 'error' });
+      } else {
+        setStatus({ msg: `Error: ${error.response?.data?.message || 'Credenciales incorrectas'}`, tipo: 'error' });
+      }
     } finally {
       setLoading(false);
     }
@@ -59,6 +87,8 @@ function Login() {
 
   const handleSubmitOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    
     setLoading(true);
     setStatus({ msg: 'Verificando código...', tipo: 'info' });
     try {
@@ -66,10 +96,41 @@ function Login() {
         correo: formData.correo,
         codigo: codigoOtp
       });
-      login(response.data);
+      
+      // Validar que la respuesta sea exitosa y contenga datos
+      if (response.status === 200 && response.data) {
+        // NORMALIZACIÓN: El backend usa un ResponseInterceptor que envuelve la data en { success, data, ... }
+        const userData = response.data.data !== undefined ? response.data.data : response.data;
+        
+        setStatus({ msg: '¡Verificación exitosa! Redirigiendo...', tipo: 'success' });
+        
+        // Pequeña pausa para que el usuario vea el éxito antes de la redirección
+        setTimeout(() => {
+          login(userData);
+        }, 500);
+      } else {
+        throw new Error('Respuesta del servidor inválida');
+      }
+      
     } catch (error: any) {
-      console.error('Error al verificar OTP:', error);
-      setStatus({ msg: `Error: ${error.response?.data?.message || 'Código incorrecto'}`, tipo: 'error' });
+      console.error('FIX: Error al verificar OTP:', error);
+      setStatus({ msg: `Error: ${error.message || 'Código incorrecto o expirado'}`, tipo: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReenviarOtp = async () => {
+    if (loading) return;
+    
+    setLoading(true);
+    setStatus({ msg: 'Reenviando código...', tipo: 'info' });
+    try {
+      await api.post('/auth/reenviar-otp', { correo: formData.correo });
+      setStatus({ msg: 'Nuevo código enviado. ¡Revisa tu correo!', tipo: 'success' });
+    } catch (error: any) {
+      console.error('Error al reenviar OTP:', error);
+      setStatus({ msg: `Error: ${error.response?.data?.message || 'No se pudo reenviar el código'}`, tipo: 'error' });
     } finally {
       setLoading(false);
     }
@@ -167,13 +228,27 @@ function Login() {
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirmar Identidad'}
             </button>
 
-            <button
-              type="button"
-              onClick={() => setMostrarOtp(false)}
-              className="w-full text-slate-500 hover:text-slate-300 font-bold text-[10px] uppercase tracking-widest transition-colors"
-            >
-              Volver al Login
-            </button>
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleReenviarOtp}
+                className="w-full text-blue-400 hover:text-blue-300 font-bold text-[10px] uppercase tracking-widest transition-colors disabled:opacity-50 py-2"
+              >
+                {loading ? 'Procesando...' : '¿No recibiste el código? Reenviar'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMostrarOtp(false);
+                  setStatus({ msg: '', tipo: null });
+                }}
+                className="w-full text-slate-500 hover:text-slate-300 font-bold text-[10px] uppercase tracking-widest transition-colors"
+              >
+                Volver al Login
+              </button>
+            </div>
           </form>
         )}
 

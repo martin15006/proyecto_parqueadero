@@ -36,16 +36,31 @@ const Registro: React.FC = () => {
     setLoading(true);
     setStatus({ msg: 'Procesando registro...', tipo: null });
     try {
-      const datosParaEnviar = {
-        ...formData,
-        idFormacion: formData.idFormacion.trim() === '' ? null : formData.idFormacion
-      };
+      // CLEANUP: Evitar enviar campos vacíos o nulos que puedan romper la validación del backend
+      const datosParaEnviar: any = { ...formData };
+      
+      if (!datosParaEnviar.idFormacion || datosParaEnviar.idFormacion.trim() === '') {
+        delete datosParaEnviar.idFormacion;
+      } else {
+        datosParaEnviar.idFormacion = datosParaEnviar.idFormacion.trim();
+      }
 
       await api.post('/usuarios', datosParaEnviar);
       setStatus({ msg: '¡Usuario registrado con éxito! Ya puedes iniciar sesión.', tipo: 'success' });
     } catch (error: any) {
       console.error('Error al registrar usuario:', error);
-      setStatus({ msg: `Error: ${error.response?.data?.message || 'No se pudo completar el registro'}`, tipo: 'error' });
+      // REFACTOR: Extraer mensaje de error de forma robusta soportando arrays de validación
+      let mensajeError = 'No se pudo completar el registro';
+      
+      if (error.message) {
+        if (Array.isArray(error.message)) {
+          mensajeError = error.message.join(', ');
+        } else {
+          mensajeError = error.message;
+        }
+      }
+      
+      setStatus({ msg: `Error: ${mensajeError}`, tipo: 'error' });
     } finally {
       setLoading(false);
     }
@@ -89,7 +104,17 @@ const Registro: React.FC = () => {
             {/* Contraseña */}
             <div className="relative group">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-green-500 transition-colors" />
-              <input name="contra" type="password" placeholder="Contraseña" onChange={handleChange} required className="w-full bg-slate-800/40 border border-slate-700 text-white pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm transition-all" />
+              <input 
+                name="contra" 
+                type="password" 
+                placeholder="Contraseña" 
+                onChange={handleChange} 
+                required 
+                className="w-full bg-slate-800/40 border border-slate-700 text-white pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm transition-all" 
+              />
+              <p className="mt-1 text-[8px] text-slate-500 font-medium px-2 uppercase tracking-tighter">
+                Mínimo 8 caracteres, una mayúscula, un número y un carácter especial
+              </p>
             </div>
 
             {/* Teléfono */}

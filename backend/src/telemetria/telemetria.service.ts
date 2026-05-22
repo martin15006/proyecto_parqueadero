@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, LessThan, Not } from 'typeorm';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Sensor } from './entities/sensor.entity';
 import { TelemetriaEvento } from './entities/telemetria-evento.entity';
 import { AlertaSistema } from './entities/alerta-sistema.entity';
@@ -120,36 +121,73 @@ export class TelemetriaService {
    * Tarea programada para detectar dispositivos que han dejado de reportar.
    * REALTIME_EMIT: Notifica cuando un sensor pasa a estado OFFLINE.
    */
+  /**
+   * Monitorización automática de salud de sensores.
+   * PERFORMANCE: Se ejecuta cada minuto para detectar dispositivos desconectados.
+   * Compara la última lectura con el tiempo actual menos 60 segundos.
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
   async monitorizarSensores() {
-    const hace5Minutos = new Date(Date.now() - 5 * 60000);
-    
-    const sensoresDesconectados = await this.sensorRepository.createQueryBuilder('sensor')
-      .where('sensor.activo = :activo', { activo: true })
-      .andWhere('sensor.estadoActual != :offline', { offline: IotStatusEnum.OFFLINE })
-      .andWhere('sensor.ultimaLectura < :hace5Minutos', { hace5Minutos })
-      .getMany();
+    this.logger.log('Iniciando monitoreo de salud de sensores IoT...');
 
-    for (const sensor of sensoresDesconectados) {
+    // 1. Definir el umbral de desconexión (60 segundos)
+    const umbral = new Date();
+    umbral.setSeconds(umbral.getSeconds() - 60);
+
+    // 2. Buscar sensores que no han reportado en el último minuto y están ONLINE o OCCUPIED
+     const sensoresInactivos = await this.sensorRepository.find({
+       where: {
+         ultimaLectura: LessThan(umbral),
+         estadoActual: Not(IotStatusEnum.OFFLINE), // Solo sensores que estaban activos
+       },
+     });
+
+    if (sensoresInactivos.length === 0) {
+      this.logger.log('Todos los sensores están reportando correctamente.');
+      return { ok: true, mensaje: 'Salud de infraestructura óptima' };
+    }
+
+    this.logger.warn(`Se detectaron ${sensoresInactivos.length} sensores sin reporte. Marcando como OFFLINE.`);
+
+    // 3. Procesar desconexiones de forma controlada
+    for (const sensor of sensoresInactivos) {
+      const estadoAnterior = sensor.estadoActual;
+      
+      // Actualizar estado en DB
       sensor.estadoActual = IotStatusEnum.OFFLINE;
       await this.sensorRepository.save(sensor);
-      
-      const mensaje = `Pérdida de señal con sensor ${sensor.codigo} (Bahía ${sensor.idBahia}). Posible fallo de red o batería.`;
-      
+
+      // REALTIME_EMIT: Notificar al frontend sobre la desconexión específica
       this.gateway.emitirSensorOffline({
-        sensorId: sensor.codigo,
         idBahia: sensor.idBahia,
+        sensorId: sensor.codigo,
         fecha: new Date(),
       });
 
-      this.logger.warn(`[IOT OFFLINE] Sensor ${sensor.codigo} marcado como desconectado.`);
+      // Auditoría Técnica: Registro del evento de desconexión
+      const evento = this.eventoRepository.create({
+        idSensor: sensor.idSensor,
+        tipoEvento: IotStatusEnum.OFFLINE,
+        payload: { 
+          motivo: 'Timeout de lectura (>60s)', 
+          estadoAnterior,
+          ultimaLectura: sensor.ultimaLectura 
+        },
+      });
+      await this.eventoRepository.save(evento);
     }
 
-    return { ok: true, totalDetectados: sensoresDesconectados.length };
+    return { 
+      ok: true, 
+      mensaje: 'Chequeo de salud completado', 
+      desconectados: sensoresInactivos.length 
+    };
   }
 
+  /**
+   * Obtiene todos los sensores registrados.
+   */
   async findAllSensores() {
-    return await this.sensorRepository.find({
-      order: { idBahia: 'ASC' },
-    });
+    return await this.sensorRepository.find();
   }
 }

@@ -1,13 +1,23 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
+import type { User } from './types';
 
 /**
- * Definición de la interfaz del contexto de autenticación.
+ * REFACTOR: Interfaz extendida para incluir tokens en el estado del contexto.
+ */
+interface AuthData {
+  accessToken: string;
+  refreshToken: string;
+  usuario: User;
+}
+
+/**
+ * Definición de la interfaz del contexto de autenticación con tipado estricto.
  */
 interface AuthContextType {
   isAuthenticated: boolean;
-  user: any;
-  login: (userData: any) => void;
+  user: AuthData | null;
+  login: (userData: AuthData) => void;
   logout: () => void;
 }
 
@@ -15,11 +25,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
  * Provider global de Autenticación.
- * Gestiona el estado de la sesión del usuario y la persistencia local.
+ * PERFORMANCE: Uso de useCallback para evitar re-renders innecesarios.
+ * SECURITY: Tipado estricto para evitar errores en tiempo de ejecución.
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AuthData | null>(null);
 
   /**
    * Recupera la sesión guardada al inicializar la aplicación.
@@ -28,10 +39,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
-        setIsAuthenticated(true);
+        const parsedUser = JSON.parse(savedUser);
+        if (parsedUser && (parsedUser.accessToken || parsedUser.access_token)) {
+          setUser(parsedUser);
+          setIsAuthenticated(true);
+        } else {
+          localStorage.removeItem('user');
+        }
       } catch (error) {
-        console.error('Error al parsear usuario de localStorage');
+        console.error('FIX: Error al recuperar sesión de localStorage');
         localStorage.removeItem('user');
       }
     }
@@ -39,21 +55,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   /**
    * Establece una nueva sesión de usuario.
+   * PERFORMANCE: Memoizado con useCallback.
    */
-  const login = (userData: any) => {
+  const login = useCallback((userData: AuthData) => {
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
-  };
+  }, []);
 
   /**
    * Finaliza la sesión actual y limpia el almacenamiento local.
    */
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('user');
     setUser(null);
     setIsAuthenticated(false);
-  };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
