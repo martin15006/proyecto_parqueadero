@@ -7,7 +7,7 @@ export interface Usuario {
   correo: string;
   idTipoUsr: number;
   idFormacion?: string | null;
-  QR?: string | null;
+  qr?: string | null;
 }
 
 export interface CreateUsuarioDto {

@@ -8,11 +8,11 @@ import {
   Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { Usuario } from './entities/usuario.entity';
-import { CodigoOtp } from './entities/codigo-otp.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import { CreateUsuarioAdminDto } from './dto/create-usuario-admin.dto';
 import { ActualizarPerfilDto } from './dto/actualizar-perfil.dto';
 import * as bcrypt from 'bcrypt';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
@@ -20,9 +20,7 @@ import { MailService } from '../mail/mail.service';
 import { VehiculosService } from '../vehiculos/vehiculos.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
-
-const ID_TIPO_USUARIO_APP = 1;
-const OTP_EXPIRA_MINUTOS = 5;
+import { AuthService } from '../auth/auth.service';
 
 /**
  * Servicio de Gestión de Usuarios.
@@ -34,10 +32,9 @@ export class UsuarioService {
   constructor(
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
-    @InjectRepository(CodigoOtp)
-    private readonly otpRepository: Repository<CodigoOtp>,
     private readonly cloudinaryService: CloudinaryService,
     private readonly mailService: MailService,
+    private readonly authService: AuthService,
     @Inject(forwardRef(() => VehiculosService))
     private readonly vehiculosService: VehiculosService,
     private readonly auditoriaService: AuditoriaService,
@@ -46,8 +43,13 @@ export class UsuarioService {
   /**
    * Crea un nuevo usuario en el sistema con contraseña encriptada y QR inicial.
    */
-  async create(createUsuarioDto: CreateUsuarioDto): Promise<Omit<Usuario, 'contra'>> {
+  async create(createUsuarioDto: CreateUsuarioDto | CreateUsuarioAdminDto): Promise<Omit<Usuario, 'contra'>> {
     const { documento, correo, contra } = createUsuarioDto;
+    const idTipoUsr = (
+      'idTipoUsr' in createUsuarioDto && typeof createUsuarioDto.idTipoUsr === 'number'
+    )
+      ? createUsuarioDto.idTipoUsr
+      : TipoUsuarioEnum.APRENDIZ;
 
     const existente = await this.usuarioRepository.findOne({
       where: [{ documento }, { correo }],
@@ -63,8 +65,10 @@ export class UsuarioService {
     const qrValue = randomUUID();
 
     try {
+      const { idTipoUsr: _idTipoUsr, ...data } = createUsuarioDto as CreateUsuarioAdminDto & CreateUsuarioDto;
       const nuevoUsuario = this.usuarioRepository.create({
-        ...createUsuarioDto,
+        ...data,
+        idTipoUsr,
         contra: hashedPassword,
         qr: qrValue,
       });
@@ -79,7 +83,7 @@ export class UsuarioService {
         datosNuevos: { correo: usuarioGuardado.correo, nombre: usuarioGuardado.nombreCompleto },
       });
 
-      const { contra: _, ...usuarioSinContrasena } = usuarioGuardado;
+      const { contra: _contra, ...usuarioSinContrasena } = usuarioGuardado;
       return usuarioSinContrasena;
     } catch (error) {
       const pgError = error as { code?: string; constraint?: string };
@@ -233,11 +237,7 @@ export class UsuarioService {
     const yaExiste = await this.usuarioRepository.findOne({ where: { correo: nuevoCorreo } });
     if (yaExiste) throw new ConflictException('El correo ya se encuentra registrado por otro usuario');
 
-    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiraEn = new Date(Date.now() + OTP_EXPIRA_MINUTOS * 60 * 1000);
-
-    await this.otpRepository.delete({ documento });
-    await this.otpRepository.save({ documento, codigo, expiraEn, usado: false });
+    const { codigo } = await this.authService.crearOtp(documento);
 
     await this.mailService.enviarCodigoOtp(nuevoCorreo, codigo, usuario.nombreCompleto);
 
@@ -251,21 +251,7 @@ export class UsuarioService {
     const usuario = await this.usuarioRepository.findOne({ where: { documento } });
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
 
-    const otp = await this.otpRepository.findOne({
-      where: { documento, usado: false, expiraEn: MoreThan(new Date()) },
-      order: { createdAt: 'DESC' },
-    });
-
-    if (!otp || otp.codigo !== codigo) {
-      if (otp) {
-        otp.intentos += 1;
-        await this.otpRepository.save(otp);
-      }
-      throw new UnauthorizedException('Código de verificación inválido');
-    }
-
-    otp.usado = true;
-    await this.otpRepository.save(otp);
+    await this.authService.validarYConsumirOtp(documento, codigo);
 
     usuario.correo = nuevoCorreo;
     const guardado = await this.usuarioRepository.save(usuario);

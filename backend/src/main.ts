@@ -11,6 +11,28 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
+  const normalizeOrigin = (value: string) => {
+    try {
+      const url = new URL(value);
+      return `${url.protocol}//${url.host}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const isDev = process.env.NODE_ENV !== 'production';
+  const devAllowedHosts = new Set(['localhost', '127.0.0.1']);
+  const devAllowedPorts = new Set(['3000', '3001', '4200', '5173', '5174']);
+
+  const corsOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(normalizeOrigin)
+    .filter((v): v is string => Boolean(v));
+
+  const corsOriginsSet = new Set(corsOrigins);
+
   // SEGURIDAD: Helmet para headers seguros con configuración recomendada para producción
   app.use(helmet({
     contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
@@ -19,21 +41,37 @@ async function bootstrap() {
   // SEGURIDAD: CORS configurado para permitir el frontend y manejar credenciales
   app.enableCors({
     origin: (origin, callback) => {
-      const allowedOrigins = [
-        'http://localhost:5173',
-        'http://localhost:5174',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:5174',
-        ...(process.env.ALLOWED_ORIGINS?.split(',') || []),
-      ];
-      
-      if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+      if (!origin) {
         callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+        return;
       }
+
+      const normalized = normalizeOrigin(origin);
+      if (normalized && corsOriginsSet.has(normalized)) {
+        callback(null, true);
+        return;
+      }
+
+      if (isDev) {
+        try {
+          const url = new URL(origin);
+          const hostOk = devAllowedHosts.has(url.hostname);
+          const portOk = Boolean(url.port) && devAllowedPorts.has(url.port);
+          const protocolOk = url.protocol === 'http:' || url.protocol === 'https:';
+
+          if (hostOk && portOk && protocolOk) {
+            callback(null, true);
+            return;
+          }
+        } catch {
+          callback(new Error('Not allowed by CORS'));
+          return;
+        }
+      }
+
+      callback(new Error('Not allowed by CORS'));
     },
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'x-iot-api-key'],
   });
@@ -78,4 +116,8 @@ async function bootstrap() {
   await app.listen(port);
   logger.log(`Servidor corriendo en puerto ${port}`);
 }
-bootstrap();
+bootstrap().catch((error) => {
+  const logger = new Logger('Bootstrap');
+  logger.error('Fallo al iniciar la aplicación', error?.stack || String(error));
+  process.exit(1);
+});

@@ -42,12 +42,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const error = typeof exceptionResponse === 'object' ? exceptionResponse.error : 'Internal Server Error';
 
     const errorResponse = {
+      success: false,
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
       message,
       error,
+      data: null,
     };
 
     // PERFORMANCE: Logging inteligente basado en severidad

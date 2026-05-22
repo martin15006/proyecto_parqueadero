@@ -39,12 +39,11 @@ export const useWebSocket = () => {
     setIsConnected(socketService.isConnected);
 
     return () => {
-      // FEATURE: Limpieza exhaustiva de listeners para evitar fugas de memoria
-      events.forEach(event => {
-        socketService.off(event, eventCallbacks[event]);
-      });
-      socketService.off('connect', handleConnect);
-      socketService.off('disconnect', handleDisconnect);
+      socketService.cleanup([
+        ...events.map(event => ({ event, callback: eventCallbacks[event] })),
+        { event: 'connect', callback: handleConnect },
+        { event: 'disconnect', callback: handleDisconnect },
+      ]);
     };
   }, []);
 

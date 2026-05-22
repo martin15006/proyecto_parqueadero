@@ -23,7 +23,7 @@ import { MailModule } from '../mail/mail.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
           expiresIn: (configService.get<string>('JWT_EXPIRES_IN') ?? '1h') as SignOptions['expiresIn'],
         },
@@ -33,6 +33,6 @@ import { MailModule } from '../mail/mail.module';
   ],
   controllers: [AuthController],
   providers: [AuthService, AuthMantenimientoService, JwtStrategy, JwtAuthGuard],
-  exports: [AuthService, AuthMantenimientoService, JwtAuthGuard, JwtStrategy, PassportModule],
+  exports: [AuthService, AuthMantenimientoService, JwtAuthGuard, JwtStrategy, PassportModule, JwtModule],
 })
 export class AuthModule {}

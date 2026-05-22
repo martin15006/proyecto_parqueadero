@@ -29,22 +29,27 @@ export const BahiasPage: React.FC = () => {
     socketService.connect();
 
     // Sincronización Realtime
-    socketService.on('ocupacion_actualizada', (data) => {
+    const handleOcupacion = (data: any) => {
       setBahias(prev => prev.map(b => {
         const updated = data.bahias.find((ub: any) => ub.idBahia === b.idBahia);
         return updated ? { ...b, ...updated } : b;
       }));
-    });
+    };
 
-    socketService.on('sensor_offline', (data) => {
+    const handleSensorOffline = (data: any) => {
       setBahias(prev => prev.map(b => 
         b.idBahia === data.idBahia ? { ...b, fueraServicio: true } : b
       ));
-    });
+    };
+
+    socketService.on('ocupacion_actualizada', handleOcupacion);
+    socketService.on('sensor_offline', handleSensorOffline);
 
     return () => {
-      socketService.off('ocupacion_actualizada');
-      socketService.off('sensor_offline');
+      socketService.cleanup([
+        { event: 'ocupacion_actualizada', callback: handleOcupacion },
+        { event: 'sensor_offline', callback: handleSensorOffline },
+      ]);
     };
   }, []);
 

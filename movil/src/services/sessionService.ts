@@ -33,7 +33,6 @@ export const sessionService = {
    */
   async obtenerToken(): Promise<string | null> {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
-    console.log('🔑 TOKEN:', token);
     return token;
   },
 

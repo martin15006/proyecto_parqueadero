@@ -3,24 +3,26 @@ import { vehiculosService } from '../../services/vehiculos.service';
 import { Search, Plus, Edit2, Trash2, Car, CreditCard, Palette, Hash } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import type { Vehiculo } from '../../types';
 
 /**
  * Gestión de Vehículos (Admin/Operativo).
  * Permite visualizar y administrar la flota de vehículos registrados.
  */
 export const VehiculosPage: React.FC = () => {
-  const [vehiculos, setVehiculos] = useState<any[]>([]);
+  const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchVehiculos = async () => {
     try {
       setLoading(true);
-      // REFACTOR: Usar findAll para vista administrativa con paginación
       const res = await vehiculosService.findAll(1, 50); 
       setVehiculos(res.data || []);
     } catch (error) {
-      console.error('Error cargando vehículos', error);
+      if (import.meta.env.DEV) {
+        console.error('Error cargando vehículos', error);
+      }
     } finally {
       setLoading(false);
     }
@@ -32,7 +34,11 @@ export const VehiculosPage: React.FC = () => {
 
   const filteredVehiculos = vehiculos.filter(v => 
     v.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (typeof v.tipoVehiculo === 'string' ? v.tipoVehiculo : v.tipoVehiculo?.tipoVehiculo || '').toLowerCase().includes(searchTerm.toLowerCase())
+    (
+      (typeof v.tipoVehiculo === 'string'
+        ? v.tipoVehiculo
+        : v.tipoVehiculo?.tipoVehiculo || '')
+    ).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -94,7 +100,11 @@ export const VehiculosPage: React.FC = () => {
                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter mb-1 flex items-center gap-1">
                     <Car size={10} /> Tipo
                   </p>
-                  <p className="text-xs font-bold text-gray-700">{v.tipoVehiculo?.tipoVehiculo || v.tipoVehiculo}</p>
+                  <p className="text-xs font-bold text-gray-700">
+                    {typeof v.tipoVehiculo === 'string'
+                      ? v.tipoVehiculo
+                      : v.tipoVehiculo?.tipoVehiculo || 'N/A'}
+                  </p>
                 </div>
                 <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter mb-1 flex items-center gap-1">

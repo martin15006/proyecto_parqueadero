@@ -51,3 +51,45 @@ export interface DashboardStats {
   ingresosMes: number;
   alertasActivas: number;
 }
+
+export type BackendEnvelope<T> = {
+  success: boolean;
+  data: T;
+  message: string;
+  statusCode: number;
+  timestamp: string;
+  meta?: unknown;
+};
+
+export interface TipoVehiculo {
+  idTipoV: number;
+  tipoVehiculo: string;
+}
+
+export interface Vehiculo {
+  placa: string;
+  fotoVehiculo: string;
+  fotoTarjetaP: string;
+  color: string;
+  idTipoVehiculo: number;
+  tipoVehiculo?: TipoVehiculo | string;
+}
+
+export interface CreateVehiculoDto {
+  placa: string;
+  fotoVehiculo: string;
+  fotoTarjetaP: string;
+  color: string;
+  idTipoVehiculo: number;
+}
+
+export interface CreateUsuarioDto {
+  documento: string;
+  fotoPersona: string;
+  nombreCompleto: string;
+  numTelf: string;
+  contactoEmerg: string;
+  correo: string;
+  contra: string;
+  idFormacion?: string;
+}

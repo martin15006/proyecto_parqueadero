@@ -400,38 +400,60 @@ export class AuthService implements OnModuleInit {
    * SECURITY: Implementa protección contra ráfagas (burst) y condiciones de carrera.
    */
   private async generarYEnviarOtp(usuario: Usuario): Promise<void> {
-    // SECURITY: Evitar generación masiva de OTPs (condiciones de carrera y spam)
+    const { codigo } = await this.crearOtp(usuario.documento);
+    await this.mailService.enviarCodigoOtp(usuario.correo, codigo, usuario.nombreCompleto);
+  }
+
+  async crearOtp(documento: string): Promise<{ codigo: string; expiraEn: Date }> {
     const ultimoOtp = await this.otpRepository.findOne({
-      where: { documento: usuario.documento, usado: false },
+      where: { documento, usado: false },
       order: { createdAt: 'DESC' },
     });
 
     if (ultimoOtp) {
       const UN_MINUTO = 60 * 1000;
       const tiempoTranscurrido = Date.now() - ultimoOtp.createdAt.getTime();
-      
+
       if (tiempoTranscurrido < UN_MINUTO) {
-        this.logger.warn(`Intento de generación de OTP bloqueado por rate-limit (1min) para usuario: ${usuario.documento}`);
+        this.logger.warn(`Intento de generación de OTP bloqueado por rate-limit (1min) para usuario: ${documento}`);
         throw new BadRequestException('Ya se envió un código recientemente. Espera 1 minuto antes de solicitar otro.');
       }
     }
 
     await this.otpRepository.update(
-      { documento: usuario.documento, usado: false },
+      { documento, usado: false },
       { usado: true },
     );
 
-    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+    const codigo = crypto.randomInt(100000, 1000000).toString();
     const expiraEn = new Date();
     expiraEn.setMinutes(expiraEn.getMinutes() + 5);
 
     await this.otpRepository.save({
-      documento: usuario.documento,
+      documento,
       codigo,
       expiraEn,
     });
 
-    await this.mailService.enviarCodigoOtp(usuario.correo, codigo, usuario.nombreCompleto);
+    return { codigo, expiraEn };
+  }
+
+  async validarYConsumirOtp(documento: string, codigo: string): Promise<void> {
+    const otp = await this.otpRepository.findOne({
+      where: { documento, usado: false, expiraEn: MoreThan(new Date()) },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!otp || otp.codigo !== codigo) {
+      if (otp) {
+        otp.intentos += 1;
+        await this.otpRepository.save(otp);
+      }
+      throw new UnauthorizedException('Código de verificación inválido');
+    }
+
+    otp.usado = true;
+    await this.otpRepository.save(otp);
   }
 
   /**

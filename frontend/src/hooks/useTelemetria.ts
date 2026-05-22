@@ -29,23 +29,28 @@ export const useTelemetria = () => {
     socketService.connect();
 
     // Listener para datos de sensores en tiempo real
-    socketService.on('broadcast_sensor', (data: { codigo: string; valor: any }) => {
+    const handleBroadcastSensor = (data: { codigo: string; valor: any }) => {
       setSensores(prev => prev.map(s => 
         s.codigo === data.codigo 
           ? { ...s, ultimaLectura: new Date().toISOString(), ocupado: data.valor.ocupado } 
           : s
       ));
-    });
+    };
 
     // Listener para sensores que se desconectan
-    socketService.on('alerta_sensor', (alerta: any) => {
+    const handleAlertaSensor = (alerta: any) => {
       console.warn('Alerta de sensor recibida:', alerta);
       // Aquí se podrían inyectar notificaciones globales
-    });
+    };
+
+    socketService.on('broadcast_sensor', handleBroadcastSensor);
+    socketService.on('alerta_sensor', handleAlertaSensor);
 
     return () => {
-      socketService.off('broadcast_sensor');
-      socketService.off('alerta_sensor');
+      socketService.cleanup([
+        { event: 'broadcast_sensor', callback: handleBroadcastSensor },
+        { event: 'alerta_sensor', callback: handleAlertaSensor },
+      ]);
     };
   }, [loadSensores]);
 

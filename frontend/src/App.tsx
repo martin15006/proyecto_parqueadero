@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import Login from './login';
 import Registro from './registro';
 import ProtectedRoute from './ProtectedRoute';
@@ -12,6 +12,7 @@ import { VehiculosPage } from './pages/admin/VehiculosPage';
 import { BahiasPage } from './pages/admin/BahiasPage';
 import { AuditoriaPage } from './pages/admin/AuditoriaPage';
 import { TelemetriaPage } from './pages/admin/TelemetriaPage';
+import { UserRole } from './constants/enums';
 
 // Vista de bienvenida raíz (/)
 function Saludo() {
@@ -40,19 +41,19 @@ function Saludo() {
 
         <div className="grid grid-cols-1 gap-4">
           {isAdmin && (
-            <a href="/appadmin" className="bg-blue-600 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-xl shadow-blue-600/20">
+            <Link to="/appadmin" className="bg-blue-600 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-xl shadow-blue-600/20">
               Panel Administrador
-            </a>
+            </Link>
           )}
           {isOperativo && (
-            <a href="/appperop" className="bg-gray-900 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-black transition-all active:scale-95 shadow-xl shadow-gray-900/20">
+            <Link to="/appperop" className="bg-gray-900 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-black transition-all active:scale-95 shadow-xl shadow-gray-900/20">
               Panel Operativo
-            </a>
+            </Link>
           )}
           {isAprendiz && (
-            <a href="/app" className="bg-green-600 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-green-700 transition-all active:scale-95 shadow-xl shadow-green-600/20">
+            <Link to="/app" className="bg-green-600 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-green-700 transition-all active:scale-95 shadow-xl shadow-green-600/20">
               Panel Aprendiz
-            </a>
+            </Link>
           )}
           
           <button 
@@ -75,7 +76,7 @@ function PanelAprendiz() {
       <h1 className="text-6xl font-black text-gray-900">🚲 Panel Aprendiz</h1>
       <p className="text-gray-500 text-xl font-medium">Gestión de Movilidad Personal en Construcción</p>
       <div className="flex justify-center gap-6">
-        <a href="/" className="px-10 py-4 bg-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-all">Volver</a>
+        <Link to="/" className="px-10 py-4 bg-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-all">Volver</Link>
         <button onClick={logout} className="px-10 py-4 bg-red-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-600 transition-all">Logout</button>
       </div>
     </div>
@@ -94,7 +95,7 @@ function App() {
             <Route path="/" element={<ProtectedRoute><Saludo /></ProtectedRoute>} />
 
             {/* Rutas Admin con Layout */}
-            <Route path="/appadmin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+            <Route path="/appadmin" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><AdminLayout /></ProtectedRoute>}>
               <Route index element={<AdminDashboard />} />
               <Route path="usuarios" element={<UsuariosPage />} />
               <Route path="vehiculos" element={<VehiculosPage />} />
@@ -103,8 +104,8 @@ function App() {
               <Route path="telemetria" element={<TelemetriaPage />} />
             </Route>
 
-            <Route path="/appperop" element={<ProtectedRoute><OperativoDashboard /></ProtectedRoute>} />
-            <Route path="/app" element={<ProtectedRoute><PanelAprendiz /></ProtectedRoute>} />
+            <Route path="/appperop" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OPERATIVO]}><OperativoDashboard /></ProtectedRoute>} />
+            <Route path="/app" element={<ProtectedRoute allowedRoles={[UserRole.APRENDIZ]}><PanelAprendiz /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

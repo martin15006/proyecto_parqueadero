@@ -83,12 +83,10 @@ export class VehiculosService {
    * SERIALIZATION: Mapea la relación Many-to-Many para un consumo simplificado en mobile.
    */
   async listarMisVehiculos(documento: string) {
-    const registros = await this.registroRepository
-      .createQueryBuilder('registro')
-      .innerJoinAndSelect('registro.vehiculo', 'v')
-      .innerJoinAndSelect('v.tipoVehiculo', 'tv')
-      .where('registro.idUsuario = :documento', { documento })
-      .getMany();
+    const registros = await this.registroRepository.find({
+      where: { idUsuario: documento },
+      relations: ['vehiculo', 'vehiculo.tipoVehiculo'],
+    });
 
     return registros.map(reg => ({
       placa: reg.vehiculo.placa,
@@ -140,13 +138,10 @@ export class VehiculosService {
   async obtenerDetalle(documento: string, placa: string) {
     const placaNormalizada = placa.toUpperCase();
 
-    const registro = await this.registroRepository
-      .createQueryBuilder('registro')
-      .innerJoinAndSelect('registro.vehiculo', 'v')
-      .innerJoinAndSelect('v.tipoVehiculo', 'tv')
-      .where('v.placa = :placa', { placa: placaNormalizada })
-      .andWhere('registro.idUsuario = :documento', { documento })
-      .getOne();
+    const registro = await this.registroRepository.findOne({
+      where: { idUsuario: documento, idVehiculo: placaNormalizada },
+      relations: ['vehiculo', 'vehiculo.tipoVehiculo'],
+    });
 
     if (!registro) throw new NotFoundException('Vehículo no encontrado en tus registros');
 

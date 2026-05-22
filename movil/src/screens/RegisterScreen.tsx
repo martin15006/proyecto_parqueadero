@@ -15,6 +15,7 @@ import { useTheme } from '../context/ThemeContext';
 import { fonts, espacios } from '../theme/senaTheme';
 import { usuarioService } from '../services/usuarioService';
 import { subirImagen } from '../services/uploadService';
+import { authService } from '../services/authService';
 import AnimatedButton from '../components/AnimatedButton';
 import AnimatedInput from '../components/AnimatedInput';
 import AnimatedLogo from '../components/AnimatedLogo';
@@ -155,7 +156,7 @@ export default function RegisterScreen({ navigation }: any) {
         idFormacion: form.idFormacion,
       });
 
-      // ─── Abrir el modal para verificar que el correo existe ───
+      await authService.loginPaso1({ correo: form.correo, contra: form.contra });
       setCorreoRegistrado(form.correo);
       setModalOtpVisible(true);
     } catch (error: any) {

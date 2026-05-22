@@ -35,11 +35,51 @@ import { TelemetriaModule } from './telemetria/telemetria.module';
 
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
+function validateEnv(config: Record<string, unknown>) {
+  const missing: string[] = [];
+
+  const getString = (key: string) => {
+    const value = config[key];
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : undefined;
+  };
+
+  const jwtSecret = getString('JWT_SECRET');
+  if (!jwtSecret) missing.push('JWT_SECRET');
+
+  const databaseUrl = getString('DATABASE_URL');
+  const dbHost = getString('DB_HOST');
+  const dbUsername = getString('DB_USERNAME');
+  const dbPassword = getString('DB_PASSWORD');
+  const dbName = getString('DB_NAME');
+  const dbPortRaw = getString('DB_PORT');
+
+  if (!databaseUrl) {
+    if (!dbHost) missing.push('DB_HOST');
+    if (!dbUsername) missing.push('DB_USERNAME');
+    if (!dbPassword) missing.push('DB_PASSWORD');
+    if (!dbName) missing.push('DB_NAME');
+  }
+
+  if (dbPortRaw && Number.isNaN(Number.parseInt(dbPortRaw, 10))) {
+    missing.push('DB_PORT (inválido)');
+  }
+
+  if (missing.length > 0) {
+    console.error(`Faltan variables de entorno requeridas: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+
+  return config;
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       envFilePath: path.resolve(__dirname, '..', '.env'),
       isGlobal: true,
+      validate: validateEnv,
     }),
 
     // Automatización de tareas (Cron Jobs)
@@ -65,6 +105,7 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
+        url: configService.get<string>('DATABASE_URL'),
         host: configService.get<string>('DB_HOST'),
         port: parseInt(configService.get<string>('DB_PORT') ?? '5432', 10),
         username: configService.get<string>('DB_USERNAME'),

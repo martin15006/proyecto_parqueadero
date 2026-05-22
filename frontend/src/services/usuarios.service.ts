@@ -1,4 +1,5 @@
 import api from '../api/axios';
+import type { BackendEnvelope, CreateUsuarioDto, User } from '../types';
 
 /**
  * Servicio de Gestión de Usuarios.
@@ -8,7 +9,7 @@ export const usuariosService = {
   /**
    * Obtiene la lista paginada de usuarios (Solo Admin).
    */
-  findAll: async (page = 1, limit = 10) => {
+  findAll: async (page = 1, limit = 10): Promise<BackendEnvelope<User[]>> => {
     const response = await api.get(`/usuarios?page=${page}&limit=${limit}`);
     return response.data;
   },
@@ -16,7 +17,7 @@ export const usuariosService = {
   /**
    * Busca un usuario por su documento de identidad.
    */
-  findOne: async (documento: string) => {
+  findOne: async (documento: string): Promise<BackendEnvelope<User>> => {
     const response = await api.get(`/usuarios/${documento}`);
     return response.data;
   },
@@ -24,7 +25,7 @@ export const usuariosService = {
   /**
    * Busca un usuario por su código QR institucional.
    */
-  buscarPorQR: async (qr: string) => {
+  buscarPorQR: async (qr: string): Promise<BackendEnvelope<User>> => {
     const response = await api.get(`/usuarios/qr/${qr}`);
     return response.data;
   },
@@ -32,7 +33,7 @@ export const usuariosService = {
   /**
    * Actualiza los datos del perfil del usuario autenticado.
    */
-  actualizarPerfil: async (datos: any) => {
+  actualizarPerfil: async (datos: Partial<CreateUsuarioDto>): Promise<BackendEnvelope<User>> => {
     const response = await api.patch('/usuarios/perfil', datos);
     return response.data;
   },
@@ -40,7 +41,7 @@ export const usuariosService = {
   /**
    * Cambia la contraseña del usuario autenticado.
    */
-  cambiarContrasena: async (contraActual: string, contraNueva: string) => {
+  cambiarContrasena: async (contraActual: string, contraNueva: string): Promise<BackendEnvelope<{ message?: string }>> => {
     const response = await api.patch('/usuarios/cambiar-contrasena', { contraActual, contraNueva });
     return response.data;
   },
@@ -48,15 +49,18 @@ export const usuariosService = {
   /**
    * Registra un nuevo usuario en el sistema.
    */
-  registrar: async (datos: any) => {
+  registerUser: async (datos: CreateUsuarioDto): Promise<BackendEnvelope<User>> => {
     const response = await api.post('/usuarios', datos);
     return response.data;
+  },
+  registrar: async (datos: CreateUsuarioDto): Promise<BackendEnvelope<User>> => {
+    return usuariosService.registerUser(datos);
   },
 
   /**
    * Regenera el código QR de seguridad.
    */
-  regenerarQr: async () => {
+  regenerarQr: async (): Promise<BackendEnvelope<{ qr?: string }>> => {
     const response = await api.post('/usuarios/qr/regenerar');
     return response.data;
   }

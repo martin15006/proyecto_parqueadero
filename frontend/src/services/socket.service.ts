@@ -1,5 +1,10 @@
 import { io, Socket } from 'socket.io-client';
 
+type SocketListener = {
+  event: string;
+  callback?: (...args: any[]) => void;
+};
+
 class SocketService {
   private socket: Socket | null = null;
   private readonly URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
@@ -63,6 +68,23 @@ class SocketService {
     } else {
       this.socket?.off(event);
     }
+  }
+
+  cleanup(listeners?: SocketListener[]) {
+    if (!this.socket) return;
+
+    if (!listeners) {
+      this.socket.removeAllListeners();
+      return;
+    }
+
+    listeners.forEach(({ event, callback }) => {
+      if (callback) {
+        this.socket?.off(event, callback);
+      } else {
+        this.socket?.off(event);
+      }
+    });
   }
 
   /**

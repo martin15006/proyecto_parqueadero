@@ -15,6 +15,7 @@ import { UsuarioService } from './usuario.service';
 import { AuthService } from '../auth/auth.service';
 import { LoginDto } from './dto/login.dto';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import { CreateUsuarioAdminDto } from './dto/create-usuario-admin.dto';
 import { CambiarContrasenaDto } from './dto/cambiar-contrasena.dto';
 import { ActualizarPerfilDto } from './dto/actualizar-perfil.dto';
 import { SolicitarCambioCorreoDto } from './dto/solicitar-cambio-correo.dto';
@@ -39,12 +40,17 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Registrar un nuevo usuario' })
   @ApiResponse({ status: 201, description: 'Usuario creado exitosamente' })
   create(@Body() createUsuarioDto: CreateUsuarioDto) {
-    // SECURITY: Se permite el rol del DTO si viene especificado (para desarrollo/pruebas), 
-    // de lo contrario por defecto es APRENDIZ.
-    if (!createUsuarioDto.idTipoUsr) {
-      createUsuarioDto.idTipoUsr = TipoUsuarioEnum.APRENDIZ;
-    }
     return this.usuarioService.create(createUsuarioDto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(TipoUsuarioEnum.ADMIN)
+  @ApiBearerAuth()
+  @Post('admin')
+  @ApiOperation({ summary: 'Crear un usuario (Solo Admin)' })
+  @ApiResponse({ status: 201, description: 'Usuario creado exitosamente' })
+  createByAdmin(@Body() dto: CreateUsuarioAdminDto) {
+    return this.usuarioService.create(dto);
   }
 
   @Post('login')

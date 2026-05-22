@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Get, HttpCode, HttpStatus, Request } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, HttpCode, HttpStatus, Request, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from '../usuarios/dto/login.dto';
 import { VerificarOtpDto } from './dto/verificar-otp.dto';
@@ -59,15 +59,28 @@ export class AuthController {
    * Cierra la sesión revocando el Refresh Token y el Access Token actual.
    * MOBILE_API: Limpia la sesión tanto en servidor como en el almacenamiento del dispositivo.
    */
+  @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(@Body() dto: RefreshTokenDto, @Request() req: any) {
-    // Revocar Access Token si se proporciona en el header
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-      const token = authHeader.split(' ')[1];
-      await this.authService.revocarAccessToken(token);
+    if (!req.user) {
+      throw new UnauthorizedException('No autenticado');
     }
+
+    const authHeader = req.headers.authorization;
+    const headerValue = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+    const raw = typeof headerValue === 'string' ? headerValue.trim() : '';
+
+    if (!raw.toLowerCase().startsWith('bearer ')) {
+      throw new UnauthorizedException('Token inválido');
+    }
+
+    const token = raw.slice(7).trim();
+    if (!token) {
+      throw new UnauthorizedException('Token inválido');
+    }
+
+    await this.authService.revocarAccessToken(token);
     
     return this.authService.logout(dto.refreshToken);
   }

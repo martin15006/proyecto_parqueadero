@@ -24,9 +24,15 @@ export const UsuariosPage: React.FC = () => {
       setLoading(true);
       const res = await usuariosService.findAll(page, 10);
       setUsuarios(res.data);
-      setTotal(res.total);
+      const metaTotal =
+        typeof (res as any)?.meta?.total === 'number'
+          ? (res as any).meta.total
+          : undefined;
+      setTotal(metaTotal ?? res.data.length);
     } catch (error) {
-      console.error('Error cargando usuarios', error);
+      if (import.meta.env.DEV) {
+        console.error('Error cargando usuarios', error);
+      }
     } finally {
       setLoading(false);
     }

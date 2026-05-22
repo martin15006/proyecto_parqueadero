@@ -8,6 +8,7 @@ import { RegistroVehiculo } from './entities/registro-vehiculo.entity';
 import { MovimientoVehiculo } from './entities/movimiento-vehiculo.entity';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { AuditoriaModule } from '../auditoria/auditoria.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AuditoriaModule } from '../auditoria/auditoria.module';
     ]),
     forwardRef(() => UsuariosModule),
     AuditoriaModule,
+    AuthModule,
   ],
   controllers: [VehiculosController],
   providers: [VehiculosService],

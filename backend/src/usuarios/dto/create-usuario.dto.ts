@@ -4,7 +4,9 @@ import {
   IsNotEmpty,
   Length,
   Matches,
+  IsOptional,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ContrasenaSegura } from '../../common/validators/contrasena-segura.validator';
 
 export class CreateUsuarioDto {
@@ -57,11 +59,5 @@ export class CreateUsuarioDto {
   @Length(7, 7, { message: 'La ficha debe tener exactamente 7 caracteres' })
   @Matches(/^[0-9]+$/, { message: 'La ficha solo puede contener números' })
   idFormacion?: string;
-
-  @Type(() => Number)
-  @IsInt({ message: 'El tipo de usuario debe ser un número válido' })
-  @Min(1, { message: 'El tipo de usuario debe ser mayor o igual a 1' })
-  @IsOptional()
-  idTipoUsr?: number;
 
 }

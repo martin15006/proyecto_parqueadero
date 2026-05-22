@@ -160,9 +160,9 @@ export default function HomeScreen({ navigation }: any) {
                   },
                 ]}
               >
-                {usuario.QR && (
+                {usuario.qr && (
                   <QRCode
-                    value={usuario.QR}
+                    value={usuario.qr}
                     size={200}
                     backgroundColor="transparent"
                     color={qrColor}
