@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, ViewStyle, StyleProp } from 'react-native';
+import { Animated, ViewStyle, StyleProp, Text } from 'react-native';
 import { animaciones } from '../theme/senaTheme';
 
 interface Props {
@@ -29,9 +29,16 @@ export default function FadeInView({ children, delay = 0, style }: Props) {
     ]).start();
   }, []);
 
+  const safeChildren = React.Children.map(children, (child) => {
+    if (typeof child === 'string' || typeof child === 'number') {
+      return <Text>{String(child)}</Text>;
+    }
+    return child;
+  });
+
   return (
     <Animated.View style={[style, { opacity: opacidad, transform: [{ translateY }] }]}>
-      {children}
+      {safeChildren}
     </Animated.View>
   );
 }

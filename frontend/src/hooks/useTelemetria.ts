@@ -6,7 +6,18 @@ import { telemetriaService } from '../services/telemetria.service';
  * Hook para la gestión de telemetría y sensores en tiempo real.
  */
 export const useTelemetria = () => {
-  const [sensores, setSensores] = useState<any[]>([]);
+  /**
+   * Estructura mínima que consume la UI de Infraestructura.
+   * Nota: la entidad real en backend puede tener más campos; aquí solo usamos los necesarios.
+   */
+  const [sensores, setSensores] = useState<Array<{
+    idSensor?: number;
+    codigo: string;
+    idBahia: number;
+    estadoActual?: string;
+    ultimaLectura?: string;
+    bateria?: number;
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -14,10 +25,10 @@ export const useTelemetria = () => {
     try {
       setLoading(true);
       const data = await telemetriaService.getSensores();
-      setSensores(data);
+      setSensores(Array.isArray(data) ? data : []);
       setError(null);
     } catch (err) {
-      console.error('Error cargando sensores:', err);
+      setSensores([]);
       setError('Error al conectar con el servicio de telemetría.');
     } finally {
       setLoading(false);
@@ -28,28 +39,49 @@ export const useTelemetria = () => {
     loadSensores();
     socketService.connect();
 
-    // Listener para datos de sensores en tiempo real
-    const handleBroadcastSensor = (data: { codigo: string; valor: any }) => {
-      setSensores(prev => prev.map(s => 
-        s.codigo === data.codigo 
-          ? { ...s, ultimaLectura: new Date().toISOString(), ocupado: data.valor.ocupado } 
-          : s
-      ));
+    /**
+     * Realtime: actualizaciones emitidas por el Gateway principal (/socket.io).
+     * - bahia_actualizada: cuando el backend procesa telemetría real o forzados manuales
+     * - sensor_offline: cuando un dispositivo deja de reportar
+     */
+    const handleBahiaModificada = (payload: { idBahia: string; nuevoEstado: string; actualizadoEn: string }) => {
+      const match = String(payload?.idBahia || '').match(/(\d+)/);
+      const idBahia = match ? Number(match[1]) : null;
+      if (!idBahia) return;
+      setSensores((prev) =>
+        prev.map((s) =>
+          s.idBahia === idBahia
+            ? {
+                ...s,
+                estadoActual: payload.nuevoEstado,
+                ultimaLectura: payload.actualizadoEn || new Date().toISOString(),
+              }
+            : s,
+        ),
+      );
     };
 
-    // Listener para sensores que se desconectan
-    const handleAlertaSensor = (alerta: any) => {
-      console.warn('Alerta de sensor recibida:', alerta);
-      // Aquí se podrían inyectar notificaciones globales
+    const handleSensorOffline = (payload: { sensorId: string; idBahia: number; fecha: string }) => {
+      setSensores((prev) =>
+        prev.map((s) =>
+          s.codigo === payload.sensorId
+            ? {
+                ...s,
+                idBahia: payload.idBahia,
+                estadoActual: 'OFFLINE',
+              }
+            : s,
+        ),
+      );
     };
 
-    socketService.on('broadcast_sensor', handleBroadcastSensor);
-    socketService.on('alerta_sensor', handleAlertaSensor);
+    socketService.on('bahia_modificada', handleBahiaModificada);
+    socketService.on('sensor_offline', handleSensorOffline);
 
     return () => {
       socketService.cleanup([
-        { event: 'broadcast_sensor', callback: handleBroadcastSensor },
-        { event: 'alerta_sensor', callback: handleAlertaSensor },
+        { event: 'bahia_modificada', callback: handleBahiaModificada },
+        { event: 'sensor_offline', callback: handleSensorOffline },
       ]);
     };
   }, [loadSensores]);

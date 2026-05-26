@@ -5,6 +5,7 @@ interface ExportButtonProps {
   label: string;
   url: string;
   color: string;
+  filename?: string;
 }
 
 /**
@@ -32,18 +33,19 @@ export const ExportButton: React.FC<ExportButtonProps> = ({ label, url, color })
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.setAttribute('download', `reporte_${label.toLowerCase()}_${Date.now()}.${label === 'EXCEL' ? 'xlsx' : 'pdf'}`);
+      const extension = label === 'EXCEL' ? 'xlsx' : label === 'CSV' ? 'csv' : 'pdf';
+      link.setAttribute('download', `reporte_${label.toLowerCase()}_${Date.now()}.${extension}`);
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
     })
-    .catch(error => console.error('Error exportando datos:', error));
+    .catch(() => {});
   };
 
   return (
     <button 
       onClick={handleExport}
-      className={`flex items-center gap-2 bg-white border border-gray-200 text-gray-600 px-5 py-2.5 rounded-2xl font-bold text-xs transition-all shadow-sm active:scale-95 ${color}`}
+      className={`flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all duration-200 shadow-sm hover:bg-slate-50 active:scale-[0.99] ${color}`}
     >
       <Download size={14} /> {label}
     </button>

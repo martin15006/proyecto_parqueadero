@@ -1,5 +1,5 @@
 import api from '../api/axios';
-import type { BackendEnvelope, CreateVehiculoDto, TipoVehiculo, Vehiculo } from '../types';
+import type { AdminVehiculoItem, BackendEnvelope, CreateVehiculoDto, TipoVehiculo, Vehiculo } from '../types';
 
 /**
  * Servicio de Gestión de Vehículos.
@@ -63,5 +63,20 @@ export const vehiculosService = {
   eliminar: async (placa: string): Promise<BackendEnvelope<{ message?: string }>> => {
     const response = await api.delete(`/vehiculos/${placa}`);
     return response.data;
-  }
+  },
+
+  listarVehiculosAdmin: async (params?: { q?: string; placa?: string; marca?: string }): Promise<BackendEnvelope<AdminVehiculoItem[]>> => {
+    const query = new URLSearchParams();
+    if (params?.q) query.set('q', params.q);
+    if (params?.placa) query.set('placa', params.placa);
+    if (params?.marca) query.set('marca', params.marca);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    const response = await api.get(`/admin/vehiculos${suffix}`);
+    return response.data;
+  },
+
+  salidaEmergenciaAdmin: async (payload: { placa?: string; idRegistroVehiculo?: number; motivo: string }): Promise<BackendEnvelope<any>> => {
+    const response = await api.post('/admin/movimientos/salida-emergencia', payload);
+    return response.data;
+  },
 };

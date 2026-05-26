@@ -2,8 +2,8 @@ import { Controller, Get, Res, UseGuards, Request, Query } from '@nestjs/common'
 import { DashboardService } from './dashboard.service';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 
 @Controller('dashboard')

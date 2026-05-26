@@ -25,7 +25,7 @@ export default function SenaHeader({ titulo, onMenuPress, onBackPress, mostrarVo
         },
       ]}
     >
-      {esOscuro && <View style={styles.glow} />}
+      {esOscuro ? <View style={styles.glow} /> : null}
 
       {/* Botón izquierdo: volver o menú */}
       {mostrarVolver ? (

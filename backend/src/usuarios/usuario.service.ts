@@ -14,6 +14,8 @@ import { Usuario } from './entities/usuario.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { CreateUsuarioAdminDto } from './dto/create-usuario-admin.dto';
 import { ActualizarPerfilDto } from './dto/actualizar-perfil.dto';
+import { CreateOperativoDto } from './dto/create-operativo.dto';
+import { UpdateOperativoDto } from './dto/update-operativo.dto';
 import * as bcrypt from 'bcrypt';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { MailService } from '../mail/mail.service';
@@ -21,6 +23,7 @@ import { VehiculosService } from '../vehiculos/vehiculos.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 import { AuthService } from '../auth/auth.service';
+import { AdminListUsuariosQueryDto } from './dto/admin-list-usuarios.query.dto';
 
 /**
  * Servicio de Gestión de Usuarios.
@@ -45,6 +48,7 @@ export class UsuarioService {
    */
   async create(createUsuarioDto: CreateUsuarioDto | CreateUsuarioAdminDto): Promise<Omit<Usuario, 'contra'>> {
     const { documento, correo, contra } = createUsuarioDto;
+    const correoNormalizado = String(correo ?? '').trim().toLowerCase();
     const idTipoUsr = (
       'idTipoUsr' in createUsuarioDto && typeof createUsuarioDto.idTipoUsr === 'number'
     )
@@ -52,7 +56,8 @@ export class UsuarioService {
       : TipoUsuarioEnum.APRENDIZ;
 
     const existente = await this.usuarioRepository.findOne({
-      where: [{ documento }, { correo }],
+      where: [{ documento }, { correo: correoNormalizado }],
+      withDeleted: true,
     });
     
     if (existente) {
@@ -71,6 +76,7 @@ export class UsuarioService {
         idTipoUsr,
         contra: hashedPassword,
         qr: qrValue,
+        correo: correoNormalizado,
       });
 
       const usuarioGuardado = await this.usuarioRepository.save(nuevoUsuario);
@@ -122,6 +128,10 @@ export class UsuarioService {
     return await this.usuarioRepository.findOne({ where: { documento } });
   }
 
+  private async findOneByDocumentoIncludingDeleted(documento: string): Promise<Usuario | null> {
+    return await this.usuarioRepository.findOne({ where: { documento }, withDeleted: true });
+  }
+
   /**
    * Búsqueda detallada por documento (Alias de findOne para compatibilidad).
    */
@@ -135,7 +145,11 @@ export class UsuarioService {
   }
 
   async findOneByCorreo(correo: string): Promise<Usuario | null> {
-    return await this.usuarioRepository.findOne({ where: { correo } });
+    const correoNormalizado = String(correo ?? '').trim().toLowerCase();
+    return await this.usuarioRepository
+      .createQueryBuilder('usuario')
+      .where('LOWER(usuario.correo) = :correo', { correo: correoNormalizado })
+      .getOne();
   }
 
   /**
@@ -190,12 +204,20 @@ export class UsuarioService {
    * Búsqueda institucional por código QR.
    */
   async buscarPorQR(qr: string) {
+    const entrada = String(qr ?? '') // RNF2/RF8: normalizamos la entrada para evitar falsos negativos por espacios o tipos inesperados.
+      .trim(); // RF8: lectores físicos suelen añadir espacios/linebreaks; los removemos.
+
+    const esHex32 = /^[0-9a-fA-F]{32}$/.test(entrada); // RF8 (Code128): formato alfanumérico puro (UUID sin guiones).
+    const normalizado = esHex32
+      ? `${entrada.slice(0, 8)}-${entrada.slice(8, 12)}-${entrada.slice(12, 16)}-${entrada.slice(16, 20)}-${entrada.slice(20)}` // RF8: reconstruye el UUID estándar esperado por la BD (compatibilidad con registros existentes).
+      : entrada; // RF8: si llega UUID con guiones (QR futuro), se usa tal cual.
+
     const usuario = await this.usuarioRepository.findOne({
-      where: { qr },
+      where: { qr: normalizado }, // RF8: permite validar tanto el token para Code128 (sin guiones) como el QR (con guiones) sin exponer PII.
       relations: ['tipoUsuario', 'formacion'],
     });
 
-    if (!usuario) throw new NotFoundException('Código QR inválido');
+    if (!usuario) throw new NotFoundException('Código de acceso inválido'); // RF31/RF33: mensaje neutral (barras/QR) para el flujo de portería.
 
     const vehiculos = await this.vehiculosService.findByUsuario(usuario.documento);
     const { contra: _, ...perfil } = usuario;
@@ -258,5 +280,165 @@ export class UsuarioService {
 
     const { contra: _, ...sinContrasena } = guardado;
     return sinContrasena;
+  }
+
+  async crearOperativoByAdmin(dto: CreateOperativoDto): Promise<Omit<Usuario, 'contra'>> {
+    const payload: CreateUsuarioAdminDto = {
+      documento: dto.documento,
+      fotoPersona: '',
+      nombreCompleto: dto.nombreCompleto,
+      numTelf: dto.numTelf,
+      contactoEmerg: dto.numTelf,
+      correo: dto.correo,
+      contra: dto.contra,
+      idTipoUsr: TipoUsuarioEnum.OPERATIVO,
+    };
+
+    return await this.create(payload);
+  }
+
+  async listarOperativosAdmin(): Promise<Array<Omit<Usuario, 'contra'>>> {
+    const operativos = await this.usuarioRepository.find({
+      where: { idTipoUsr: TipoUsuarioEnum.OPERATIVO },
+      withDeleted: true,
+      order: { nombreCompleto: 'ASC' },
+    });
+
+    return operativos.map(({ contra: _contra, ...rest }) => rest);
+  }
+
+  async actualizarOperativoAdmin(documento: string, dto: UpdateOperativoDto): Promise<Omit<Usuario, 'contra'>> {
+    const usuario = await this.findOneByDocumentoIncludingDeleted(documento);
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    if (usuario.idTipoUsr !== TipoUsuarioEnum.OPERATIVO) throw new BadRequestException('El usuario no es Operativo');
+
+    const correoNuevo = dto.correo?.trim();
+    if (correoNuevo && correoNuevo !== usuario.correo) {
+      const yaExiste = await this.usuarioRepository.findOne({ where: { correo: correoNuevo }, withDeleted: true });
+      if (yaExiste && yaExiste.documento !== usuario.documento) {
+        throw new ConflictException('El correo ya se encuentra registrado por otro usuario');
+      }
+      usuario.correo = correoNuevo;
+    }
+
+    if (dto.nombreCompleto !== undefined) usuario.nombreCompleto = dto.nombreCompleto;
+    if (dto.numTelf !== undefined) usuario.numTelf = dto.numTelf;
+    if (dto.contactoEmerg !== undefined) usuario.contactoEmerg = dto.contactoEmerg;
+
+    const guardado = await this.usuarioRepository.save(usuario);
+
+    await this.auditoriaService.create({
+      accion: 'ACTUALIZAR_OPERATIVO',
+      entidad: 'USUARIO',
+      idEntidad: parseInt(guardado.documento),
+      idUsuario: guardado.documento,
+      datosNuevos: {
+        correo: guardado.correo,
+        nombreCompleto: guardado.nombreCompleto,
+        numTelf: guardado.numTelf,
+        contactoEmerg: guardado.contactoEmerg,
+      },
+    });
+
+    const { contra: _contra, ...sinContrasena } = guardado;
+    return sinContrasena;
+  }
+
+  async actualizarEstadoOperativoAdmin(documento: string, activo: boolean): Promise<Omit<Usuario, 'contra'>> {
+    const usuario = await this.findOneByDocumentoIncludingDeleted(documento);
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    if (usuario.idTipoUsr !== TipoUsuarioEnum.OPERATIVO) throw new BadRequestException('El usuario no es Operativo');
+
+    if (activo) {
+      await this.usuarioRepository.restore({ documento });
+    } else {
+      await this.usuarioRepository.softDelete({ documento });
+    }
+
+    const actualizado = await this.findOneByDocumentoIncludingDeleted(documento);
+    if (!actualizado) throw new NotFoundException('Usuario no encontrado');
+
+    await this.auditoriaService.create({
+      accion: 'CAMBIAR_ESTADO_OPERATIVO',
+      entidad: 'USUARIO',
+      idEntidad: parseInt(actualizado.documento),
+      idUsuario: actualizado.documento,
+      datosNuevos: { activo: Boolean(activo) },
+    });
+
+    const { contra: _contra, ...sinContrasena } = actualizado;
+    return sinContrasena;
+  }
+
+  async restablecerContrasenaOperativoAdmin(documento: string, contraNueva: string): Promise<{ mensaje: string }> {
+    const usuario = await this.findOneByDocumentoIncludingDeleted(documento);
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    if (usuario.idTipoUsr !== TipoUsuarioEnum.OPERATIVO) throw new BadRequestException('El usuario no es Operativo');
+
+    const esIgual = await bcrypt.compare(contraNueva, usuario.contra);
+    if (esIgual) {
+      throw new BadRequestException('La nueva contraseña no puede ser igual a la anterior');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    usuario.contra = await bcrypt.hash(contraNueva, salt);
+    await this.usuarioRepository.save(usuario);
+
+    await this.auditoriaService.create({
+      accion: 'RESET_PASSWORD_OPERATIVO',
+      entidad: 'USUARIO',
+      idEntidad: parseInt(usuario.documento),
+      idUsuario: usuario.documento,
+      datosNuevos: { reset: true },
+    });
+
+    return { mensaje: 'Contraseña restablecida exitosamente' };
+  }
+
+  async listarUsuariosAdmin(query: AdminListUsuariosQueryDto) {
+    const q = query.q?.trim();
+    const nombre = query.nombre?.trim();
+    const documento = query.documento?.trim();
+    const estado = query.estado ?? 'TODOS';
+
+    const qb = this.usuarioRepository
+      .createQueryBuilder('u')
+      .withDeleted()
+      .leftJoinAndSelect('u.registrosVehiculos', 'rv')
+      .leftJoinAndSelect('rv.vehiculo', 'vehiculo')
+      .where('u.id_tipo_usr != :adminRol', { adminRol: TipoUsuarioEnum.ADMIN });
+
+    if (estado === 'ACTIVO') {
+      qb.andWhere('u.deleted_at IS NULL');
+    } else if (estado === 'INACTIVO') {
+      qb.andWhere('u.deleted_at IS NOT NULL');
+    }
+
+    if (documento) {
+      qb.andWhere('u.documento ILIKE :documento', { documento: `%${documento}%` });
+    }
+
+    if (nombre) {
+      qb.andWhere('u.nombre_completo ILIKE :nombre', { nombre: `%${nombre}%` });
+    }
+
+    if (q) {
+      qb.andWhere('(u.nombre_completo ILIKE :q OR u.documento ILIKE :q OR u.correo ILIKE :q)', { q: `%${q}%` });
+    }
+
+    qb.orderBy('u.nombre_completo', 'ASC');
+
+    const usuarios = await qb.getMany();
+
+    return usuarios.map((u) => {
+      const { contra: _contra, registrosVehiculos: _registros, ...rest } = u;
+      return {
+        ...rest,
+        estadoCuenta: u.deletedAt ? 'INACTIVO' : 'ACTIVO',
+        vehiculos: (_registros || [])
+          .map((r) => r.vehiculo)
+          .filter(Boolean),
+      };
+    });
   }
 }

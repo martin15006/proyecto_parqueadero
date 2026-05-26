@@ -22,28 +22,28 @@ export function Table<T>({
   emptyMessage = 'No se encontraron registros',
 }: TableProps<T>) {
   return (
-    <div className="w-full overflow-hidden rounded-[2rem] bg-white shadow-xl shadow-gray-200/50 border border-gray-100">
+    <div className="w-full overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gray-50/50 border-bottom border-gray-100">
+            <tr className="bg-slate-50 border-bottom border-slate-200">
               {columns.map((col, idx) => (
                 <th
                   key={idx}
-                  className={`px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ${col.className || ''}`}
+                  className={`px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ${col.className || ''}`}
                 >
                   {col.header}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               [...Array(5)].map((_, i) => (
                 <tr key={i} className="animate-pulse">
                   {columns.map((_, j) => (
                     <td key={j} className="px-8 py-6">
-                      <div className="h-4 bg-gray-100 rounded-full w-2/3"></div>
+                      <div className="h-4 bg-slate-100 rounded-full w-2/3"></div>
                     </td>
                   ))}
                 </tr>
@@ -52,7 +52,7 @@ export function Table<T>({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-8 py-20 text-center text-gray-400 font-medium italic"
+                  className="px-8 py-20 text-center text-slate-500 font-medium italic"
                 >
                   {emptyMessage}
                 </td>
@@ -62,14 +62,14 @@ export function Table<T>({
                 <tr
                   key={idx}
                   onClick={() => onRowClick?.(item)}
-                  className={`group hover:bg-blue-50/30 transition-colors cursor-default ${
+                  className={`group hover:bg-slate-50 transition-all duration-200 cursor-default ${
                     onRowClick ? 'cursor-pointer' : ''
                   }`}
                 >
                   {columns.map((col, cIdx) => (
                     <td
                       key={cIdx}
-                      className={`px-8 py-6 text-sm font-semibold text-gray-700 ${col.className || ''}`}
+                      className={`px-8 py-6 text-sm font-semibold text-slate-700 ${col.className || ''}`}
                     >
                       {typeof col.accessor === 'function'
                         ? col.accessor(item)

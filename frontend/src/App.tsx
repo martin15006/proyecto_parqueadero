@@ -1,3 +1,4 @@
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import Login from './login';
 import Registro from './registro';
@@ -12,7 +13,62 @@ import { VehiculosPage } from './pages/admin/VehiculosPage';
 import { BahiasPage } from './pages/admin/BahiasPage';
 import { AuditoriaPage } from './pages/admin/AuditoriaPage';
 import { TelemetriaPage } from './pages/admin/TelemetriaPage';
+import { OperativosPage } from './pages/admin/OperativosPage';
+import { ConfiguracionAdminPage } from './pages/admin/ConfiguracionAdminPage';
+import { VisitantesPage } from './pages/admin/VisitantesPage';
+import { InformesPage } from './pages/admin/InformesPage';
+import { GraficosPage } from './pages/admin/GraficosPage';
 import { UserRole } from './constants/enums';
+
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; message: string }
+> {
+  state = { hasError: false, message: '' };
+
+  static getDerivedStateFromError(error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error inesperado en el cliente';
+    return { hasError: true, message };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-10 max-w-lg w-full text-center">
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Se produjo un error de renderizado</h1>
+            <p className="mt-3 text-sm font-semibold text-slate-600">
+              La aplicación activó un modo de recuperación para evitar pantalla en blanco.
+            </p>
+            <p className="mt-4 text-[11px] font-mono text-slate-500 break-words">
+              {this.state.message}
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="px-6 py-3 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest transition-all duration-200 hover:bg-slate-950"
+              >
+                Recargar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('user');
+                  window.location.href = '/login';
+                }}
+                className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-black uppercase tracking-widest transition-all duration-200 hover:bg-slate-50"
+              >
+                Ir a Login
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Vista de bienvenida raíz (/)
 function Saludo() {
@@ -85,33 +141,49 @@ function PanelAprendiz() {
 
 function App() {
   return (
-    <NotificationProvider>
-      <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/registro" element={<Registro />} />
-            
-            <Route path="/" element={<ProtectedRoute><Saludo /></ProtectedRoute>} />
+    <AppErrorBoundary>
+      <NotificationProvider>
+        <AuthProvider>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/registro" element={<Registro />} />
+              
+              <Route path="/" element={<ProtectedRoute><Saludo /></ProtectedRoute>} />
 
-            {/* Rutas Admin con Layout */}
-            <Route path="/appadmin" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><AdminLayout /></ProtectedRoute>}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="usuarios" element={<UsuariosPage />} />
-              <Route path="vehiculos" element={<VehiculosPage />} />
-              <Route path="bahias" element={<BahiasPage />} />
-              <Route path="auditoria" element={<AuditoriaPage />} />
-              <Route path="telemetria" element={<TelemetriaPage />} />
-            </Route>
+              {/* Rutas Admin con Layout */}
+              <Route path="/appadmin" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><AdminLayout /></ProtectedRoute>}>
+                <Route index element={<AdminDashboard />} />
+                <Route path="usuarios" element={<UsuariosPage />} />
+                <Route path="operativos" element={<OperativosPage />} />
+                <Route path="visitantes" element={<VisitantesPage />} />
+                <Route path="vehiculos" element={<VehiculosPage />} />
+                <Route path="bahias" element={<BahiasPage />} />
+                <Route path="informes" element={<InformesPage />} />
+                <Route path="graficos" element={<GraficosPage />} />
+                <Route path="auditoria" element={<AuditoriaPage />} />
+                <Route path="telemetria" element={<TelemetriaPage />} />
+                <Route path="configuracion" element={<ConfiguracionAdminPage />} />
+              </Route>
 
-            <Route path="/appperop" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OPERATIVO]}><OperativoDashboard /></ProtectedRoute>} />
-            <Route path="/app" element={<ProtectedRoute allowedRoles={[UserRole.APRENDIZ]}><PanelAprendiz /></ProtectedRoute>} />
+              <Route
+                path="/admin/operativos"
+                element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><Navigate to="/appadmin/operativos" replace /></ProtectedRoute>}
+              />
+              <Route
+                path="/admin/configuracion"
+                element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><Navigate to="/appadmin/configuracion" replace /></ProtectedRoute>}
+              />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Router>
-      </AuthProvider>
-    </NotificationProvider>
+              <Route path="/appperop" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OPERATIVO]}><OperativoDashboard /></ProtectedRoute>} />
+              <Route path="/app" element={<ProtectedRoute allowedRoles={[UserRole.APRENDIZ]}><PanelAprendiz /></ProtectedRoute>} />
+
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Router>
+        </AuthProvider>
+      </NotificationProvider>
+    </AppErrorBoundary>
   );
 }
 

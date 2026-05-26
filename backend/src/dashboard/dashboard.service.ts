@@ -67,6 +67,8 @@ export class DashboardService {
     return {
       totalUsuarios,
       totalVehiculos,
+      parqueaderoDeshabilitado: ocupacion.parqueaderoDeshabilitado,
+      estadoParqueadero: ocupacion.estadoParqueadero,
       ocupacion: {
         total: ocupacion.total,
         ocupados: ocupacion.ocupados,

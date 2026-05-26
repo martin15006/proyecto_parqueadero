@@ -5,6 +5,7 @@ import {
   NotFoundException,
   OnModuleInit,
   Logger,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, EntityManager } from 'typeorm';
@@ -73,9 +74,11 @@ export class AuthService implements OnModuleInit {
    * @param loginDto Credenciales de acceso
    */
   async loginPaso1(loginDto: LoginDto): Promise<{ mensaje: string; correo: string }> {
-    const usuario = await this.usuarioRepository.findOne({
-      where: { correo: loginDto.correo },
-    });
+    const correoNormalizado = String(loginDto?.correo ?? '').trim().toLowerCase();
+    const usuario = await this.usuarioRepository
+      .createQueryBuilder('usuario')
+      .where('LOWER(usuario.correo) = :correo', { correo: correoNormalizado })
+      .getOne();
 
     if (!usuario) {
       throw new UnauthorizedException('Credenciales inválidas');
@@ -106,9 +109,11 @@ export class AuthService implements OnModuleInit {
     usuario: Omit<Usuario, 'contra'> & { rol: string } 
   }> {
     return await this.otpRepository.manager.transaction(async (manager) => {
-      const usuario = await manager.findOne(Usuario, {
-        where: { correo: dto.correo },
-      });
+      const correoNormalizado = String(dto?.correo ?? '').trim().toLowerCase();
+      const usuario = await manager
+        .createQueryBuilder(Usuario, 'usuario')
+        .where('LOWER(usuario.correo) = :correo', { correo: correoNormalizado })
+        .getOne();
 
       if (!usuario) {
         throw new NotFoundException('Usuario no encontrado');
@@ -130,7 +135,8 @@ export class AuthService implements OnModuleInit {
         });
 
         if (otpReciente && (new Date().getTime() - otpReciente.updatedAt.getTime() < 3000)) {
-          this.logger.warn(`Petición de verificación duplicada detectada para usuario: ${usuario.documento}. Ignorando.`);
+          // RNF2 (Privacidad): prohibido loguear documento/cédula (PII). Registramos solo el evento técnico.
+          this.logger.warn('Petición de verificación OTP duplicada detectada (posible doble submit).');
           // En lugar de lanzar error, podríamos intentar recuperar la última sesión, 
           // pero por seguridad y simplicidad, el frontend debe manejar la redirección.
           // Lanzamos un error específico que el frontend pueda identificar si fuera necesario,
@@ -294,9 +300,11 @@ export class AuthService implements OnModuleInit {
    * Reenvía código OTP.
    */
   async reenviarOtp(dto: ReenviarOtpDto): Promise<{ mensaje: string }> {
-    const usuario = await this.usuarioRepository.findOne({
-      where: { correo: dto.correo },
-    });
+    const correoNormalizado = String(dto?.correo ?? '').trim().toLowerCase();
+    const usuario = await this.usuarioRepository
+      .createQueryBuilder('usuario')
+      .where('LOWER(usuario.correo) = :correo', { correo: correoNormalizado })
+      .getOne();
 
     if (!usuario) {
       return { mensaje: 'Si el correo existe, se enviará un nuevo código.' };
@@ -310,7 +318,11 @@ export class AuthService implements OnModuleInit {
    * Recuperación de contraseña - Paso 1.
    */
   async solicitarRecuperacion(correo: string): Promise<{ mensaje: string }> {
-    const usuario = await this.usuarioRepository.findOne({ where: { correo } });
+    const correoNormalizado = String(correo ?? '').trim().toLowerCase();
+    const usuario = await this.usuarioRepository
+      .createQueryBuilder('usuario')
+      .where('LOWER(usuario.correo) = :correo', { correo: correoNormalizado })
+      .getOne();
 
     if (!usuario) {
       return { mensaje: 'Si el correo está registrado, recibirás un código de verificación.' };
@@ -324,7 +336,11 @@ export class AuthService implements OnModuleInit {
    * Recuperación de contraseña - Paso 2.
    */
   async verificarRecuperacion(correo: string, codigo: string): Promise<{ mensaje: string; valido: boolean }> {
-    const usuario = await this.usuarioRepository.findOne({ where: { correo } });
+    const correoNormalizado = String(correo ?? '').trim().toLowerCase();
+    const usuario = await this.usuarioRepository
+      .createQueryBuilder('usuario')
+      .where('LOWER(usuario.correo) = :correo', { correo: correoNormalizado })
+      .getOne();
 
     if (!usuario) {
       throw new UnauthorizedException('Código o correo incorrectos');
@@ -360,7 +376,11 @@ export class AuthService implements OnModuleInit {
    * Recuperación de contraseña - Paso 3.
    */
   async restablecerContrasena(correo: string, codigo: string, contraNueva: string): Promise<{ mensaje: string }> {
-    const usuario = await this.usuarioRepository.findOne({ where: { correo } });
+    const correoNormalizado = String(correo ?? '').trim().toLowerCase();
+    const usuario = await this.usuarioRepository
+      .createQueryBuilder('usuario')
+      .where('LOWER(usuario.correo) = :correo', { correo: correoNormalizado })
+      .getOne();
 
     if (!usuario) {
       throw new UnauthorizedException('Datos incorrectos');
@@ -400,11 +420,16 @@ export class AuthService implements OnModuleInit {
    * SECURITY: Implementa protección contra ráfagas (burst) y condiciones de carrera.
    */
   private async generarYEnviarOtp(usuario: Usuario): Promise<void> {
-    const { codigo } = await this.crearOtp(usuario.documento);
-    await this.mailService.enviarCodigoOtp(usuario.correo, codigo, usuario.nombreCompleto);
+    const { idOtp, codigo } = await this.crearOtp(usuario.documento);
+    try {
+      await this.mailService.enviarCodigoOtp(usuario.correo, codigo, usuario.nombreCompleto);
+    } catch (error) {
+      await this.otpRepository.update({ idOtp }, { usado: true });
+      throw new InternalServerErrorException('No se pudo enviar el código de verificación. Intenta de nuevo.');
+    }
   }
 
-  async crearOtp(documento: string): Promise<{ codigo: string; expiraEn: Date }> {
+  async crearOtp(documento: string): Promise<{ idOtp: number; codigo: string; expiraEn: Date }> {
     const ultimoOtp = await this.otpRepository.findOne({
       where: { documento, usado: false },
       order: { createdAt: 'DESC' },
@@ -415,7 +440,8 @@ export class AuthService implements OnModuleInit {
       const tiempoTranscurrido = Date.now() - ultimoOtp.createdAt.getTime();
 
       if (tiempoTranscurrido < UN_MINUTO) {
-        this.logger.warn(`Intento de generación de OTP bloqueado por rate-limit (1min) para usuario: ${documento}`);
+        // RNF2 (Privacidad): no registramos documento/cédula (PII). Registramos solo el control de rate-limit.
+        this.logger.warn('Intento de generación de OTP bloqueado por rate-limit (1min).');
         throw new BadRequestException('Ya se envió un código recientemente. Espera 1 minuto antes de solicitar otro.');
       }
     }
@@ -429,13 +455,13 @@ export class AuthService implements OnModuleInit {
     const expiraEn = new Date();
     expiraEn.setMinutes(expiraEn.getMinutes() + 5);
 
-    await this.otpRepository.save({
+    const creado = await this.otpRepository.save({
       documento,
       codigo,
       expiraEn,
     });
 
-    return { codigo, expiraEn };
+    return { idOtp: creado.idOtp, codigo, expiraEn };
   }
 
   async validarYConsumirOtp(documento: string, codigo: string): Promise<void> {

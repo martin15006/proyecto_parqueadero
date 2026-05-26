@@ -8,4 +8,5 @@ export enum IotStatusEnum {
   OFFLINE = 'OFFLINE',     // Sensor sin reporte (Heartbeat fallido)
   ERROR = 'ERROR',         // Sensor reporta falla técnica o hardware
   ONLINE = 'ONLINE',       // Sensor recién conectado o reestablecido
+  DISABLED = 'DISABLED',   // Bahía o parqueadero deshabilitado manualmente
 }

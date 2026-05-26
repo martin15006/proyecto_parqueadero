@@ -10,8 +10,11 @@ import { Repository } from 'typeorm';
 import { Vehiculo } from './entities/vehiculo.entity';
 import { TipoVehiculo } from './entities/tipo-vehiculo.entity';
 import { RegistroVehiculo } from './entities/registro-vehiculo.entity';
+import { MovimientoVehiculo, EstadoMovimiento } from './entities/movimiento-vehiculo.entity';
+import { Bahia } from '../bahias/entities/bahia.entity';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
 import { ActualizarVehiculoDto } from './dto/actualizar-vehiculo.dto';
+import { AdminListVehiculosQueryDto } from './dto/admin-list-vehiculos.query.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 
@@ -29,6 +32,8 @@ export class VehiculosService {
     private readonly tipoVehiculoRepository: Repository<TipoVehiculo>,
     @InjectRepository(RegistroVehiculo)
     private readonly registroRepository: Repository<RegistroVehiculo>,
+    @InjectRepository(MovimientoVehiculo)
+    private readonly movimientoRepository: Repository<MovimientoVehiculo>,
     private readonly cloudinaryService: CloudinaryService,
     private readonly auditoriaService: AuditoriaService,
   ) {}
@@ -121,6 +126,51 @@ export class VehiculosService {
     };
   }
 
+  async listarVehiculosAdmin(query: AdminListVehiculosQueryDto) {
+    const placa = query.placa?.trim().toUpperCase();
+    const marca = query.marca?.trim();
+    const q = query.q?.trim();
+
+    const qb = this.vehiculoRepository
+      .createQueryBuilder('v')
+      .leftJoinAndSelect('v.tipoVehiculo', 'tv')
+      .orderBy('v.placa', 'ASC');
+
+    if (placa) {
+      qb.andWhere('v.placa ILIKE :placa', { placa: `%${placa}%` });
+    }
+
+    if (marca) {
+      qb.andWhere('tv.tipo_vehiculo ILIKE :marca', { marca: `%${marca}%` });
+    }
+
+    if (q) {
+      qb.andWhere('(v.placa ILIKE :q OR tv.tipo_vehiculo ILIKE :q)', { q: `%${q}%` });
+    }
+
+    const subQuery = qb.subQuery()
+      .select('1')
+      .from(MovimientoVehiculo, 'mv')
+      .innerJoin(RegistroVehiculo, 'rv', 'rv.id_registro_v = mv.id_registro_vehiculo')
+      .where('rv.id_vehiculo = v.placa')
+      .andWhere('mv.estado = :estadoAdentro', { estadoAdentro: EstadoMovimiento.ADENTRO })
+      .andWhere('mv.deleted_at IS NULL')
+      .getQuery();
+
+    qb.addSelect(`EXISTS (${subQuery})`, 'is_adentro');
+
+    const { entities, raw } = await qb.getRawAndEntities();
+
+    return entities.map((vehiculo, idx) => {
+      const isAdentroRaw = raw[idx]?.is_adentro;
+      const isAdentro = isAdentroRaw === true || isAdentroRaw === 't' || isAdentroRaw === 1 || isAdentroRaw === '1';
+      return {
+        ...vehiculo,
+        isAdentro,
+      };
+    });
+  }
+
   /**
    * Requerido por UsuarioService.
    */
@@ -130,6 +180,38 @@ export class VehiculosService {
       relations: ['vehiculo', 'vehiculo.tipoVehiculo'],
     });
     return registros.map(r => r.vehiculo);
+  }
+
+  /**
+   * RF32: Historial de uso del Aprendiz.
+   *
+   * Objetivo:
+   * - Permitir que el Aprendiz consulte sus ingresos/salidas (transparencia).
+   * - Depende de que registrarSalida cierre correctamente el movimiento (horaSalida + estado).
+   *
+   * RNF2:
+   * - Retorna solo información operativa del usuario autenticado (no expone datos de otros usuarios).
+   */
+  async listarHistorialUsuario(documento: string) {
+    const movimientos = await this.movimientoRepository
+      .createQueryBuilder('mv') // PERFORMANCE: consulta agregada con joins controlados.
+      .innerJoin(RegistroVehiculo, 'rv', 'rv.id_registro_v = mv.id_registro_vehiculo') // RF32: enlaza movimiento con registro usuario-vehículo.
+      .innerJoin(Vehiculo, 'v', 'v.placa = rv.id_vehiculo') // RF32: permite devolver la placa en el historial.
+      .leftJoin(Bahia, 'b', 'b.id_bahia = mv.id_bahia') // RF32: permite devolver nombre de bahía si existe.
+      .where('rv.id_usuario = :documento', { documento }) // RNF2: limita estrictamente al usuario autenticado.
+      .orderBy('mv.hora_ingreso', 'DESC') // RF32: orden cronológico descendente.
+      .limit(50) // UX: limita historial para evitar cargas grandes en móvil.
+      .select([
+        'mv.id_movimiento AS "idMovimiento"',
+        'v.placa AS "placa"',
+        'mv.hora_ingreso AS "horaIngreso"',
+        'mv.hora_salida AS "horaSalida"',
+        'mv.estado AS "estado"',
+        'b.nombre_bahia AS "bahia"',
+      ]) // RF32: payload mínimo para UI.
+      .getRawMany();
+
+    return movimientos;
   }
 
   /**

@@ -62,12 +62,12 @@ export default function DrawerContent(props: any) {
 
   return (
     <View style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
-      {esOscuro && (
+      {esOscuro ? (
         <>
           <View style={styles.auroraTop} />
           <View style={styles.auroraBottom} />
         </>
-      )}
+      ) : null}
 
       <DrawerContentScrollView {...props} contentContainerStyle={styles.scroll}>
         {/* HEADER */}
@@ -77,7 +77,7 @@ export default function DrawerContent(props: any) {
           <View style={styles.circuloDeco3} />
 
           <View style={styles.avatarWrapper}>
-            {esOscuro && <View style={styles.avatarGlow} />}
+            {esOscuro ? <View style={styles.avatarGlow} /> : null}
             <AvatarIniciales
               nombre={usuario.nombreCompleto}
               fotoUrl={usuario.fotoPersona}
@@ -130,11 +130,11 @@ export default function DrawerContent(props: any) {
                   onPress={() => navegar(item.ruta)}
                   activeOpacity={0.7}
                 >
-                  {activo && (
+                  {activo ? (
                     <View
                       style={[styles.indicadorActivo, { backgroundColor: colores.verde }]}
                     />
-                  )}
+                  ) : null}
                   <Text style={styles.iconoItem}>{item.icono}</Text>
                   <Text
                     style={[

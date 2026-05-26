@@ -8,6 +8,7 @@ export interface User {
   numTelf?: string;
   contactoEmerg?: string;
   qr?: string;
+  deletedAt?: string | null;
 }
 
 export interface AuthResponse {
@@ -42,6 +43,8 @@ export interface Movement {
 export interface DashboardStats {
   totalUsuarios: number;
   totalVehiculos: number;
+  parqueaderoDeshabilitado?: boolean;
+  estadoParqueadero?: 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO';
   ocupacion: {
     total: number;
     ocupados: number;
@@ -51,6 +54,43 @@ export interface DashboardStats {
   ingresosMes: number;
   alertasActivas: number;
 }
+
+export type BahiaEstado =
+  | 'AVAILABLE'
+  | 'OCCUPIED'
+  | 'TRANSITO'
+  | 'DISCREPANCIA'
+  | 'OFFLINE'
+  | 'ERROR'
+  | 'DISABLED';
+
+export interface OcupacionPayload {
+  total: number;
+  ocupados: number;
+  disponibles: number;
+  parqueaderoDeshabilitado: boolean;
+  estadoParqueadero: 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO';
+  bahias: Array<{
+    idBahia: number;
+    nombreBahia: string;
+    estado: BahiaEstado;
+    tipo: string;
+  }>;
+}
+
+export type BahiaModificadaPayload = {
+  idBahia: string;
+  nuevoEstado: 'LIBRE' | 'TRANSITO' | 'OCUPADO' | 'DISCREPANCIA' | 'OFFLINE' | 'DESHABILITADO';
+  actualizadoEn: string;
+};
+
+export type ConteoGlobalDisponiblesPayload = {
+  total: number;
+  ocupados: number;
+  disponibles: number;
+  estadoParqueadero: 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO';
+  actualizadoEn: string;
+};
 
 export type BackendEnvelope<T> = {
   success: boolean;
@@ -75,6 +115,15 @@ export interface Vehiculo {
   tipoVehiculo?: TipoVehiculo | string;
 }
 
+export interface AdminUsuarioItem extends User {
+  estadoCuenta: 'ACTIVO' | 'INACTIVO';
+  vehiculos: Vehiculo[];
+}
+
+export interface AdminVehiculoItem extends Vehiculo {
+  isAdentro: boolean;
+}
+
 export interface CreateVehiculoDto {
   placa: string;
   fotoVehiculo: string;
@@ -92,4 +141,19 @@ export interface CreateUsuarioDto {
   correo: string;
   contra: string;
   idFormacion?: string;
+}
+
+export interface CreateOperativoAdminDto {
+  documento: string;
+  nombreCompleto: string;
+  correo: string;
+  numTelf: string;
+  contra: string;
+}
+
+export interface UpdateOperativoAdminDto {
+  nombreCompleto?: string;
+  correo?: string;
+  numTelf?: string;
+  contactoEmerg?: string;
 }

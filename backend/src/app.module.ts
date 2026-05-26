@@ -26,12 +26,14 @@ import { Visitante } from './visitantes/entities/visitante.entity';
 import { Sensor } from './telemetria/entities/sensor.entity';
 import { TelemetriaEvento } from './telemetria/entities/telemetria-evento.entity';
 import { AlertaSistema } from './telemetria/entities/alerta-sistema.entity';
+import { ParqueaderoEstado } from './bahias/entities/parqueadero-estado.entity';
 
 // Módulo de WebSocket
 import { GatewayModule } from './gateway/gateway.module';
 import { OperativoModule } from './operativo/operativo.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TelemetriaModule } from './telemetria/telemetria.module';
+import { NotificacionesModule } from './notificaciones/notificaciones.module';
 
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
@@ -103,27 +105,40 @@ function validateEnv(config: Record<string, unknown>) {
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        url: configService.get<string>('DATABASE_URL'),
-        host: configService.get<string>('DB_HOST'),
-        port: parseInt(configService.get<string>('DB_PORT') ?? '5432', 10),
-        username: configService.get<string>('DB_USERNAME'),
-        password: String(configService.get<string>('DB_PASSWORD') ?? ''),
-        database: configService.get<string>('DB_NAME'),
+      useFactory: (configService: ConfigService) => {
+        const dbHost = String(configService.get<string>('DB_HOST') ?? '').trim();
+        const dbName = String(configService.get<string>('DB_NAME') ?? '').trim();
 
-        entities: [
-          __dirname + '/**/*.entity{.ts,.js}',
-        ],
+        const isLocalDb =
+          dbName === 'parqueadero' &&
+          (dbHost === 'localhost' || dbHost === '127.0.0.1');
 
-        migrations: [
-          __dirname + '/migrations/*{.ts,.js}',
-        ],
+        const syncEnv = configService.get<string>('TYPEORM_SYNCHRONIZE');
+        const synchronize = typeof syncEnv === 'string' ? syncEnv === 'true' : isLocalDb;
 
-        synchronize: false,
-        migrationsRun: false, // Se deshabilita para evitar conflictos con migraciones antiguas; ejecutar manualmente vía CLI si es necesario
-        namingStrategy: new SnakeNamingStrategy(),
-      }),
+        return {
+          type: 'postgres',
+          url: configService.get<string>('DATABASE_URL'),
+          host: configService.get<string>('DB_HOST'),
+          port: parseInt(configService.get<string>('DB_PORT') ?? '5432', 10),
+          username: configService.get<string>('DB_USERNAME'),
+          password: String(configService.get<string>('DB_PASSWORD') ?? ''),
+          database: configService.get<string>('DB_NAME'),
+
+          entities: [
+            __dirname + '/**/*.entity{.ts,.js}',
+            ParqueaderoEstado,
+          ],
+
+          migrations: [
+            __dirname + '/migrations/*{.ts,.js}',
+          ],
+
+          synchronize,
+          migrationsRun: false,
+          namingStrategy: new SnakeNamingStrategy(),
+        };
+      },
     }),
 
     // Módulos principales
@@ -139,6 +154,7 @@ function validateEnv(config: Record<string, unknown>) {
     OperativoModule,
     DashboardModule,
     TelemetriaModule,
+    NotificacionesModule,
   ],
 
   controllers: [AppController],

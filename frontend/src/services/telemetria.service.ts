@@ -10,7 +10,7 @@ export const telemetriaService = {
    */
   getSensores: async () => {
     const response = await api.get('/telemetria/sensores');
-    return response.data;
+    return response.data.data;
   },
 
   /**
@@ -18,8 +18,26 @@ export const telemetriaService = {
    */
   testOffline: async () => {
     const response = await api.post('/telemetria/test-offline');
-    return response.data;
-  }
+    return response.data.data;
+  },
+
+  /**
+   * Simulador (DEMO): fuerza un ingreso simulado para reflejar cambios en el mapa 2D y disparar alertas (RF14).
+   * Solo está disponible en ambiente NO productivo y para ADMIN.
+   */
+  simularIngresoQr: async (params?: { idBahia?: number; placa?: string }) => {
+    const response = await api.post('/telemetria/simulador/qr-ingreso', params ?? {});
+    return response.data.data ?? response.data;
+  },
+
+  /**
+   * Simulador (DEMO): emite una alerta del sistema en tiempo real (RF14) sin depender de hardware.
+   * Solo está disponible en ambiente NO productivo y para ADMIN.
+   */
+  simularAlerta: async (params: { tipo?: string; mensaje: string }) => {
+    const response = await api.post('/telemetria/simulador/alerta', params);
+    return response.data.data ?? response.data;
+  },
 };
 
 /**
@@ -31,7 +49,7 @@ export const bahiasService = {
    */
   findAll: async () => {
     const response = await api.get('/bahias');
-    return response.data;
+    return response.data.data;
   },
 
   /**
@@ -39,7 +57,7 @@ export const bahiasService = {
    */
   getOcupacion: async () => {
     const response = await api.get('/bahias/ocupacion');
-    return response.data;
+    return response.data.data;
   },
 
   /**
@@ -47,6 +65,6 @@ export const bahiasService = {
    */
   findOne: async (id: number) => {
     const response = await api.get(`/bahias/${id}`);
-    return response.data;
+    return response.data.data;
   }
 };

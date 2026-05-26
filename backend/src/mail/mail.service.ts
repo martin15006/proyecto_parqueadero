@@ -5,7 +5,7 @@ import * as nodemailer from 'nodemailer';
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private transporter: nodemailer.Transporter;
+  private transporter: nodemailer.Transporter | null = null;
   private disabled = false;
 
   constructor(private readonly configService: ConfigService) {
@@ -15,25 +15,42 @@ export class MailService {
     const mailUser = this.configService.get<string>('MAIL_USER');
     const mailPassword = this.configService.get<string>('MAIL_PASSWORD');
     const mailHost = this.configService.get<string>('MAIL_HOST');
-    const mailPort = this.configService.get<number>('MAIL_PORT');
-    const mailSecure = this.configService.get<boolean>('MAIL_SECURE');
+    const mailPortRaw = this.configService.get<string>('MAIL_PORT');
+    const mailSecureRaw = this.configService.get<string>('MAIL_SECURE');
+    const mailTlsRejectUnauthorizedRaw = this.configService.get<string>('MAIL_TLS_REJECT_UNAUTHORIZED');
+    const mailTlsCiphers = this.configService.get<string>('MAIL_TLS_CIPHERS');
+    const mailRequireTlsRaw = this.configService.get<string>('MAIL_REQUIRE_TLS');
 
-    if (this.disabled || !mailUser || !mailPassword) {
+    const mailPort = Number(mailPortRaw ?? '587');
+    const mailSecure = (mailSecureRaw ?? '').toLowerCase() === 'true';
+    const mailRequireTls = (mailRequireTlsRaw ?? '').toLowerCase() === 'true';
+    const rejectUnauthorized =
+      (mailTlsRejectUnauthorizedRaw ?? '').toLowerCase() === 'true'
+        ? true
+        : (process.env.NODE_ENV || '').toLowerCase() === 'production';
+
+    if (this.disabled) {
+      return;
+    }
+
+    if (!mailUser || !mailPassword) {
       this.disabled = true;
-      this.logger.log(
-        'Modo de desarrollo activado: envío de correos deshabilitado porque faltan credenciales SMTP o DISABLE_EMAILS=true.',
-      );
       return;
     }
 
     const transportOptions: any = mailHost
       ? {
           host: mailHost,
-          port: mailPort ?? 587,
-          secure: mailSecure ?? false,
+          port: Number.isFinite(mailPort) ? mailPort : 587,
+          secure: mailSecure,
+          requireTLS: mailRequireTls || (!mailSecure && (Number.isFinite(mailPort) ? mailPort : 587) === 2525),
           auth: {
             user: mailUser,
             pass: mailPassword,
+          },
+          tls: {
+            rejectUnauthorized,
+            ...(mailTlsCiphers ? { ciphers: mailTlsCiphers } : {}),
           },
         }
       : {
@@ -57,8 +74,58 @@ export class MailService {
     const html = this.plantillaHtml(codigo, nombreUsuario);
 
     if (this.disabled) {
-      // En entorno de desarrollo no enviamos correos: registramos el OTP en logs.
-      this.logger.log(`DEV MAIL - OTP para ${destinatario}: ${codigo}`);
+      throw new InternalServerErrorException('Servicio de correo no configurado.');
+    }
+
+    if (!this.transporter || !remitenteCorreo) {
+      throw new InternalServerErrorException('Servicio de correo no configurado.');
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: `"${remitenteNombre}" <${remitenteCorreo}>`,
+        to: destinatario,
+        subject: 'Tu código de acceso - Sistema de Parqueadero SENA',
+        html,
+      });
+      // RNF2 (Privacidad): no registramos el correo del destinatario (PII) en logs.
+      this.logger.log('Correo OTP enviado');
+    } catch (error) {
+      // RNF2 (Privacidad): no registramos el correo del destinatario (PII) en logs de error.
+      this.logger.error('Error al enviar correo OTP', error);
+      throw new InternalServerErrorException(
+        'No se pudo enviar el código de verificación. Intenta de nuevo.',
+      );
+    }
+  }
+
+  async enviarNotificacionSalidaEmergencia(
+    destinatario: string,
+    nombreUsuario: string,
+    placa: string,
+    motivo: string,
+  ): Promise<void> {
+    const remitenteNombre = this.configService.get<string>('MAIL_FROM_NAME') ?? 'Parqueadero SENA';
+    const remitenteCorreo = this.configService.get<string>('MAIL_USER');
+
+    const subject = 'Salida de emergencia registrada';
+    const html = `
+      <div style="font-family:Arial,sans-serif;color:#111827;">
+        <h2 style="margin:0 0 12px 0;">Hola, ${nombreUsuario}</h2>
+        <p style="margin:0 0 8px 0;">Se registró una salida de emergencia para tu vehículo.</p>
+        <p style="margin:0 0 6px 0;"><strong>Placa:</strong> ${placa}</p>
+        <p style="margin:0 0 6px 0;"><strong>Motivo:</strong> ${motivo}</p>
+        <p style="margin:16px 0 0 0;color:#6b7280;font-size:12px;">Si no reconoces esta acción, contacta al administrador del parqueadero.</p>
+      </div>
+    `;
+
+    if (this.disabled) {
+      // RNF2 (Privacidad): evitamos registrar correos/placas en logs de DEV para no exponer PII.
+      // En entornos sin SMTP, omitimos el envío sin imprimir datos del usuario.
+      return;
+    }
+
+    if (!this.transporter || !remitenteCorreo) {
       return;
     }
 
@@ -66,15 +133,15 @@ export class MailService {
       await this.transporter.sendMail({
         from: `"${remitenteNombre}" <${remitenteCorreo}>`,
         to: destinatario,
-        subject: 'Tu código de verificación - SENA',
+        subject,
         html,
       });
-      this.logger.log(`Correo OTP enviado a ${destinatario}`);
+      // RNF2 (Privacidad): no registramos correo (PII) en logs.
+      this.logger.log('Notificación de salida de emergencia enviada');
     } catch (error) {
-      this.logger.error(`Error al enviar correo a ${destinatario}`, error);
-      throw new InternalServerErrorException(
-        'No se pudo enviar el código de verificación. Intenta de nuevo.',
-      );
+      // RNF2 (Privacidad): no registramos correo (PII) en logs.
+      this.logger.error('Error al enviar notificación de salida de emergencia', error);
+      throw new InternalServerErrorException('No se pudo enviar la notificación de salida de emergencia.');
     }
   }
 
@@ -111,8 +178,7 @@ export class MailService {
                     Hola, ${nombreUsuario}
                   </h2>
                   <p style="color:#444444;font-size:15px;line-height:1.6;margin:0 0 25px 0;">
-                    Recibimos una solicitud para iniciar sesión en tu cuenta. 
-                    Para continuar, usa el siguiente código de verificación:
+                    Hola ${nombreUsuario}, tu código de acceso al Sistema de Parqueadero del SENA es:
                   </p>
 
                   <!-- Código OTP -->
@@ -126,8 +192,7 @@ export class MailService {
                   </div>
 
                   <p style="color:#444444;font-size:14px;line-height:1.6;margin:20px 0 0 0;">
-                    Este código expira en <strong>5 minutos</strong>. 
-                    Si no fuiste tú quien intentó iniciar sesión, por favor ignora este correo.
+                    Este código expira en <strong>5 minutos</strong>.
                   </p>
                 </td>
               </tr>

@@ -21,8 +21,8 @@ async function bootstrap() {
   };
 
   const isDev = process.env.NODE_ENV !== 'production';
-  const devAllowedHosts = new Set(['localhost', '127.0.0.1']);
-  const devAllowedPorts = new Set(['3000', '3001', '4200', '5173', '5174']);
+  // CORRECCIÓN 1: Agregar patrones comunes de IP local o permitir la IP del Wi-Fi en desarrollo
+  const devAllowedHosts = new Set(['localhost', '127.0.0.1', '192.168.101.84']);
 
   const corsOrigins = (process.env.CORS_ORIGINS ?? '')
     .split(',')
@@ -33,12 +33,10 @@ async function bootstrap() {
 
   const corsOriginsSet = new Set(corsOrigins);
 
-  // SEGURIDAD: Helmet para headers seguros con configuración recomendada para producción
   app.use(helmet({
     contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
   }));
 
-  // SEGURIDAD: CORS configurado para permitir el frontend y manejar credenciales
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin) {
@@ -55,11 +53,12 @@ async function bootstrap() {
       if (isDev) {
         try {
           const url = new URL(origin);
-          const hostOk = devAllowedHosts.has(url.hostname);
-          const portOk = Boolean(url.port) && devAllowedPorts.has(url.port);
-          const protocolOk = url.protocol === 'http:' || url.protocol === 'https:';
+          
+          // CORRECCIÓN 2: Flexibilidad total en entorno de desarrollo local para pruebas móviles
+          const hostOk = devAllowedHosts.has(url.hostname) || url.hostname.startsWith('192.168.');
+          const protocolOk = url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'exp:';
 
-          if (hostOk && portOk && protocolOk) {
+          if (protocolOk && hostOk) {
             callback(null, true);
             return;
           }
@@ -112,9 +111,20 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
-  const port = process.env.PORT ?? 3000;
-  await app.listen(port);
-  logger.log(`Servidor corriendo en puerto ${port}`);
+  const port = Number(process.env.PORT ?? 3000);
+  
+  // CORRECCIÓN 3: Escuchar explícitamente en '0.0.0.0' para abrir los puertos a la red Wi-Fi
+  try {
+    await app.listen(port, '0.0.0.0');
+  } catch (error: any) {
+    if (error?.code === 'EADDRINUSE') {
+      logger.error(`El puerto ${port} ya está en uso. Detén el proceso que lo está ocupando o inicia el backend con PORT=${port + 1}.`);
+      await app.close().catch(() => undefined);
+      process.exit(1);
+    }
+    throw error;
+  }
+  logger.log(`Servidor corriendo en red local. Accesible en http://192.168.101.84:${port}`);
 }
 bootstrap().catch((error) => {
   const logger = new Logger('Bootstrap');

@@ -1,13 +1,8 @@
 import { sessionService } from './sessionService';
 import axios, { type AxiosRequestConfig } from 'axios';
+import { NativeModules } from 'react-native';
 
 const RAW_API_URL = process.env.EXPO_PUBLIC_API_URL?.trim();
-
-if (!RAW_API_URL) {
-  throw new Error(
-    'Falta configurar EXPO_PUBLIC_API_URL en el archivo .env de la carpeta movil/',
-  );
-}
 
 const stripTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 const ensureApiPrefix = (baseUrl: string) => {
@@ -15,7 +10,28 @@ const ensureApiPrefix = (baseUrl: string) => {
   return normalized.endsWith('/api/v1') ? normalized : `${normalized}/api/v1`;
 };
 
-const API_BASE_URL = ensureApiPrefix(RAW_API_URL);
+const extractIpFromDebuggerHost = (host: string | undefined | null) => {
+  const raw = String(host || '').trim();
+  if (!raw) return null;
+  const withoutProtocol = raw.includes('://') ? raw.split('://')[1] : raw;
+  const withoutPath = withoutProtocol.split('/')[0];
+  const hostPart = withoutPath.split(':')[0];
+  return hostPart || null;
+};
+
+const debuggerHost = (() => {
+  const scriptURL = NativeModules?.SourceCode?.scriptURL;
+  if (typeof scriptURL === 'string' && scriptURL.length) {
+    return scriptURL;
+  }
+  return null;
+})();
+
+const localhostIp = extractIpFromDebuggerHost(debuggerHost) || '192.168.101.84';
+
+const API_BASE_URL = ensureApiPrefix(
+  RAW_API_URL || `http://${localhostIp}:3000/api/v1`,
+);
 
 export { API_BASE_URL };
 
@@ -43,9 +59,15 @@ function isBackendEnvelope<T>(value: any): value is BackendEnvelope<T> {
 }
 
 let onSesionInvalida: (() => void) | null = null;
+let inMemoryAuthToken: string | null = null;
+
+export function setInMemoryAuthToken(token: string | null) {
+  const raw = String(token ?? '').trim();
+  inMemoryAuthToken = raw.length ? raw : null;
+}
 
 /**
- * Configura el callback global que se ejecuta cuando el backend responde 401/403 en solicitudes autenticadas.
+ * Configura el callback global que se ejecuta cuando el backend responde 401 en solicitudes autenticadas.
  * @param callback Acción de cierre de sesión y navegación.
  */
 export function configurarManejoSesionInvalida(callback: () => void) {
@@ -67,7 +89,7 @@ http.interceptors.request.use(async (config) => {
   const conAuth = Boolean((config as HttpConfig)._conAuth);
 
   if (conAuth) {
-    const token = await sessionService.obtenerToken();
+    const token = (await sessionService.obtenerToken()) || inMemoryAuthToken;
     if (token) {
       if (!config.headers) {
         config.headers = {} as any;
@@ -82,9 +104,15 @@ http.interceptors.request.use(async (config) => {
 http.interceptors.response.use(async (response) => {
   const conAuth = Boolean((response.config as HttpConfig)._conAuth);
 
-  if (conAuth && (response.status === 401 || response.status === 403)) {
-    await sessionService.eliminarSesion();
-    if (onSesionInvalida) onSesionInvalida();
+  if (conAuth && response.status === 401) {
+    const headers = (response.config as any)?.headers as any;
+    const sentAuthHeader = headers?.Authorization || headers?.authorization;
+
+    if (sentAuthHeader) {
+      await sessionService.eliminarSesion();
+      if (onSesionInvalida) onSesionInvalida();
+    }
+
     throw new Error('Tu sesión expiró o no es válida. Por favor inicia sesión de nuevo.');
   }
 

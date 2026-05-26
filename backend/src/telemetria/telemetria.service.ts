@@ -84,12 +84,10 @@ export class TelemetriaService {
    * REALTIME_EMIT: Notifica al frontend sobre cambios críticos.
    */
   private async gestionarImpactoOperativo(sensor: Sensor, status: IotStatusEnum) {
-    // REALTIME_EMIT: Actualización visual del mapa de bahías
-    this.gateway.emitirBahiaActualizada({
-      idBahia: sensor.idBahia,
-      ocupada: status === IotStatusEnum.OCCUPIED,
-      sensor: sensor.codigo,
-    });
+    await this.bahiasService.procesarTelemetriaSensor(
+      sensor.codigo,
+      status === IotStatusEnum.OCCUPIED,
+    );
 
     // REALTIME_EMIT: Alertas críticas por falla de hardware
     if (status === IotStatusEnum.ERROR) {
@@ -104,9 +102,7 @@ export class TelemetriaService {
       });
     }
 
-    // Sincronización global de ocupación
-    const ocupacion = await this.bahiasService.obtenerOcupacion();
-    this.gateway.emitirOcupacionActualizada(ocupacion);
+    return;
   }
 
   /**
@@ -115,6 +111,19 @@ export class TelemetriaService {
   private async registrarAlertaSistema(tipo: string, mensaje: string) {
     const alerta = this.alertaRepository.create({ tipo, mensaje });
     await this.alertaRepository.save(alerta);
+  }
+
+  /**
+   * Simulador (DEMO): Registra una alerta y la emite en tiempo real.
+   * Se utiliza para presentaciones locales cuando no hay hardware conectado, pero se desea demostrar RF14.
+   */
+  async simularAlertaSistema(tipo: string, mensaje: string) {
+    await this.registrarAlertaSistema(tipo, mensaje);
+    this.gateway.emitirAlertaParqueadero({
+      tipo,
+      mensaje,
+      fecha: new Date(),
+    });
   }
 
   /**
@@ -156,6 +165,8 @@ export class TelemetriaService {
       // Actualizar estado en DB
       sensor.estadoActual = IotStatusEnum.OFFLINE;
       await this.sensorRepository.save(sensor);
+
+      await this.bahiasService.marcarBahiaOfflinePorSensor(sensor.codigo);
 
       // REALTIME_EMIT: Notificar al frontend sobre la desconexión específica
       this.gateway.emitirSensorOffline({

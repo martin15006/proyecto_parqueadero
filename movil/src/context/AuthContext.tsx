@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Usuario } from '../types/usuario';
 import { sessionService } from '../services/sessionService';
 import { authService } from '../services/authService';
-import { configurarManejoSesionInvalida } from '../services/api';
+import { configurarManejoSesionInvalida, setInMemoryAuthToken } from '../services/api';
 
 interface AuthContextType {
   usuario: Usuario | null;
@@ -22,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     configurarManejoSesionInvalida(() => {
       // Cuando el api detecta sesión inválida, cerrar sesión
       setUsuario(null);
+      setInMemoryAuthToken(null);
     });
   }, []);
 
@@ -38,6 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        setInMemoryAuthToken(token);
+
         // Verificar con el backend que el JWT siga siendo válido
         try {
           const usuarioActualizado = await authService.verificarSesion();
@@ -49,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (error.statusCode === 401) {
             await sessionService.cerrarSesion();
             setUsuario(null);
+            setInMemoryAuthToken(null);
           } else {
             // Si es error de red, dejamos al usuario logueado con datos en cache
             setUsuario(usuarioGuardado);
@@ -65,11 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const iniciarSesion = async (datosUsuario: Usuario, token: string) => {
     await sessionService.guardarSesion(datosUsuario, token);
     setUsuario(datosUsuario);
+    setInMemoryAuthToken(token);
   };
 
   const cerrarSesion = async () => {
     await sessionService.cerrarSesion();
     setUsuario(null);
+    setInMemoryAuthToken(null);
   };
 
   return (

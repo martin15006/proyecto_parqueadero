@@ -43,6 +43,8 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
     const paddingTopSeguro =
         Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 50;
 
+    const tituloColor = esOscuro ? colores.textoPrimario : '#232323';
+    const subtituloColor = esOscuro ? colores.textoSecundario : 'rgba(35,35,35,0.74)';
     // PASO 1
     const handleEnviarCorreo = async () => {
         const e: any = {};
@@ -140,10 +142,10 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
                             else setPaso('codigo');
                         }}
                     >
-                        <Text style={[styles.flechaVolver, { color: colores.textoPrimario }]}>
+                        <Text style={[styles.flechaVolver, { color: tituloColor }]}>
                             ‹
                         </Text>
-                        <Text style={[styles.textoVolver, { color: colores.textoPrimario }]}>
+                        <Text style={[styles.textoVolver, { color: tituloColor }]}>
                             Volver
                         </Text>
                     </TouchableOpacity>
@@ -214,10 +216,10 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
                         {/* PASO 1 */}
                         {paso === 'correo' && (
                             <>
-                                <Text style={[styles.titulo, { color: colores.textoPrimario }]}>
+                                <Text style={[styles.titulo, { color: tituloColor }]}>
                                     Recuperar contraseña
                                 </Text>
-                                <Text style={[styles.subtitulo, { color: colores.textoSecundario }]}>
+                                <Text style={[styles.subtitulo, { color: subtituloColor }]}>
                                     Ingresa tu correo registrado y te enviaremos un código de
                                     verificación.
                                 </Text>
@@ -249,10 +251,10 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
                         {/* PASO 2 */}
                         {paso === 'codigo' && (
                             <>
-                                <Text style={[styles.titulo, { color: colores.textoPrimario }]}>
+                                <Text style={[styles.titulo, { color: tituloColor }]}>
                                     Verifica tu correo
                                 </Text>
-                                <Text style={[styles.subtitulo, { color: colores.textoSecundario }]}>
+                                <Text style={[styles.subtitulo, { color: subtituloColor }]}>
                                     Si el correo está registrado, recibirás un código de 6 dígitos en
                                 </Text>
                                 <Text style={[styles.correoResaltado, { color: colores.verde }]}>
@@ -286,10 +288,10 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
                         {/* PASO 3 */}
                         {paso === 'nueva' && (
                             <>
-                                <Text style={[styles.titulo, { color: colores.textoPrimario }]}>
+                                <Text style={[styles.titulo, { color: tituloColor }]}>
                                     Nueva contraseña
                                 </Text>
-                                <Text style={[styles.subtitulo, { color: colores.textoSecundario }]}>
+                                <Text style={[styles.subtitulo, { color: subtituloColor }]}>
                                     Crea una nueva contraseña segura para tu cuenta.
                                 </Text>
 

@@ -1,28 +1,38 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
   UseGuards,
   Request,
+  Req,
+  BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 
 import { OperativoService } from './operativo.service';
 
 import { LoginOperativoDto } from './dto/login-operativo.dto';
 import { EscanearQrDto } from './dto/escanear-qr.dto';
+import { EscanearCodigoDto } from './dto/escanear-codigo.dto';
+import { ConfirmarIngresoMultivehiculoDto } from './dto/confirmar-ingreso-multivehiculo.dto';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
 import { RegistrarIngresoManualDto } from './dto/registrar-ingreso-manual.dto';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 import type { AuthenticatedRequest } from '../common/interfaces/auth.interface';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('operativo')
 export class OperativoController {
-  constructor(private readonly operativoService: OperativoService) {}
+  constructor(
+    private readonly operativoService: OperativoService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post('login')
   login(@Body() dto: LoginOperativoDto) {
@@ -33,7 +43,36 @@ export class OperativoController {
   @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
   @Post('escanear-qr')
   escanearQr(@Body() dto: EscanearQrDto) {
+    // COMPATIBILIDAD: se mantiene el endpoint histórico para clientes antiguos (solo consulta usuario+vehículos).
     return this.operativoService.escanearQr(dto.qr);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard) // RF31: solo personal autorizado puede operar el acceso.
+  @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO) // RF31: se permite a operativo (y admin por soporte) ejecutar el escaneo.
+  @Post('escanear-codigo') // RF31/RF33: endpoint unificado para lector de barras (Code128) y QR futuro.
+  escanearCodigo(
+    @Body() dto: EscanearCodigoDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    // RF31: el operador que ejecuta el ingreso queda como actor del movimiento/auditoría.
+    return this.operativoService.escanearCodigo(
+      dto.codigo,
+      { ...req.user, ip: req.ip },
+    );
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard) // RF31: endpoint protegido porque registra un ingreso real.
+  @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO) // RF31: operativo confirma el vehículo observado.
+  @Post('confirmar-ingreso-multivehiculo') // RF31: confirmación secundaria cuando hay múltiples vehículos.
+  confirmarIngresoMultivehiculo(
+    @Body() dto: ConfirmarIngresoMultivehiculoDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    // RF31: el backend revalida el código y registra ingreso solo para la placa seleccionada.
+    return this.operativoService.confirmarIngresoMultivehiculo(
+      dto,
+      { ...req.user, ip: req.ip },
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -75,10 +114,46 @@ export class OperativoController {
     );
   }
 
+  @Post('camara-ingest')
+  async camaraIngest(
+    @Body() body: { placa?: string; camaraId?: string },
+    @Req() req: any,
+  ) {
+    const apiKey = req?.headers?.['x-anpr-api-key'];
+    const headerValue = Array.isArray(apiKey) ? apiKey[0] : apiKey;
+    const provided = typeof headerValue === 'string' ? headerValue.trim() : '';
+    const expected = String(this.configService.get<string>('ANPR_API_KEY') ?? '').trim();
+    if (!expected || !provided || provided !== expected) {
+      throw new UnauthorizedException('Acceso denegado: API Key de cámara inválida o ausente');
+    }
+
+    const placaRaw = String(body?.placa ?? '').trim();
+    const camaraIdRaw = String(body?.camaraId ?? '').trim();
+    if (!placaRaw || !camaraIdRaw) {
+      throw new BadRequestException('placa y camaraId son obligatorios');
+    }
+
+    const placa = placaRaw.replace(/[- ]/g, '').toUpperCase();
+    const actor = camaraIdRaw.replace(/[^0-9a-zA-Z]/g, '').toUpperCase().slice(0, 10) || 'SISTEMA';
+
+    return this.operativoService.registrarEntrada(
+      placa,
+      { sub: actor, correo: '', idTipoUsr: TipoUsuarioEnum.OPERATIVO, ip: req.ip },
+    );
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
   @Post('salida-emergencia')
   salidaEmergencia(@Request() req: AuthenticatedRequest) {
     return this.operativoService.salidaEmergencia({ ...req.user, ip: req.ip });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard) // Brecha contractual: endpoint dedicado para OPERATIVO (no depende de /dashboard/resumen admin-only).
+  @Roles(TipoUsuarioEnum.OPERATIVO) // PRINCIPIO DE MÍNIMO PRIVILEGIO: solo operativo consume su resumen de turno.
+  @Get('resumen-turno') // RF35: sincronización inicial del dashboard operativo con métricas pertinentes.
+  resumenTurno(@Request() req: AuthenticatedRequest) {
+    // RF35: el backend retorna solo métricas operativas (ocupación, ingresos/salidas del día, alertas técnicas).
+    return this.operativoService.obtenerResumenTurno({ ...req.user, ip: req.ip });
   }
 }

@@ -38,17 +38,35 @@ export const useAdmin = () => {
         dashboardService.getHeatmap()
       ]);
       
-      setResumen(res);
-      setTrafico(traf);
-      setOcupacionTipo(ocup);
-      setTendencia(estad);
-      setHeatmap(heat);
+      const resumenSeguro: DashboardStats = (
+        res
+        && typeof res === 'object'
+        && (res as any).ocupacion
+        && typeof (res as any).ocupacion === 'object'
+      )
+        ? (res as DashboardStats)
+        : {
+            totalUsuarios: 0,
+            totalVehiculos: 0,
+            parqueaderoDeshabilitado: false,
+            estadoParqueadero: 'DISPONIBLE',
+            ocupacion: { total: 0, ocupados: 0, disponibles: 0 },
+            ingresosHoy: 0,
+            ingresosMes: 0,
+            alertasActivas: 0,
+          };
+
+      setResumen(resumenSeguro);
+      setTrafico(Array.isArray(traf) ? traf : []);
+      setOcupacionTipo(Array.isArray(ocup) ? ocup : []);
+      setTendencia(Array.isArray(estad) ? estad : []);
+      setHeatmap(Array.isArray(heat) ? heat : []);
     } catch (err: any) {
-      console.error('Error crítico en carga de analíticas:', err);
-      
-      if (err.response?.status === 429) {
+      const status = err?.statusCode;
+
+      if (status === 429) {
         setError('Demasiadas solicitudes. Por favor, espera un momento.');
-      } else if (err.response?.status === 403) {
+      } else if (status === 403) {
         setError('No tienes permisos suficientes para acceder a estas analíticas.');
       } else {
         setError('No se pudo establecer conexión con el motor de analíticas.');
@@ -66,6 +84,8 @@ export const useAdmin = () => {
     const handleOcupacion = (data: any) => {
       setResumen((prev) => prev ? ({
         ...prev,
+        parqueaderoDeshabilitado: data.parqueaderoDeshabilitado,
+        estadoParqueadero: data.estadoParqueadero,
         ocupacion: {
           total: data.total,
           ocupados: data.ocupados,

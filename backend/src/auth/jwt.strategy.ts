@@ -48,6 +48,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // Devolver el usuario sin la contraseña
     const { contra, ...usuarioSinContrasena } = usuario;
-    return usuarioSinContrasena;
+    return {
+      ...usuarioSinContrasena,
+      sub: usuario.documento,
+      idTipoUsr: usuario.idTipoUsr,
+    };
   }
 }

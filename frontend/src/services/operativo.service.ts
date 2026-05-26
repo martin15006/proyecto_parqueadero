@@ -7,8 +7,13 @@ export const operativoService = {
     return response.data;
   },
 
-  escanearQr: async (qr: string) => {
-    const response = await api.post('/operativo/escanear-qr', { qr });
+  escanearCodigo: async (codigo: string) => {
+    const response = await api.post('/operativo/escanear-codigo', { codigo });
+    return response.data;
+  },
+
+  confirmarIngresoMultivehiculo: async (codigo: string, placa: string) => {
+    const response = await api.post('/operativo/confirmar-ingreso-multivehiculo', { codigo, placa });
     return response.data;
   },
 
@@ -29,35 +34,40 @@ export const operativoService = {
 
   /**
    * Registro Manual de Contingencia (RF34).
-   * @param placa Placa o documento del vehículo.
+   * @param identificacion Placa o documento del vehículo.
    * @param motivo Razón obligatoria de la contingencia.
    */
-  registrarIngresoManual: async (placa: string, motivo: string) => {
-    const response = await api.post('/operativo/registrar-ingreso-manual', { placa, motivo });
+  registrarIngresoManual: async (identificacion: string, motivo: string) => {
+    const response = await api.post('/operativo/registrar-ingreso-manual', { identificacion, motivo });
     return response.data;
-  }
+  },
+
+  resumenTurno: async () => {
+    const response = await api.get('/operativo/resumen-turno');
+    return (response.data && response.data.data) ? response.data.data : response.data;
+  },
 };
 
 export const dashboardService = {
   getResumen: async () => {
     const response = await api.get('/dashboard/resumen');
-    return response.data;
+    return response.data.data;
   },
   getEstadisticas: async () => {
     const response = await api.get('/dashboard/estadisticas');
-    return response.data;
+    return response.data.data;
   },
   getTraficoHoras: async () => {
     const response = await api.get('/dashboard/trafico-horas');
-    return response.data;
+    return response.data.data;
   },
   getOcupacionTipo: async () => {
     const response = await api.get('/dashboard/ocupacion-tipo');
-    return response.data;
+    return response.data.data;
   },
   getHeatmap: async () => {
     const response = await api.get('/dashboard/heatmap');
-    return response.data;
+    return response.data.data;
   }
 };
 
@@ -117,8 +127,8 @@ export const authService = {
 
 export const bahiasService = {
   getOcupacion: async () => {
-    // Reutilizamos el endpoint del dashboard que ya tiene la lógica de bahías
-    const response = await api.get('/dashboard/resumen');
-    return response.data.ocupacion;
+    const response = await api.get('/bahias/ocupacion');
+    const payload = (response.data && response.data.data) ? response.data.data : response.data;
+    return payload;
   }
 };

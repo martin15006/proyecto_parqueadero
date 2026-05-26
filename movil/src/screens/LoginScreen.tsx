@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Alert,
@@ -22,7 +22,7 @@ import OtpModal from '../components/OtpModal';
 import { Usuario } from '../types/usuario';
 import BotonTema from '../components/BotonTema';
 
-export default function LoginScreen({ navigation }: any) {
+export default function LoginScreen({ navigation, route }: any) {
   const { iniciarSesion } = useAuth();
   const { colores, esOscuro } = useTheme();
   const [correo, setCorreo] = useState('');
@@ -31,6 +31,13 @@ export default function LoginScreen({ navigation }: any) {
   const [cargando, setCargando] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [correoParaOtp, setCorreoParaOtp] = useState('');
+
+  useEffect(() => {
+    const correoInicial = route?.params?.correo;
+    if (typeof correoInicial === 'string' && correoInicial.trim()) {
+      setCorreo(correoInicial.trim());
+    }
+  }, [route?.params?.correo]);
 
   const validar = (): boolean => {
     const e: { correo?: string; contra?: string } = {};
@@ -61,9 +68,15 @@ export default function LoginScreen({ navigation }: any) {
     await iniciarSesion(usuarioData, token);
   };
 
+  const verdeSena = '#39A900';
+  const grisOscuro = '#232323';
+  const tituloColor = esOscuro ? colores.textoPrimario : grisOscuro;
+  const subtituloColor = esOscuro ? colores.textoSecundario : 'rgba(35,35,35,0.74)';
+  const linkColor = esOscuro ? colores.verde : verdeSena;
+
   return (
     <>
-      <View style={[styles.container, { backgroundColor: colores.fondo }]}>
+      <View style={[styles.container, { backgroundColor: esOscuro ? colores.fondo : '#F4F6F4' }]}>
         {/* AURORA DE FONDO solo en modo oscuro */}
         {esOscuro && (
           <>
@@ -113,16 +126,26 @@ export default function LoginScreen({ navigation }: any) {
                 </View>
               </View>
 
-              <Text style={[styles.titulo, { color: colores.textoPrimario }]}>
+              <Text style={[styles.titulo, { color: tituloColor }]}>
                 Bienvenido
               </Text>
               <Text
-                style={[styles.subtitulo, { color: colores.textoSecundario }]}
+                style={[styles.subtitulo, { color: subtituloColor }]}
               >
                 Inicia sesión para acceder al parqueadero
               </Text>
 
               <View style={styles.formContainer}>
+                <View
+                  style={[
+                    styles.formCard,
+                    {
+                      backgroundColor: esOscuro ? colores.glassFondo : colores.superficie,
+                      borderColor: esOscuro ? colores.glassBorde : 'rgba(35,35,35,0.08)',
+                      shadowColor: esOscuro ? '#000000' : 'rgba(15, 23, 42, 0.16)',
+                    },
+                  ]}
+                >
                 <AnimatedInput
                   label="Correo electrónico"
                   placeholder="ejemplo@correo.com"
@@ -162,7 +185,7 @@ export default function LoginScreen({ navigation }: any) {
                   onPress={() => navigation.navigate('RecuperarContrasena')}
                 >
                   <Text
-                    style={[styles.linkOlvidoTexto, { color: colores.verde }]}
+                    style={[styles.linkOlvidoTexto, { color: linkColor }]}
                   >
                     ¿Olvidaste tu contraseña?
                   </Text>
@@ -175,10 +198,11 @@ export default function LoginScreen({ navigation }: any) {
                     ¿No tienes cuenta?
                   </Text>
                   <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-                    <Text style={[styles.enlace, { color: colores.verde }]}>
+                    <Text style={[styles.enlace, { color: linkColor }]}>
                       Regístrate
                     </Text>
                   </TouchableOpacity>
+                </View>
                 </View>
               </View>
             </FadeInView>
@@ -331,6 +355,15 @@ const styles = StyleSheet.create({
 
   // ─── FORM ───
   formContainer: { marginTop: espacios.pequeno },
+  formCard: {
+    borderRadius: 24,
+    padding: espacios.grande,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 6,
+  },
   filaInferior: {
     flexDirection: 'row',
     justifyContent: 'center',

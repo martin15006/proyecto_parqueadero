@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { VehiculosService } from './vehiculos.service';
 import { VehiculosController } from './vehiculos.controller';
+import { AdminVehiculosController } from './admin-vehiculos.controller';
 import { Vehiculo } from './entities/vehiculo.entity';
 import { TipoVehiculo } from './entities/tipo-vehiculo.entity';
 import { RegistroVehiculo } from './entities/registro-vehiculo.entity';
@@ -22,7 +23,7 @@ import { AuthModule } from '../auth/auth.module';
     AuditoriaModule,
     AuthModule,
   ],
-  controllers: [VehiculosController],
+  controllers: [VehiculosController, AdminVehiculosController],
   providers: [VehiculosService],
   exports: [VehiculosService],
 })

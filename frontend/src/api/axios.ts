@@ -36,28 +36,27 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    const originalRequest = error.config;
-    const isDev = Boolean(import.meta.env.DEV);
+    const originalRequest = error.config ?? {};
+    const status = error.response?.status;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const backendError = error.response?.data;
+    const message = Array.isArray(backendError?.message)
+      ? backendError.message.join('\n')
+      : backendError?.message || 'Error inesperado en el sistema';
+
+    const url = String(originalRequest?.url ?? '');
+    const isAuthEndpoint =
+      url.includes('/auth/login') ||
+      url.includes('/auth/verificar-otp') ||
+      url.includes('/auth/refresh');
+
+    if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
       localStorage.removeItem('user');
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     }
-
-    if (isDev && error.response?.status >= 500) {
-      console.error('SERVER_ERROR', {
-        statusCode: error.response.status,
-        url: originalRequest?.url,
-      });
-    }
-
-    const backendError = error.response?.data;
-    const message = Array.isArray(backendError?.message)
-      ? backendError.message.join('\n')
-      : backendError?.message || 'Error inesperado en el sistema';
 
     const errorData = {
       statusCode: backendError?.statusCode || error.response?.status || 500,

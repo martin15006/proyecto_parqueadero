@@ -8,6 +8,7 @@ type SocketListener = {
 class SocketService {
   private socket: Socket | null = null;
   private readonly URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+  private lastConnectionError: string | null = null;
 
   /**
    * Establece una conexión única con el servidor de WebSockets.
@@ -30,11 +31,11 @@ class SocketService {
       });
 
       this.socket.on('connect', () => {
-        console.log('Socket.IO Singleton: Conexión Establecida');
+        this.lastConnectionError = null;
       });
 
       this.socket.on('connect_error', (error) => {
-        console.error('Socket.IO Singleton: Error de Conexión:', error.message);
+        this.lastConnectionError = error?.message || 'Error de conexión WebSocket';
       });
     }
     return this.socket;
@@ -97,6 +98,14 @@ class SocketService {
 
   get isConnected() {
     return this.socket?.connected || false;
+  }
+
+  /**
+   * Último error de conexión capturado por Socket.IO.
+   * Nota: No se usa para invalidar sesión; solo para diagnóstico visual si la UI lo desea.
+   */
+  get connectionError() {
+    return this.lastConnectionError;
   }
 }
 

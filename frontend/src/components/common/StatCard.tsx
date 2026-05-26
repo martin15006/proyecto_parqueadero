@@ -18,12 +18,12 @@ export const StatCard: React.FC<StatCardProps> = ({
   isCritical, 
   subValue 
 }) => (
-  <div className="bg-white p-6 rounded-[2rem] shadow-lg shadow-gray-200/40 border border-gray-100 flex flex-col gap-4 hover:translate-y-[-4px] transition-transform duration-300">
+  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4 transition-all duration-200 hover:shadow-md/5">
     <div className="flex justify-between items-start">
-      <div className="p-3 bg-gray-50 rounded-2xl">{icon}</div>
+      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">{icon}</div>
       {trend && (
-        <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-full ${
-          isCritical ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
+        <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-full border ${
+          isCritical ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
         }`}>
           {isCritical ? <AlertTriangle size={12} /> : <ArrowUpRight size={12} />}
           {trend}
@@ -31,9 +31,9 @@ export const StatCard: React.FC<StatCardProps> = ({
       )}
     </div>
     <div>
-      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
-      <p className="text-3xl font-black text-gray-900 tracking-tighter">{value ?? 0}</p>
-      {subValue && <p className="text-[10px] font-bold text-gray-500 mt-1 uppercase">{subValue}</p>}
+      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{label}</p>
+      <p className="text-3xl font-black text-slate-900 tracking-tighter tabular-nums">{value ?? 0}</p>
+      {subValue && <p className="text-[10px] font-bold text-slate-600 mt-1 uppercase">{subValue}</p>}
     </div>
   </div>
 );

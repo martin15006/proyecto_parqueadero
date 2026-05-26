@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { auditoriaService } from '../../services/auditoria.service';
 import { History, User, Activity, Globe, Monitor, Search } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -15,16 +15,29 @@ export const AuditoriaPage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [operativo, setOperativo] = useState('');
+  const [desde, setDesde] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 14);
+    return d.toISOString().slice(0, 10);
+  });
+  const [hasta, setHasta] = useState(() => new Date().toISOString().slice(0, 10));
 
   const fetchLogs = async () => {
     try {
       setLoading(true);
-      const res = await auditoriaService.findAll(page, 20);
-      setLogs(res.data);
-      setTotal(res.total);
+      const res = await auditoriaService.operaciones({
+        operativo: operativo.trim() || undefined,
+        desde: new Date(desde).toISOString(),
+        hasta: new Date(hasta).toISOString(),
+        page,
+        limit: 20,
+      });
+      setLogs(res.data || []);
+      setTotal(res.total || 0);
     } catch (error) {
-      console.error('Error cargando auditoría', error);
+      setLogs([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -34,19 +47,27 @@ export const AuditoriaPage: React.FC = () => {
     fetchLogs();
   }, [page]);
 
-  const columns = [
+  useEffect(() => {
+    setPage(1);
+    const t = window.setTimeout(() => {
+      fetchLogs();
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [operativo, desde, hasta]);
+
+  const columns = useMemo(() => ([
     {
       header: 'Fecha y Hora',
       accessor: (log: any) => (
         <div className="flex items-center gap-4">
-          <div className="p-2.5 bg-gray-50 rounded-2xl text-blue-600 border border-gray-100">
+          <div className="p-2.5 bg-slate-50 rounded-xl text-slate-700 border border-slate-200">
             <History size={16} />
           </div>
           <div>
-            <p className="text-sm font-black text-gray-900 leading-none mb-1.5">
+            <p className="text-sm font-black text-slate-900 leading-none mb-1.5">
               {new Date(log.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
             </p>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
               {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </p>
           </div>
@@ -58,11 +79,11 @@ export const AuditoriaPage: React.FC = () => {
       accessor: (log: any) => (
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <User size={14} className="text-blue-500" />
-            <span className="text-sm font-semibold text-gray-700">{log.idUsuario}</span>
+            <User size={14} className="text-slate-500" />
+            <span className="text-sm font-semibold text-slate-700">{log.idUsuario}</span>
           </div>
-          <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
-            <Globe size={12} className="text-gray-400" />
+          <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
+            <Globe size={12} className="text-slate-400" />
             <span className="font-mono">{log.ip || '0.0.0.0'}</span>
           </div>
         </div>
@@ -79,7 +100,7 @@ export const AuditoriaPage: React.FC = () => {
     {
       header: 'Módulo',
       accessor: (log: any) => (
-        <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] py-1 px-2 bg-gray-50 rounded-lg border border-gray-100">
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] py-1 px-2 bg-slate-50 rounded-lg border border-slate-200">
           {log.modulo || 'SISTEMA'}
         </span>
       ),
@@ -87,8 +108,8 @@ export const AuditoriaPage: React.FC = () => {
     {
       header: 'Detalles',
       accessor: (log: any) => (
-        <div className="flex items-center gap-2 text-[9px] font-medium text-gray-500 max-w-[200px] truncate">
-          <Monitor size={11} className="text-gray-400 shrink-0" />
+        <div className="flex items-center gap-2 text-[9px] font-medium text-slate-600 max-w-[200px] truncate">
+          <Monitor size={11} className="text-slate-400 shrink-0" />
           <span className="truncate">{log.idEntidad || 'N/A'}</span>
         </div>
       ),
@@ -102,27 +123,45 @@ export const AuditoriaPage: React.FC = () => {
         </Button>
       ),
     },
-  ];
+  ]), []);
 
   return (
-    <div className="p-6 space-y-8 bg-gray-50 min-h-screen">
+    <div className="space-y-8">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Registro de Auditoría</h1>
-          <p className="text-gray-500 text-sm font-medium uppercase tracking-widest">Trazabilidad Técnica en Tiempo Real</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Auditoría Operativa</h1>
+          <p className="text-slate-500 text-sm font-medium uppercase tracking-widest">RF37 • Historial del personal operativo</p>
         </div>
         <Button variant="primary" size="md" onClick={fetchLogs} isLoading={loading}>
           <Activity size={18} className="mr-2" /> SINCRONIZAR
         </Button>
       </header>
 
-      <div className="bg-white p-4 rounded-[2rem] shadow-sm border border-gray-100">
-        <Input 
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Input
           icon={<Search size={20} />}
-          placeholder="Filtrar por usuario, acción o módulo..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Documento operativo (opcional)"
+          value={operativo}
+          onChange={(e) => setOperativo(e.target.value)}
         />
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Desde</label>
+          <input
+            type="date"
+            value={desde}
+            onChange={(e) => setDesde(e.target.value)}
+            className="bg-slate-50 border-2 border-transparent focus:border-slate-900 focus:bg-white outline-none rounded-xl px-5 py-4 text-sm font-medium transition-all duration-200"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Hasta</label>
+          <input
+            type="date"
+            value={hasta}
+            onChange={(e) => setHasta(e.target.value)}
+            className="bg-slate-50 border-2 border-transparent focus:border-slate-900 focus:bg-white outline-none rounded-xl px-5 py-4 text-sm font-medium transition-all duration-200"
+          />
+        </div>
       </div>
 
       <Table 
@@ -134,9 +173,9 @@ export const AuditoriaPage: React.FC = () => {
 
       <footer className="flex justify-between items-center px-4">
         <div className="flex items-center gap-3">
-          <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">
-            Total: <span className="text-gray-900 font-black">{total}</span> eventos registrados
+          <div className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse shadow-[0_0_10px_rgba(5,150,105,0.35)]" />
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
+            Total: <span className="text-slate-900 font-black">{total}</span> eventos registrados
           </p>
         </div>
         

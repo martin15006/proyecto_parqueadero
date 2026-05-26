@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Body, Param, Patch, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { VisitantesService } from './visitantes.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { IJwtPayload } from '../common/interfaces/auth.interface';

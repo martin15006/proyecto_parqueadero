@@ -8,7 +8,9 @@ import {
   CreateDateColumn, 
   UpdateDateColumn, 
   DeleteDateColumn,
-  Index
+  Index,
+  BeforeInsert,
+  BeforeUpdate
 } from 'typeorm';
 import { TipoVehiculo } from './tipo-vehiculo.entity';
 import { RegistroVehiculo } from './registro-vehiculo.entity';
@@ -47,4 +49,12 @@ export class Vehiculo {
 
   @OneToMany(() => RegistroVehiculo, (registro) => registro.vehiculo)
   registrosUsuarios: RegistroVehiculo[];
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  private normalizarPlaca() {
+    if (typeof this.placa === 'string') {
+      this.placa = this.placa.replace(/[- ]/g, '').toUpperCase();
+    }
+  }
 }

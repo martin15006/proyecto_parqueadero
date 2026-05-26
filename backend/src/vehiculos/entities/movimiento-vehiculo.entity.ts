@@ -3,8 +3,10 @@ import { RegistroVehiculo } from './registro-vehiculo.entity';
 import { Bahia } from '../../bahias/entities/bahia.entity';
 
 export enum EstadoMovimiento {
+  TRANSITO = 'TRANSITO',
   ADENTRO = 'ADENTRO',
   SALIDA = 'SALIDA',
+  ANULADO = 'ANULADO',
 }
 
 @Entity({ name: 'movimiento_vehiculo' })

@@ -13,8 +13,12 @@ import type {
   IOcupacionPayload, 
   IAlertaPayload, 
   ISensorOfflinePayload,
-  IBahiaActualizadaPayload
+  IBahiaActualizadaPayload,
+  IParqueaderoEstadoPayload,
+  IBahiaModificadaPayload,
+  IConteoGlobalDisponiblesPayload
 } from '../common/interfaces/socket-payloads.interface';
+import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 
 const normalizeOrigin = (value: string) => {
   try {
@@ -51,12 +55,31 @@ const buildCorsOriginsSet = () => {
       const normalized = normalizeOrigin(origin);
       const corsOriginsSet = buildCorsOriginsSet();
 
-      if (!normalized || corsOriginsSet.size === 0 || !corsOriginsSet.has(normalized)) {
-        callback(new Error('Not allowed by CORS'));
+      if (normalized && corsOriginsSet.has(normalized)) {
+        callback(null, true);
         return;
       }
 
-      callback(null, true);
+      const isDev = process.env.NODE_ENV !== 'production';
+      if (isDev) {
+        try {
+          const url = new URL(origin);
+          const devAllowedHosts = new Set(['localhost', '127.0.0.1']);
+          const devAllowedPorts = new Set(['3000', '3001', '4200', '5173', '5174']);
+          const hostOk = devAllowedHosts.has(url.hostname);
+          const portOk = Boolean(url.port) && devAllowedPorts.has(url.port);
+          const protocolOk = url.protocol === 'http:' || url.protocol === 'https:';
+          if (hostOk && portOk && protocolOk) {
+            callback(null, true);
+            return;
+          }
+        } catch {
+          callback(new Error('Not allowed by CORS'));
+          return;
+        }
+      }
+
+      callback(new Error('Not allowed by CORS'));
     },
   },
   pingTimeout: 10000, // MOBILE_API: Tiempo de gracia para reconexión tras micro-cortes
@@ -71,6 +94,14 @@ export class EventosGateway
   server: Server;
 
   private clients: Map<string, { lastSeen: number }> = new Map();
+  private bahiaDebounce: Map<string, { timer: NodeJS.Timeout | null; pending: IBahiaModificadaPayload; lastEmitState: IBahiaModificadaPayload['nuevoEstado'] | null }> = new Map();
+
+  private readonly ROOMS = {
+    OPERATIVOS_ALERTAS: 'operativos_alertas',
+    PARQUEADERO_BAHIAS: 'parqueadero_bahias',
+    APRENDICES_CONTEO: 'aprendices_conteo_global',
+    ADMINS_FULL: 'admins_full',
+  } as const;
 
   constructor(private readonly jwtService: JwtService) {
     // MOBILE_API: Limpieza de clientes inactivos para optimizar memoria en el servidor
@@ -103,6 +134,18 @@ export class EventosGateway
       const payload = await this.jwtService.verifyAsync(token);
       client.data.user = payload;
 
+      const idTipoUsr = Number(payload?.idTipoUsr);
+      if (idTipoUsr === TipoUsuarioEnum.APRENDIZ) {
+        client.join(this.ROOMS.APRENDICES_CONTEO);
+      } else if (idTipoUsr === TipoUsuarioEnum.OPERATIVO) {
+        client.join(this.ROOMS.OPERATIVOS_ALERTAS);
+        client.join(this.ROOMS.PARQUEADERO_BAHIAS);
+      } else if (idTipoUsr === TipoUsuarioEnum.ADMIN) {
+        client.join(this.ROOMS.OPERATIVOS_ALERTAS);
+        client.join(this.ROOMS.PARQUEADERO_BAHIAS);
+        client.join(this.ROOMS.ADMINS_FULL);
+      }
+
       this.logger.log(`Dispositivo conectado: ${client.id}`);
       this.clients.set(client.id, { lastSeen: Date.now() });
     } catch {
@@ -127,8 +170,12 @@ export class EventosGateway
   /**
    * Método base para emisión de eventos con tipado genérico.
    */
-  private emitirEvento<T>(evento: string, payload: T) {
-    this.server.emit(evento, payload);
+  private emitirEvento<T>(evento: string, payload: T, room?: string) {
+    if (room) {
+      this.server.to(room).emit(evento, payload);
+    } else {
+      this.server.emit(evento, payload);
+    }
     this.logger.log(`Evento emitido: ${evento}`);
   }
 
@@ -157,26 +204,71 @@ export class EventosGateway
   }
 
   emitirVehiculoIngresado(payload: IVehiculoEventoPayload) {
-    this.emitirEvento('vehiculo_ingresado', payload);
+    this.emitirEvento('vehiculo_ingresado', payload, this.ROOMS.PARQUEADERO_BAHIAS);
   }
 
   emitirVehiculoRetirado(payload: IVehiculoEventoPayload) {
-    this.emitirEvento('vehiculo_retirado', payload);
+    this.emitirEvento('vehiculo_retirado', payload, this.ROOMS.PARQUEADERO_BAHIAS);
   }
 
   emitirOcupacionActualizada(payload: IOcupacionPayload) {
-    this.emitirEvento('ocupacion_actualizada', payload);
+    this.emitirEvento('ocupacion_actualizada', payload, this.ROOMS.ADMINS_FULL);
   }
 
   emitirAlertaParqueadero(payload: IAlertaPayload) {
-    this.emitirEvento('alerta_parqueadero', payload);
+    this.emitirEvento('alerta_parqueadero', payload, this.ROOMS.OPERATIVOS_ALERTAS);
   }
 
   emitirSensorOffline(payload: ISensorOfflinePayload) {
-    this.emitirEvento('sensor_offline', payload);
+    this.emitirEvento('sensor_offline', payload, this.ROOMS.OPERATIVOS_ALERTAS);
   }
 
   emitirBahiaActualizada(payload: IBahiaActualizadaPayload) {
-    this.emitirEvento('bahia_actualizada', payload);
+    this.emitirEvento('bahia_actualizada', payload, this.ROOMS.PARQUEADERO_BAHIAS);
+  }
+
+  emitirParqueaderoEstadoActualizado(payload: IParqueaderoEstadoPayload) {
+    this.emitirEvento('parqueadero_estado_actualizado', payload, this.ROOMS.OPERATIVOS_ALERTAS);
+    this.emitirEvento('parqueadero_estado_actualizado', payload, this.ROOMS.ADMINS_FULL);
+  }
+
+  emitirConteoGlobalDisponibles(payload: IConteoGlobalDisponiblesPayload) {
+    this.emitirEvento('conteo_global_disponibles', payload, this.ROOMS.APRENDICES_CONTEO);
+    this.emitirEvento('conteo_global_disponibles', payload, this.ROOMS.PARQUEADERO_BAHIAS);
+    this.emitirEvento('conteo_global_disponibles', payload, this.ROOMS.ADMINS_FULL);
+  }
+
+  emitirBahiaModificada(payload: IBahiaModificadaPayload, opts?: { source?: 'IOT' | 'PORTERIA' | 'ADMIN' }) {
+    const source = opts?.source ?? 'ADMIN';
+    if (source !== 'IOT') {
+      this.emitirEvento('bahia_modificada', payload, this.ROOMS.PARQUEADERO_BAHIAS);
+      return;
+    }
+
+    const key = payload.idBahia;
+    const current = this.bahiaDebounce.get(key);
+    const lastEmitState = current?.lastEmitState ?? null;
+
+    if (lastEmitState === payload.nuevoEstado) return;
+
+    if (current?.timer) {
+      clearTimeout(current.timer);
+    }
+
+    const timer = setTimeout(() => {
+      const updated = this.bahiaDebounce.get(key);
+      if (!updated) return;
+      const toEmit = updated.pending;
+      this.emitirEvento('bahia_modificada', toEmit, this.ROOMS.PARQUEADERO_BAHIAS);
+      updated.lastEmitState = toEmit.nuevoEstado;
+      updated.timer = null;
+      this.bahiaDebounce.set(key, updated);
+    }, 2000);
+
+    this.bahiaDebounce.set(key, {
+      timer,
+      pending: payload,
+      lastEmitState,
+    });
   }
 }

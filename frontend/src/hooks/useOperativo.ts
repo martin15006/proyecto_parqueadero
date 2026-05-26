@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { socketService } from '../services/socket.service';
-import { dashboardService, operativoService } from '../services/operativo.service';
-import type { Bahia, Movement } from '../types';
+import { bahiasService, operativoService } from '../services/operativo.service';
+import type { Bahia, BahiaEstado, BahiaModificadaPayload, ConteoGlobalDisponiblesPayload, Movement } from '../types';
 
 interface OperativoStats {
   total: number;
@@ -43,7 +43,7 @@ export const useOperativo = () => {
    */
   const mapActivosFromBahias = useCallback((bahiasList: Bahia[]): Movement[] => {
     return bahiasList
-      .filter(b => b.ocupada)
+      .filter(b => (b as any).ocupada || (b as any).estado === 'OCCUPIED' || (b as any).estado === 'DISCREPANCIA')
       .map(b => ({
         idMovimiento: b.idBahia,
         placa: b.placa || '???-000',
@@ -61,7 +61,7 @@ export const useOperativo = () => {
   const loadInitialData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await dashboardService.getResumen();
+      const res = await operativoService.resumenTurno();
       const { ocupacion } = res;
       
       setStats({
@@ -94,17 +94,35 @@ export const useOperativo = () => {
 
   useEffect(() => {
     loadInitialData();
+
+    let pollTimer: number | null = null;
+    const startPolling = () => {
+      if (pollTimer) return;
+      pollTimer = window.setInterval(async () => {
+        try {
+          const ocupacion = await bahiasService.getOcupacion();
+          setStats({
+            total: ocupacion.total,
+            ocupados: ocupacion.ocupados,
+            disponibles: ocupacion.disponibles,
+            vehiculosActivos: ocupacion.ocupados,
+          });
+          setBahias(ocupacion.bahias);
+          setVehiculos(mapActivosFromBahias(ocupacion.bahias));
+        } catch {
+        }
+      }, 4000);
+    };
+    startPolling();
     
     // SOCKET: Suscripción a eventos operativos realtime
-    const handleOcupacion = (data: any) => {
+    const handleConteoGlobal = (data: ConteoGlobalDisponiblesPayload) => {
       setStats({
         total: data.total,
         ocupados: data.ocupados,
         disponibles: data.disponibles,
-        vehiculosActivos: data.ocupados
+        vehiculosActivos: data.ocupados,
       });
-      setBahias(data.bahias);
-      setVehiculos(mapActivosFromBahias(data.bahias));
 
       if (data.disponibles === 0 && data.total > 0) {
         setAlerts(prev => {
@@ -119,6 +137,39 @@ export const useOperativo = () => {
       } else {
         setAlerts(prev => prev.filter(a => a.id !== 'full-alert'));
       }
+    };
+
+    const mapNuevoEstadoToBahiaEstado = (nuevo: BahiaModificadaPayload['nuevoEstado']): BahiaEstado => {
+      switch (nuevo) {
+        case 'LIBRE':
+          return 'AVAILABLE';
+        case 'OCUPADO':
+          return 'OCCUPIED';
+        case 'TRANSITO':
+          return 'TRANSITO';
+        case 'DISCREPANCIA':
+          return 'DISCREPANCIA';
+        case 'OFFLINE':
+          return 'OFFLINE';
+        case 'DESHABILITADO':
+          return 'DISABLED';
+        default:
+          return 'AVAILABLE';
+      }
+    };
+
+    const parseIdBahia = (value: string) => {
+      const match = String(value || '').match(/(\d+)/);
+      return match ? Number(match[1]) : null;
+    };
+
+    const handleBahiaModificada = (data: BahiaModificadaPayload) => {
+      const id = parseIdBahia(data.idBahia);
+      if (!id) return;
+
+      const estado = mapNuevoEstadoToBahiaEstado(data.nuevoEstado);
+
+      setBahias(prev => (Array.isArray(prev) ? prev.map((b: any) => (b.idBahia === id ? { ...b, estado } : b)) : prev));
     };
 
     const handleIngreso = (data: any) => {
@@ -153,14 +204,20 @@ export const useOperativo = () => {
       }
     };
 
-    socketService.on('ocupacion_actualizada', handleOcupacion);
+    socketService.on('conteo_global_disponibles', handleConteoGlobal);
+    socketService.on('bahia_modificada', handleBahiaModificada);
     socketService.on('vehiculo_ingresado', handleIngreso);
     socketService.on('vehiculo_retirado', handleRetirado);
     socketService.on('alerta_parqueadero', handleAlerta);
     socketService.on('sensor_offline', handleSensorOffline);
 
     return () => {
-      socketService.off('ocupacion_actualizada', handleOcupacion);
+      if (pollTimer) {
+        window.clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      socketService.off('conteo_global_disponibles', handleConteoGlobal);
+      socketService.off('bahia_modificada', handleBahiaModificada);
       socketService.off('vehiculo_ingresado', handleIngreso);
       socketService.off('vehiculo_retirado', handleRetirado);
       socketService.off('alerta_parqueadero', handleAlerta);

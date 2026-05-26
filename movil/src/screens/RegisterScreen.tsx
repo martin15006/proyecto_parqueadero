@@ -15,7 +15,6 @@ import { useTheme } from '../context/ThemeContext';
 import { fonts, espacios } from '../theme/senaTheme';
 import { usuarioService } from '../services/usuarioService';
 import { subirImagen } from '../services/uploadService';
-import { authService } from '../services/authService';
 import AnimatedButton from '../components/AnimatedButton';
 import AnimatedInput from '../components/AnimatedInput';
 import AnimatedLogo from '../components/AnimatedLogo';
@@ -25,9 +24,6 @@ import SuccessCheck from '../components/SuccessCheck';
 import BotonTema from '../components/BotonTema';
 import MedidorContrasena from '../components/MedidorContrasena';
 import { validarContrasenaSegura } from '../utils/validacionContrasena';
-import OtpModal from '../components/OtpModal';
-import { useAuth } from '../context/AuthContext';
-import { Usuario } from '../types/usuario';
 
 interface FormState {
   nombreCompleto: string;
@@ -59,11 +55,13 @@ export default function RegisterScreen({ navigation }: any) {
   const [cargando, setCargando] = useState(false);
   const [mensajeCargando, setMensajeCargando] = useState('');
   const [exitoVisible, setExitoVisible] = useState(false);
-  const { iniciarSesion } = useAuth();
-  const [modalOtpVisible, setModalOtpVisible] = useState(false);
-  const [correoRegistrado, setCorreoRegistrado] = useState('');
   const paddingTopSeguro =
     Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 50;
+
+  const verdeSena = '#39A900';
+  const grisOscuro = '#232323';
+  const tituloColor = esOscuro ? colores.textoPrimario : grisOscuro;
+  const linkColor = esOscuro ? colores.verde : verdeSena;
 
   const actualizarCampo = (campo: keyof FormState, valor: string) => {
     setForm({ ...form, [campo]: valor });
@@ -156,9 +154,17 @@ export default function RegisterScreen({ navigation }: any) {
         idFormacion: form.idFormacion,
       });
 
-      await authService.loginPaso1({ correo: form.correo, contra: form.contra });
-      setCorreoRegistrado(form.correo);
-      setModalOtpVisible(true);
+      setExitoVisible(true);
+      const correoRegistrado = form.correo;
+      setTimeout(() => {
+        setExitoVisible(false);
+        setForm(FORM_INICIAL);
+        setFotoLocal(null);
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login', params: { correo: correoRegistrado } }],
+        });
+      }, 900);
     } catch (error: any) {
       Alert.alert('Error en el registro', error.message);
     } finally {
@@ -167,30 +173,9 @@ export default function RegisterScreen({ navigation }: any) {
     }
   };
 
-  // Cuando se verifica el OTP correctamente, iniciar sesión automáticamente
-  const handleOtpExito = async (token: string, usuarioData: Usuario) => {
-    setModalOtpVisible(false);
-    await iniciarSesion(usuarioData, token);
-  };
-
-  // Si el usuario cancela el OTP
-  const handleOtpCerrar = () => {
-    setModalOtpVisible(false);
-    Alert.alert(
-      'Verificación pendiente',
-      'Tu cuenta fue creada pero debes verificar tu correo. Inicia sesión cuando quieras completar la verificación.',
-      [
-        {
-          text: 'Ir a Login',
-          onPress: () => navigation.navigate('Login'),
-        },
-      ],
-    );
-  };
-
   return (
     <>
-      <View style={[{ flex: 1, backgroundColor: colores.fondo }, styles.relative]}>
+      <View style={[{ flex: 1, backgroundColor: esOscuro ? colores.fondo : '#F4F6F4' }, styles.relative]}>
         {esOscuro && (
           <>
             <View style={styles.auroraTop} />
@@ -210,140 +195,149 @@ export default function RegisterScreen({ navigation }: any) {
               <AnimatedLogo size={70} pulse={false} />
             </FadeInView>
             <FadeInView delay={150}>
-              <Text style={[styles.titulo, { color: colores.textoPrimario }]}>Registro</Text>
+              <Text style={[styles.titulo, { color: tituloColor }]}>Registro</Text>
 
-              <View style={styles.fotoContainer}>
-                {fotoLocal ? (
-                  <Image source={{ uri: fotoLocal }} style={styles.fotoPreview} />
-                ) : (
-                  <View
-                    style={[
-                      styles.fotoPlaceholder,
-                      {
-                        backgroundColor: esOscuro
-                          ? colores.glassFondo
-                          : '#f4f6f4',
-                        borderColor: colores.borde,
-                      },
-                    ]}
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: esOscuro ? colores.glassFondo : colores.superficie,
+                    borderColor: esOscuro ? colores.glassBorde : 'rgba(35,35,35,0.08)',
+                    shadowColor: esOscuro ? '#000000' : 'rgba(15, 23, 42, 0.16)',
+                  },
+                ]}
+              >
+                <View style={styles.fotoContainer}>
+                  {fotoLocal ? (
+                    <Image source={{ uri: fotoLocal }} style={[styles.fotoPreview, { borderColor: linkColor }]} />
+                  ) : (
+                    <View
+                      style={[
+                        styles.fotoPlaceholder,
+                        {
+                          backgroundColor: esOscuro ? colores.glassFondo : '#f4f6f4',
+                          borderColor: 'rgba(57,169,0,0.35)',
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.fotoPlaceholderTexto, { color: colores.textoTenue }]}>
+                        Sin foto
+                      </Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.botonFoto, { backgroundColor: linkColor, shadowColor: linkColor }]}
+                    onPress={seleccionarFoto}
+                    disabled={cargando}
                   >
-                    <Text style={[styles.fotoPlaceholderTexto, { color: colores.textoTenue }]}>
-                      Sin foto
+                    <Text style={styles.botonFotoTexto}>
+                      {fotoLocal ? 'Cambiar Foto' : 'Subir Foto'}
                     </Text>
-                  </View>
-                )}
-                <TouchableOpacity
-                  style={[styles.botonFoto, { backgroundColor: colores.verde }]}
-                  onPress={seleccionarFoto}
-                  disabled={cargando}
-                >
-                  <Text style={styles.botonFotoTexto}>
-                    {fotoLocal ? 'Cambiar Foto' : 'Subir Foto'}
-                  </Text>
-                </TouchableOpacity>
-                {errores.foto && (
-                  <Text style={[styles.textoError, { color: colores.error }]}>
-                    {errores.foto}
-                  </Text>
-                )}
-              </View>
+                  </TouchableOpacity>
+                  {errores.foto ? (
+                    <Text style={[styles.textoError, { color: colores.error }]}>
+                      {errores.foto}
+                    </Text>
+                  ) : null}
+                </View>
 
-              <AnimatedInput
-                label="Nombre y Apellido"
-                placeholder="Nombres y apellidos"
-                value={form.nombreCompleto}
-                error={errores.nombreCompleto}
-                onChangeText={(v) => actualizarCampo('nombreCompleto', v)}
-              />
-
-              <AnimatedInput
-                label="Número de Documento"
-                placeholder="Número de documento"
-                keyboardType="numeric"
-                maxLength={10}
-                value={form.documento}
-                error={errores.documento}
-                onChangeText={(v) => actualizarCampo('documento', v)}
-              />
-
-              <AnimatedInput
-                label="Correo"
-                placeholder="ejemplo@correo.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={form.correo}
-                error={errores.correo}
-                onChangeText={(v) => actualizarCampo('correo', v)}
-              />
-
-              <AnimatedInput
-                label="Número Telefónico"
-                placeholder="3001234567"
-                keyboardType="phone-pad"
-                maxLength={10}
-                value={form.numTelf}
-                error={errores.numTelf}
-                onChangeText={(v) => actualizarCampo('numTelf', v)}
-              />
-
-              <AnimatedInput
-                label="Contacto de Emergencia"
-                placeholder="3007654321"
-                keyboardType="phone-pad"
-                maxLength={10}
-                value={form.contactoEmerg}
-                error={errores.contactoEmerg}
-                onChangeText={(v) => actualizarCampo('contactoEmerg', v)}
-              />
-
-              <AnimatedInput
-                label="Ficha de Formación"
-                placeholder="7 dígitos"
-                keyboardType="numeric"
-                maxLength={7}
-                value={form.idFormacion}
-                error={errores.idFormacion}
-                onChangeText={(v) => actualizarCampo('idFormacion', v)}
-              />
-
-              {/* ─── CONTRASEÑAS AL FINAL ─── */}
-              <AnimatedInput
-                label="Contraseña"
-                placeholder="Crea una contraseña segura"
-                secureTextEntry
-                value={form.contra}
-                error={errores.contra}
-                onChangeText={(v) => actualizarCampo('contra', v)}
-              />
-
-              {/* Medidor de fortaleza - solo aparece al escribir */}
-              <MedidorContrasena contrasena={form.contra} />
-
-              <AnimatedInput
-                label="Confirmar Contraseña"
-                placeholder="Repite la contraseña"
-                secureTextEntry
-                value={form.confirmarContra}
-                error={errores.confirmarContra}
-                onChangeText={(v) => actualizarCampo('confirmarContra', v)}
-              />
-
-              <View style={{ marginTop: 16 }}>
-                <AnimatedButton
-                  texto="Continuar"
-                  onPress={handleRegistro}
-                  cargando={cargando}
-                  mensajeCargando={mensajeCargando}
+                <AnimatedInput
+                  label="Nombre y Apellido"
+                  placeholder="Nombres y apellidos"
+                  value={form.nombreCompleto}
+                  error={errores.nombreCompleto}
+                  onChangeText={(v) => actualizarCampo('nombreCompleto', v)}
                 />
-              </View>
 
-              <View style={styles.filaInferior}>
-                <Text style={[styles.textoNormal, { color: colores.textoTenue }]}>
-                  ¿Tienes una cuenta?
-                </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                  <Text style={[styles.enlace, { color: colores.verde }]}>Iniciar Sesión</Text>
-                </TouchableOpacity>
+                <AnimatedInput
+                  label="Número de Documento"
+                  placeholder="Número de documento"
+                  keyboardType="numeric"
+                  maxLength={10}
+                  value={form.documento}
+                  error={errores.documento}
+                  onChangeText={(v) => actualizarCampo('documento', v)}
+                />
+
+                <AnimatedInput
+                  label="Correo"
+                  placeholder="ejemplo@correo.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={form.correo}
+                  error={errores.correo}
+                  onChangeText={(v) => actualizarCampo('correo', v)}
+                />
+
+                <AnimatedInput
+                  label="Número Telefónico"
+                  placeholder="3001234567"
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                  value={form.numTelf}
+                  error={errores.numTelf}
+                  onChangeText={(v) => actualizarCampo('numTelf', v)}
+                />
+
+                <AnimatedInput
+                  label="Contacto de Emergencia"
+                  placeholder="3007654321"
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                  value={form.contactoEmerg}
+                  error={errores.contactoEmerg}
+                  onChangeText={(v) => actualizarCampo('contactoEmerg', v)}
+                />
+
+                <AnimatedInput
+                  label="Ficha de Formación"
+                  placeholder="7 dígitos"
+                  keyboardType="numeric"
+                  maxLength={7}
+                  value={form.idFormacion}
+                  error={errores.idFormacion}
+                  onChangeText={(v) => actualizarCampo('idFormacion', v)}
+                />
+
+                {/* ─── CONTRASEÑAS AL FINAL ─── */}
+                <AnimatedInput
+                  label="Contraseña"
+                  placeholder="Crea una contraseña segura"
+                  secureTextEntry
+                  value={form.contra}
+                  error={errores.contra}
+                  onChangeText={(v) => actualizarCampo('contra', v)}
+                />
+
+                {/* Medidor de fortaleza - solo aparece al escribir */}
+                <MedidorContrasena contrasena={form.contra} />
+
+                <AnimatedInput
+                  label="Confirmar Contraseña"
+                  placeholder="Repite la contraseña"
+                  secureTextEntry
+                  value={form.confirmarContra}
+                  error={errores.confirmarContra}
+                  onChangeText={(v) => actualizarCampo('confirmarContra', v)}
+                />
+
+                <View style={{ marginTop: 16 }}>
+                  <AnimatedButton
+                    texto="Continuar"
+                    onPress={handleRegistro}
+                    cargando={cargando}
+                    mensajeCargando={mensajeCargando}
+                  />
+                </View>
+
+                <View style={styles.filaInferior}>
+                  <Text style={[styles.textoNormal, { color: colores.textoTenue }]}>
+                    ¿Tienes una cuenta?
+                  </Text>
+                  <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                    <Text style={[styles.enlace, { color: linkColor }]}>Iniciar Sesión</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </FadeInView>
           </View>
@@ -351,14 +345,6 @@ export default function RegisterScreen({ navigation }: any) {
         </KeyboardAwareScrollView>
       </View>
       <SuccessCheck visible={exitoVisible} mensaje="¡Registro exitoso!" />
-
-      {/* Modal del OTP para verificar el correo */}
-      <OtpModal
-        visible={modalOtpVisible}
-        correo={correoRegistrado}
-        onCerrar={handleOtpCerrar}
-        onExito={handleOtpExito}
-      />
     </>
   );
 }
@@ -396,12 +382,22 @@ const styles = StyleSheet.create({
     marginBottom: espacios.medio,
     letterSpacing: -0.5,
   },
+  card: {
+    borderRadius: 24,
+    padding: espacios.grande,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 6,
+  },
   fotoContainer: { alignItems: 'center', marginBottom: espacios.medio },
   fotoPreview: {
     width: 100,
     height: 100,
     borderRadius: 50,
     marginBottom: 10,
+    borderWidth: 2,
   },
   fotoPlaceholder: {
     width: 100,
@@ -418,6 +414,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 5,
   },
   botonFotoTexto: { color: '#ffffff', fontWeight: 'bold', fontSize: fonts.pequeno },
   textoError: { fontSize: fonts.pequeno, marginTop: 4 },

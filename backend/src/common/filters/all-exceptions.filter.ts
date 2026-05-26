@@ -76,6 +76,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (status >= 500) {
       const stack = exception instanceof Error ? exception.stack : 'No stack trace';
       this.logger.error(`[CRÍTICO] ${context} - Status: ${status} - Error: ${messageStr}`, stack);
+    } else if (status === 401 || status === 403) {
+      this.logger.log(`[AUTH] ${context} - Status: ${status} - Message: ${messageStr}`);
     } else if (status >= 400) {
       this.logger.warn(`[CLIENTE] ${context} - Status: ${status} - Message: ${messageStr}`);
     } else {

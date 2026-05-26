@@ -1,0 +1,8 @@
+export enum BahiaReconciliacionEstadoEnum {
+  LIBRE = 'LIBRE',
+  TRANSITO = 'TRANSITO',
+  OCUPADO = 'OCUPADO',
+  DISCREPANCIA = 'DISCREPANCIA',
+  OFFLINE = 'OFFLINE',
+  DESHABILITADO = 'DESHABILITADO',
+}

@@ -7,9 +7,9 @@ import { ActualizarVehiculoDto } from './dto/actualizar-vehiculo.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Usuario } from '../usuarios/entities/usuario.entity';
-import { Roles } from '../common/decorators/roles.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
-import { RolesGuard } from '../common/guards/roles.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @Controller('vehiculos')
 export class VehiculosController {
@@ -45,6 +45,12 @@ export class VehiculosController {
   @Get('mios')
   listarMios(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
     return this.vehiculosService.listarMisVehiculos(usuario.documento);
+  }
+
+  @UseGuards(JwtAuthGuard) // RF32: solo el usuario autenticado puede consultar su historial.
+  @Get('historial') // RF32: endpoint de transparencia para que el Aprendiz vea sus ingresos/salidas.
+  listarHistorial(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
+    return this.vehiculosService.listarHistorialUsuario(usuario.documento); // RNF2: limita la consulta al documento del token.
   }
 
   @UseGuards(JwtAuthGuard)

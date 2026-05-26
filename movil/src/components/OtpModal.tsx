@@ -13,6 +13,7 @@ import {
   Image,
 } from 'react-native';
 import OtpInput from './OtpInput';
+import AnimatedButton from './AnimatedButton';
 import { useTheme } from '../context/ThemeContext';
 import { fonts, espacios, animaciones } from '../theme/senaTheme';
 import { authService } from '../services/authService';
@@ -31,7 +32,7 @@ const TIEMPO_REENVIO = 60;
 
 export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) {
   const { colores, esOscuro } = useTheme();
-  const [codigo, setCodigo] = useState('');
+  const [, setCodigo] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState(false);
   const [mensajeError, setMensajeError] = useState('');
@@ -113,6 +114,9 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
     return `${usuario.slice(0, visibles)}${'*'.repeat(Math.max(usuario.length - visibles, 3))}@${dominio}`;
   })();
 
+  const tituloColor = esOscuro ? colores.textoPrimario : '#232323';
+  const subtituloColor = esOscuro ? colores.textoSecundario : 'rgba(35,35,35,0.74)';
+
   return (
     <Modal
       visible={visible}
@@ -137,8 +141,8 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
               styles.modalContent,
               {
                 backgroundColor: esOscuro ? '#001f12' : colores.superficie,
-                borderColor: esOscuro ? 'rgba(95,217,36,0.30)' : 'transparent',
-                borderWidth: esOscuro ? 1 : 0,
+                borderColor: esOscuro ? 'rgba(95,217,36,0.30)' : 'rgba(35,35,35,0.08)',
+                borderWidth: 1,
                 transform: [{ translateY: slideAnim }],
               },
             ]}
@@ -184,10 +188,10 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
               />
             </View>
 
-            <Text style={[styles.titulo, { color: colores.textoPrimario }]}>
+            <Text style={[styles.titulo, { color: tituloColor }]}>
               Verificación
             </Text>
-            <Text style={[styles.subtitulo, { color: colores.textoSecundario }]}>
+            <Text style={[styles.subtitulo, { color: subtituloColor }]}>
               Te enviamos un código de 6 dígitos a
             </Text>
             <Text style={[styles.correo, { color: colores.verde }]}>{correoCensurado}</Text>
@@ -218,27 +222,37 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
                 ¿No te llegó el código?
               </Text>
               {segundosRestantes > 0 ? (
-                <Text style={[styles.contador, { color: colores.textoTenue }]}>
+                <Text
+                  style={[
+                    styles.contador,
+                    {
+                      color: esOscuro ? colores.textoTenue : 'rgba(35,35,35,0.55)',
+                    },
+                  ]}
+                >
                   Reenviar en {segundosRestantes}s
                 </Text>
               ) : (
-                <TouchableOpacity onPress={handleReenviar} disabled={reenviando}>
-                  <Text style={[styles.linkReenviar, { color: colores.verde }]}>
-                    {reenviando ? 'Enviando...' : 'Reenviar código'}
-                  </Text>
-                </TouchableOpacity>
+                <View style={styles.acciones}>
+                  <AnimatedButton
+                    texto="Reenviar código"
+                    onPress={handleReenviar}
+                    cargando={reenviando}
+                    mensajeCargando="Enviando..."
+                    deshabilitado={cargando}
+                  />
+                </View>
               )}
             </View>
 
-            <TouchableOpacity
-              onPress={onCerrar}
-              style={styles.botonCancelar}
-              disabled={cargando}
-            >
-              <Text style={[styles.botonCancelarTexto, { color: colores.textoTenue }]}>
-                Cancelar
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.cancelar}>
+              <AnimatedButton
+                texto="Cancelar"
+                onPress={onCerrar}
+                variante="secundario"
+                deshabilitado={cargando || reenviando}
+              />
+            </View>
           </Animated.View>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -331,13 +345,13 @@ const styles = StyleSheet.create({
   cargandoTexto: { marginLeft: 8, fontSize: fonts.normal },
   reenviarContainer: { alignItems: 'center', marginTop: espacios.normal },
   reenviarTexto: { fontSize: fonts.normal },
-  contador: { marginTop: 4, fontSize: fonts.normal, fontWeight: '700' },
-  linkReenviar: {
-    marginTop: 4,
-    fontSize: fonts.normal,
-    fontWeight: '700',
-    textDecorationLine: 'underline',
+  contador: {
+    marginTop: 6,
+    fontSize: fonts.medio,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    fontVariant: ['tabular-nums'],
   },
-  botonCancelar: { marginTop: espacios.normal, paddingVertical: espacios.pequeno },
-  botonCancelarTexto: { fontSize: fonts.normal },
+  acciones: { marginTop: espacios.pequeno },
+  cancelar: { marginTop: espacios.normal },
 });
