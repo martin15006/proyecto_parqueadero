@@ -35,6 +35,8 @@ import { IJwtPayload } from '../common/interfaces/auth.interface';
 @Injectable()
 export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
+  private static readonly OTP_RATE_LIMIT_MSG =
+    'Ya se envió un código recientemente. Espera 1 minuto antes de solicitar otro.';
 
   constructor(
     @InjectRepository(Usuario)
@@ -57,6 +59,17 @@ export class AuthService implements OnModuleInit {
    */
   async onModuleInit() {
     this.iniciarTareasMantenimiento();
+  }
+
+  private esErrorRateLimitOtp(error: unknown): boolean {
+    if (!(error instanceof BadRequestException)) return false;
+    const response = error.getResponse?.();
+    const message =
+      typeof response === 'string'
+        ? response
+        : (response as { message?: unknown } | undefined)?.message;
+    if (Array.isArray(message)) return message.includes(AuthService.OTP_RATE_LIMIT_MSG);
+    return message === AuthService.OTP_RATE_LIMIT_MSG;
   }
 
   /**
@@ -89,7 +102,17 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    await this.generarYEnviarOtp(usuario);
+    try {
+      await this.generarYEnviarOtp(usuario);
+    } catch (error) {
+      if (this.esErrorRateLimitOtp(error)) {
+        return {
+          mensaje: AuthService.OTP_RATE_LIMIT_MSG,
+          correo: usuario.correo,
+        };
+      }
+      throw error;
+    }
 
     return {
       mensaje: 'Código de verificación enviado a tu correo',
@@ -310,8 +333,15 @@ export class AuthService implements OnModuleInit {
       return { mensaje: 'Si el correo existe, se enviará un nuevo código.' };
     }
 
-    await this.generarYEnviarOtp(usuario);
-    return { mensaje: 'Nuevo código enviado a tu correo.' };
+    try {
+      await this.generarYEnviarOtp(usuario);
+      return { mensaje: 'Nuevo código enviado a tu correo.' };
+    } catch (error) {
+      if (this.esErrorRateLimitOtp(error)) {
+        return { mensaje: AuthService.OTP_RATE_LIMIT_MSG };
+      }
+      throw error;
+    }
   }
 
   /**
@@ -328,7 +358,15 @@ export class AuthService implements OnModuleInit {
       return { mensaje: 'Si el correo está registrado, recibirás un código de verificación.' };
     }
 
-    await this.generarYEnviarOtp(usuario);
+    try {
+      await this.generarYEnviarOtp(usuario);
+    } catch (error) {
+      if (this.esErrorRateLimitOtp(error)) {
+        return { mensaje: 'Si el correo está registrado, recibirás un código de verificación.' };
+      }
+      this.logger.error('Fallo al enviar OTP en solicitarRecuperacion.', error as Error);
+      return { mensaje: 'Si el correo está registrado, recibirás un código de verificación.' };
+    }
     return { mensaje: 'Si el correo está registrado, recibirás un código de verificación.' };
   }
 
@@ -442,7 +480,7 @@ export class AuthService implements OnModuleInit {
       if (tiempoTranscurrido < UN_MINUTO) {
         // RNF2 (Privacidad): no registramos documento/cédula (PII). Registramos solo el control de rate-limit.
         this.logger.warn('Intento de generación de OTP bloqueado por rate-limit (1min).');
-        throw new BadRequestException('Ya se envió un código recientemente. Espera 1 minuto antes de solicitar otro.');
+        throw new BadRequestException(AuthService.OTP_RATE_LIMIT_MSG);
       }
     }
 

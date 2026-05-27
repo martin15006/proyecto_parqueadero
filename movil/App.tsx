@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
-import { LogBox, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -44,10 +44,6 @@ class DevErrorBoundary extends React.Component<
 
 export default function App() {
   useEffect(() => {
-    LogBox.ignoreLogs([
-      'setLayoutAnimationEnabledExperimental',
-    ]);
-
     const anyGlobal = globalThis as any;
     const ErrorUtils = anyGlobal?.ErrorUtils;
     if (__DEV__ && ErrorUtils?.getGlobalHandler && ErrorUtils?.setGlobalHandler) {

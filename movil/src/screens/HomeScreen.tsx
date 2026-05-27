@@ -9,7 +9,6 @@ import { // UI: importación de componentes nativos para una UI consistente y pe
   StyleSheet, // UI: estilos nativos con rendimiento óptimo (directriz).
   Text, // UI: render tipográfico.
   TouchableOpacity, // UX: interacción táctil con feedback.
-  UIManager, // UX: habilita LayoutAnimation en Android (estabilidad).
   View, // UI: layout base.
 } from 'react-native'; // UI: runtime React Native.
 import Barcode from 'react-native-barcode-qr-generator'; // RF8: render de Code128/QR en Expo sin depender de hardware QR actual.
@@ -52,10 +51,6 @@ const COLORS = { // UI: paleta oficial SENA exigida por requerimiento.
   borde: 'rgba(15, 23, 42, 0.10)', // UI: borde sutil para tarjetas (premium).
   sombra: 'rgba(15, 23, 42, 0.14)', // UI: sombra suave para iOS.
 }; // UI: constantes centralizadas para consistencia visual.
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) { // UX: habilita LayoutAnimation solo en Android para evitar crash.
-  UIManager.setLayoutAnimationEnabledExperimental(true); // UX: activa animaciones de layout (bandeja RF25).
-} // UX: evita llamadas innecesarias en iOS.
 
 export default function HomeScreen({ navigation }: { navigation: any }) { // UX: navegación del Drawer sin romper integración existente.
   const { usuario } = useAuth(); // RF7: obtiene perfil autenticado del aprendiz desde contexto de sesión.
