@@ -24,6 +24,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 import { AuthService } from '../auth/auth.service';
 import { AdminListUsuariosQueryDto } from './dto/admin-list-usuarios.query.dto';
+import { RegistroVehiculo } from '../vehiculos/entities/registro-vehiculo.entity';
 
 /**
  * Servicio de Gestión de Usuarios.
@@ -201,6 +202,57 @@ export class UsuarioService {
   }
 
   /**
+   * Búsqueda institucional por código QR, Documento o Placa.
+   * RF31/RF33: Permite identificación unificada en portería.
+   */
+  async buscarIdentidadUnificada(token: string) {
+    const entrada = String(token ?? '').trim();
+    if (!entrada) throw new BadRequestException('El código es obligatorio');
+
+    let placaDetectada: string | null = null;
+
+    // 1. Intentar por QR/Token (Normalizado)
+    const esHex32 = /^[0-9a-fA-F]{32}$/.test(entrada);
+    const normalizado = (esHex32
+      ? `${entrada.slice(0, 8)}-${entrada.slice(8, 12)}-${entrada.slice(12, 16)}-${entrada.slice(16, 20)}-${entrada.slice(20)}`
+      : entrada).toLowerCase();
+
+    let usuario = await this.usuarioRepository.findOne({
+      where: { qr: normalizado },
+      relations: ['tipoUsuario', 'formacion'],
+    });
+
+    // 2. Intentar por Documento directo
+    if (!usuario && /^[0-9]{6,12}$/.test(entrada)) {
+      usuario = await this.usuarioRepository.findOne({
+        where: { documento: entrada },
+        relations: ['tipoUsuario', 'formacion'],
+      });
+    }
+
+    // 3. Intentar por Placa de vehículo
+    if (!usuario) {
+      const placaNormal = entrada.replace(/[- ]/g, '').toUpperCase();
+      const registro = await this.usuarioRepository.manager.findOne(RegistroVehiculo, {
+        where: { idVehiculo: placaNormal },
+        relations: ['usuario', 'usuario.tipoUsuario', 'usuario.formacion'],
+      });
+      if (registro) {
+        usuario = registro.usuario;
+        placaDetectada = placaNormal;
+      }
+    }
+
+    if (!usuario) {
+      throw new NotFoundException('Identidad no reconocida en el sistema');
+    }
+
+    const vehiculos = await this.vehiculosService.findByUsuario(usuario.documento);
+    const { contra: _, ...perfil } = usuario;
+    return { usuario: perfil, vehiculos, placaDetectada };
+  }
+
+  /**
    * Búsqueda institucional por código QR.
    */
   async buscarPorQR(qr: string) {
@@ -208,9 +260,9 @@ export class UsuarioService {
       .trim(); // RF8: lectores físicos suelen añadir espacios/linebreaks; los removemos.
 
     const esHex32 = /^[0-9a-fA-F]{32}$/.test(entrada); // RF8 (Code128): formato alfanumérico puro (UUID sin guiones).
-    const normalizado = esHex32
+    const normalizado = (esHex32
       ? `${entrada.slice(0, 8)}-${entrada.slice(8, 12)}-${entrada.slice(12, 16)}-${entrada.slice(16, 20)}-${entrada.slice(20)}` // RF8: reconstruye el UUID estándar esperado por la BD (compatibilidad con registros existentes).
-      : entrada; // RF8: si llega UUID con guiones (QR futuro), se usa tal cual.
+      : entrada).toLowerCase(); // RF8: normalizamos a minúsculas para coincidir con el formato de UUID en la base de datos (PostgreSQL es case-sensitive).
 
     const usuario = await this.usuarioRepository.findOne({
       where: { qr: normalizado }, // RF8: permite validar tanto el token para Code128 (sin guiones) como el QR (con guiones) sin exponer PII.

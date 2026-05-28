@@ -14,6 +14,11 @@ export class ActualizarVehiculoDto {
   @IsString()
   @IsOptional()
   @IsNotEmpty()
+  fotoPlaca?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsNotEmpty()
   @Length(1, 50)
   color?: string;
 

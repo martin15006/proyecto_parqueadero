@@ -23,7 +23,7 @@ export class RegistroVehiculo {
   updatedAt: Date;
 
   @DeleteDateColumn({ type: 'timestamptz', nullable: true })
-  deletedAt: Date;
+  deletedAt: Date | null;
 
   @ManyToOne(() => Usuario, (usuario) => usuario.registrosVehiculos)
   @JoinColumn({ name: 'id_usuario' })

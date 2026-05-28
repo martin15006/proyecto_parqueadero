@@ -22,14 +22,15 @@ export class AdminSeedService implements OnModuleInit {
     const saltRounds = 10;
 
     const existente = await this.usuarioRepository.findOne({
-      where: { correo: correoAdmin },
+      where: [{ correo: correoAdmin }, { documento: documentoAdmin }],
       withDeleted: true,
     });
 
     if (existente) {
-      if (existente.documento !== documentoAdmin) {
-        this.logger.warn('Usuario ADMIN de inicialización ya existe con documento distinto (omitido).');
-        return;
+      // Si el documento coincide pero el correo cambió, actualizamos al correo por defecto del sistema
+      if (existente.correo !== correoAdmin) {
+        this.logger.warn(`Sincronizando correo de ADMIN (${existente.documento}) a ${correoAdmin}.`);
+        existente.correo = correoAdmin;
       }
 
       const wasDeleted = Boolean(existente.deletedAt);
@@ -89,7 +90,7 @@ export class AdminSeedService implements OnModuleInit {
 
       const actualizado = await this.usuarioRepository.save(usuario);
       this.logger.log(
-        `Usuario ADMIN de inicialización actualizado (rol=${actualizado.idTipoUsr}, contra=${requiereCambioContra ? 'actualizada' : 'ok'}).`,
+        `Usuario ADMIN de inicialización actualizado (correo=${actualizado.correo}, contra=${requiereCambioContra ? 'Admin123*' : 'ok'}).`,
       );
       return;
     }
@@ -111,6 +112,6 @@ export class AdminSeedService implements OnModuleInit {
     });
 
     await this.usuarioRepository.save(admin);
-    this.logger.log('Usuario ADMIN de inicialización creado.');
+    this.logger.log(`Usuario ADMIN de inicialización creado: ${correoAdmin} / Admin123*`);
   }
 }

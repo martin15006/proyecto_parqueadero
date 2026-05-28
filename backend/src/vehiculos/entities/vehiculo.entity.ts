@@ -26,6 +26,9 @@ export class Vehiculo {
   @Column({ length: 255 })
   fotoTarjetaP: string;
 
+  @Column({ length: 255, nullable: true })
+  fotoPlaca: string;
+
   @Column({ length: 50 })
   color: string;
 
@@ -41,7 +44,7 @@ export class Vehiculo {
   updatedAt: Date;
 
   @DeleteDateColumn({ type: 'timestamptz', nullable: true })
-  deletedAt: Date;
+  deletedAt: Date | null;
 
   @ManyToOne(() => TipoVehiculo, (tipo) => tipo.vehiculos)
   @JoinColumn({ name: 'id_tipo_vehiculo' })

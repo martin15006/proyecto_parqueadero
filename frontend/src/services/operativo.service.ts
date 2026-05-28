@@ -9,27 +9,27 @@ export const operativoService = {
 
   escanearCodigo: async (codigo: string) => {
     const response = await api.post('/operativo/escanear-codigo', { codigo });
-    return response.data;
+    return response.data.data || response.data;
   },
 
   confirmarIngresoMultivehiculo: async (codigo: string, placa: string) => {
     const response = await api.post('/operativo/confirmar-ingreso-multivehiculo', { codigo, placa });
-    return response.data;
+    return response.data.data || response.data;
   },
 
   registrarEntrada: async (placa: string) => {
     const response = await api.post('/operativo/registrar-entrada', { placa });
-    return response.data;
+    return response.data.data || response.data;
   },
 
   registrarSalida: async (placa: string) => {
     const response = await api.post('/operativo/registrar-salida', { placa });
-    return response.data;
+    return response.data.data || response.data;
   },
 
   salidaEmergencia: async () => {
     const response = await api.post('/operativo/salida-emergencia');
-    return response.data;
+    return response.data.data || response.data;
   },
 
   /**
@@ -39,7 +39,7 @@ export const operativoService = {
    */
   registrarIngresoManual: async (identificacion: string, motivo: string) => {
     const response = await api.post('/operativo/registrar-ingreso-manual', { identificacion, motivo });
-    return response.data;
+    return response.data.data || response.data;
   },
 
   resumenTurno: async () => {

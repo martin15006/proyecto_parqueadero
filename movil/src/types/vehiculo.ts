@@ -2,6 +2,7 @@ export interface CreateVehiculoDto {
   placa: string;
   fotoVehiculo: string;
   fotoTarjetaP: string;
+  fotoPlaca: string;
   color: string;
   idTipoVehiculo: number;
 }
@@ -15,6 +16,7 @@ export interface VehiculoUsuario {
   placa: string;
   fotoVehiculo: string;
   fotoTarjetaP: string;
+  fotoPlaca?: string;
   color: string;
   tipoVehiculo: string;
   idTipoVehiculo: number;

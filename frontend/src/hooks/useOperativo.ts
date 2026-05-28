@@ -88,7 +88,7 @@ export const useOperativo = () => {
       await operativoService.registrarSalida(placa);
       showToast(`Vehículo ${placa} retirado exitosamente`, 'success');
     } catch (error: any) {
-      showToast(error.response?.data?.message || 'No se pudo procesar la salida', 'error');
+      showToast(error.message || error.response?.data?.message || 'No se pudo procesar la salida', 'error');
     }
   };
 

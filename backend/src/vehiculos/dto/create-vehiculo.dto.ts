@@ -16,6 +16,10 @@ export class CreateVehiculoDto {
 
   @IsString()
   @IsNotEmpty()
+  fotoPlaca: string;
+
+  @IsString()
+  @IsNotEmpty()
   @Length(1, 50)
   color: string;
 

@@ -75,10 +75,10 @@ function Login() {
       console.error('Error en el login:', error);
       
       // Manejo robusto de errores de red/CORS
-      if (error.code === 'ERR_NETWORK' || !error.response) {
+      if (error.code === 'ERR_NETWORK' || (!error.response && !error.message)) {
         setStatus({ msg: 'Error de conexión con el servidor. Verifica que el backend esté corriendo.', tipo: 'error' });
       } else {
-        setStatus({ msg: `Error: ${error.response?.data?.message || 'Credenciales incorrectas'}`, tipo: 'error' });
+        setStatus({ msg: `Error: ${error.message || error.response?.data?.message || 'Credenciales incorrectas'}`, tipo: 'error' });
       }
     } finally {
       setLoading(false);

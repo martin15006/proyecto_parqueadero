@@ -31,6 +31,7 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
   const [errorTipos, setErrorTipos] = useState(false);
   const [fotoVehiculo, setFotoVehiculo] = useState<string | null>(null);
   const [fotoTarjeta, setFotoTarjeta] = useState<string | null>(null);
+  const [fotoPlaca, setFotoPlaca] = useState<string | null>(null);
   const [errores, setErrores] = useState<any>({});
   const [cargando, setCargando] = useState(false);
   const [mensajeCargando, setMensajeCargando] = useState('');
@@ -68,7 +69,7 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
     }
   };
 
-  const seleccionarFoto = async (cual: 'vehiculo' | 'tarjeta') => {
+  const seleccionarFoto = async (cual: 'vehiculo' | 'tarjeta' | 'placa') => {
     Alert.alert('Foto', '¿De dónde tomar la foto?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Cámara', onPress: () => abrir(cual, 'camara') },
@@ -77,7 +78,7 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
   };
 
   const abrir = async (
-    cual: 'vehiculo' | 'tarjeta',
+    cual: 'vehiculo' | 'tarjeta' | 'placa',
     origen: 'camara' | 'galeria',
   ) => {
     const permiso =
@@ -104,7 +105,8 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
 
     if (!result.canceled && result.assets.length > 0) {
       if (cual === 'vehiculo') setFotoVehiculo(result.assets[0].uri);
-      else setFotoTarjeta(result.assets[0].uri);
+      else if (cual === 'tarjeta') setFotoTarjeta(result.assets[0].uri);
+      else setFotoPlaca(result.assets[0].uri);
     }
   };
 
@@ -117,6 +119,7 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
     if (!tipoSeleccionado) e.tipo = 'Selecciona un tipo';
     if (!fotoVehiculo) e.fotoVehiculo = 'Foto del vehículo obligatoria';
     if (!fotoTarjeta) e.fotoTarjeta = 'Foto de la tarjeta obligatoria';
+    if (!fotoPlaca) e.fotoPlaca = 'Foto de la placa obligatoria';
     setErrores(e);
     return Object.keys(e).length === 0;
   };
@@ -128,12 +131,14 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
       setMensajeCargando('Subiendo fotos...');
       const urlVehiculo = await subirImagen(fotoVehiculo!);
       const urlTarjeta = await subirImagen(fotoTarjeta!);
+      const urlPlaca = await subirImagen(fotoPlaca!);
 
       setMensajeCargando('Registrando...');
       await vehiculoService.registrar({
         placa: placa.toUpperCase().trim(),
         fotoVehiculo: urlVehiculo,
         fotoTarjetaP: urlTarjeta,
+        fotoPlaca: urlPlaca,
         color: color.trim(),
         idTipoVehiculo: tipoSeleccionado!,
       });
@@ -223,6 +228,35 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
           {errores.fotoTarjeta && (
             <Text style={[styles.error, { color: colores.error }]}>
               {errores.fotoTarjeta}
+            </Text>
+          )}
+
+          <Text style={[styles.label, { color: colores.verde }]}>
+            Foto de la Placa
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.fotoBox,
+              {
+                backgroundColor: esOscuro ? colores.glassFondo : '#f4f6f4',
+                borderColor: esOscuro ? colores.borde : colores.gris,
+              },
+            ]}
+            onPress={() => seleccionarFoto('placa')}
+          >
+            {fotoPlaca ? (
+              <Image source={{ uri: fotoPlaca }} style={styles.fotoImg} />
+            ) : (
+              <Text
+                style={[styles.fotoPlaceholder, { color: colores.textoTenue }]}
+              >
+                📷 Toca para agregar
+              </Text>
+            )}
+          </TouchableOpacity>
+          {errores.fotoPlaca && (
+            <Text style={[styles.error, { color: colores.error }]}>
+              {errores.fotoPlaca}
             </Text>
           )}
 

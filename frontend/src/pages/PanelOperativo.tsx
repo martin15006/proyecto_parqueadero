@@ -40,7 +40,7 @@ export const PanelOperativo: React.FC = () => {
       setPlaca('');
       refresh();
     } catch (error: any) {
-      showToast(error.response?.data?.message || 'Error en entrada', 'error');
+      showToast(error.message || error.response?.data?.message || 'Error en entrada', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -60,7 +60,7 @@ export const PanelOperativo: React.FC = () => {
       setPlaca('');
       refresh();
     } catch (error: any) {
-      showToast(error.response?.data?.message || 'Error en salida', 'error');
+      showToast(error.message || error.response?.data?.message || 'Error en salida', 'error');
     } finally {
       setActionLoading(false);
     }

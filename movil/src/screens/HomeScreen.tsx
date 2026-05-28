@@ -13,6 +13,7 @@ import { // UI: importación de componentes nativos para una UI consistente y pe
 } from 'react-native'; // UI: runtime React Native.
 import Barcode from 'react-native-barcode-qr-generator'; // RF8: render de Code128/QR en Expo sin depender de hardware QR actual.
 import QRCode from 'react-native-qrcode-svg'; // RF8: render QR para compatibilidad futura (conmutación).
+import AvatarIniciales from '../components/AvatarIniciales';
 import { useAuth } from '../context/AuthContext'; // RF7: fuente de sesión y perfil del aprendiz.
 import { apiRequest } from '../services/api'; // RF16/RF25: cliente HTTP tipado con auth y manejo de sesión inválida.
 
@@ -260,9 +261,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
           </TouchableOpacity>
 
           <View style={styles.headerRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initiales}</Text>
-            </View>
+            <AvatarIniciales
+              nombre={usuario.nombreCompleto}
+              fotoUrl={usuario.fotoPersona}
+              size={56}
+            />
 
             <View style={styles.headerTextBlock}>
               <Text style={styles.bienvenida}>BIENVENIDO</Text>

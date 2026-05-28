@@ -4,6 +4,7 @@ import { CreateVehiculoDto, TipoVehiculo, VehiculoUsuario } from '../types/vehic
 export interface ActualizarVehiculoDto {
   fotoVehiculo?: string;
   fotoTarjetaP?: string;
+  fotoPlaca?: string;
   color?: string;
   idTipoVehiculo?: number;
 }

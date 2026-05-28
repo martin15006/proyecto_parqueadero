@@ -156,6 +156,29 @@ export default function DetalleVehiculoScreen({ navigation, route }: any) {
             />
           </TouchableOpacity>
 
+          {/* Foto de la placa */}
+          <Text style={[styles.seccion, { color: colores.textoTenue, marginTop: espacios.medio }]}>
+            FOTO DE LA PLACA
+          </Text>
+          {(vehiculo.fotoPlaca && vehiculo.fotoPlaca.trim() !== '') ? (
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => setFotoAmpliada(vehiculo.fotoPlaca!)}
+            >
+              <Image
+                source={{ uri: vehiculo.fotoPlaca }}
+                style={[styles.foto, { borderColor: colores.borde }]}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.fotoPlaceholder, { borderColor: colores.borde, backgroundColor: esOscuro ? colores.glassFondo : '#f1f5f9' }]}>
+              <Text style={{ color: colores.textoTenue, fontSize: fonts.pequeno }}>
+                Foto no disponible
+              </Text>
+            </View>
+          )}
+
           <Text style={[styles.tip, { color: colores.textoTenue }]}>
             💡 Toca las fotos para verlas en grande
           </Text>
@@ -230,6 +253,10 @@ const styles = StyleSheet.create({
   },
   foto: {
     width: '100%', height: 220, borderRadius: 16, borderWidth: 1,
+  },
+  fotoPlaceholder: {
+    width: '100%', height: 100, borderRadius: 16, borderWidth: 1,
+    borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center',
   },
   tip: {
     fontSize: fonts.pequeno, textAlign: 'center', marginTop: espacios.normal,

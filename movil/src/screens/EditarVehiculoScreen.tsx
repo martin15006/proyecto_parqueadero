@@ -25,6 +25,7 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
   const [tipoSeleccionado, setTipoSeleccionado] = useState<number | null>(null);
   const [fotoVehiculoLocal, setFotoVehiculoLocal] = useState<string | null>(null);
   const [fotoTarjetaLocal, setFotoTarjetaLocal] = useState<string | null>(null);
+  const [fotoPlacaLocal, setFotoPlacaLocal] = useState<string | null>(null);
   const [errores, setErrores] = useState<any>({});
   const [cargandoInicial, setCargandoInicial] = useState(true);
   const [cargando, setCargando] = useState(false);
@@ -53,7 +54,7 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
     }
   };
 
-  const seleccionarFoto = (cual: 'vehiculo' | 'tarjeta') => {
+  const seleccionarFoto = (cual: 'vehiculo' | 'tarjeta' | 'placa') => {
     Alert.alert('Foto', '¿De dónde tomar la foto?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Cámara', onPress: () => abrir(cual, 'camara') },
@@ -61,7 +62,7 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
     ]);
   };
 
-  const abrir = async (cual: 'vehiculo' | 'tarjeta', origen: 'camara' | 'galeria') => {
+  const abrir = async (cual: 'vehiculo' | 'tarjeta' | 'placa', origen: 'camara' | 'galeria') => {
     const permiso =
       origen === 'camara'
         ? await ImagePicker.requestCameraPermissionsAsync()
@@ -80,7 +81,8 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
         });
     if (!result.canceled && result.assets.length > 0) {
       if (cual === 'vehiculo') setFotoVehiculoLocal(result.assets[0].uri);
-      else setFotoTarjetaLocal(result.assets[0].uri);
+      else if (cual === 'tarjeta') setFotoTarjetaLocal(result.assets[0].uri);
+      else setFotoPlacaLocal(result.assets[0].uri);
     }
   };
 
@@ -105,6 +107,10 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
       if (fotoTarjetaLocal) {
         setMensajeCargando('Subiendo foto de tarjeta...');
         datos.fotoTarjetaP = await subirImagen(fotoTarjetaLocal);
+      }
+      if (fotoPlacaLocal) {
+        setMensajeCargando('Subiendo foto de placa...');
+        datos.fotoPlaca = await subirImagen(fotoPlacaLocal);
       }
       if (color !== vehiculo.color) datos.color = color.trim();
       if (tipoSeleccionado !== vehiculo.idTipoVehiculo) datos.idTipoVehiculo = tipoSeleccionado;
@@ -207,6 +213,28 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
             />
             <View style={[styles.cambiarOverlay, { backgroundColor: colores.verde }]}>
               <Text style={styles.cambiarTexto}>📷 Cambiar</Text>
+            </View>
+          </TouchableOpacity>
+
+          <Text style={[styles.label, { color: colores.verde }]}>Foto de la Placa</Text>
+          <TouchableOpacity
+            style={[styles.fotoBox, { backgroundColor: esOscuro ? colores.glassFondo : '#f4f6f4', borderColor: esOscuro ? colores.borde : colores.gris }]}
+            onPress={() => seleccionarFoto('placa')}
+          >
+            {(fotoPlacaLocal || (vehiculo.fotoPlaca && vehiculo.fotoPlaca.trim() !== '')) ? (
+              <Image
+                source={{ uri: fotoPlacaLocal || vehiculo.fotoPlaca }}
+                style={styles.fotoImg}
+              />
+            ) : (
+              <Text style={{ color: colores.textoTenue, fontSize: fonts.pequeno }}>
+                📷 Toca para agregar foto de placa
+              </Text>
+            )}
+            <View style={[styles.cambiarOverlay, { backgroundColor: colores.verde }]}>
+              <Text style={styles.cambiarTexto}>
+                📷 { (fotoPlacaLocal || (vehiculo.fotoPlaca && vehiculo.fotoPlaca.trim() !== '')) ? 'Cambiar' : 'Agregar' }
+              </Text>
             </View>
           </TouchableOpacity>
 

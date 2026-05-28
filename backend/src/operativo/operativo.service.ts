@@ -69,15 +69,21 @@ export class OperativoService {
       });
     }
 
-    const resultado = await this.usuarioService.buscarPorQR(token); // RF31: identifica al aprendiz a partir del token opaco.
+    // RF31/RF33: Identificación unificada (Token/Documento/Placa).
+    const resultado = await this.usuarioService.buscarIdentidadUnificada(token); 
     const usuario = resultado.usuario; // RF31: perfil del aprendiz (sin contraseña).
-    const vehiculos = resultado.vehiculos || []; // RF31: flota asociada al aprendiz.
+    let vehiculos = resultado.vehiculos || []; // RF31: flota asociada al aprendiz.
 
     if (vehiculos.length === 0) {
       throw new BadRequestException({
         message: 'El usuario no tiene vehículos registrados.',
         errorCode: 'USUARIO_SIN_VEHICULOS',
       });
+    }
+
+    // Si se detectó una placa específica, filtramos la lista para que actúe en modo AUTO para ese vehículo.
+    if (resultado.placaDetectada) {
+      vehiculos = vehiculos.filter(v => v.placa === resultado.placaDetectada);
     }
 
     const listaVehiculos = vehiculos.map((v: Vehiculo) => ({
@@ -95,22 +101,63 @@ export class OperativoService {
       }
 
       const placa = vehiculos[0].placa; // RF31: único vehículo => ingreso directo.
-      const ingreso = await this.registrarEntrada(placa, operador); // RF31/RF39: registra ingreso y aplica bloqueos DESHABILITADO/LLENO.
+      
+      // CAMBIO: Determinar si es entrada o salida automáticamente
+      // Buscamos si el vehículo tiene un movimiento activo (ADENTRO o TRANSITO)
+      const registro = await this.movimientoRepository.manager.findOne(RegistroVehiculo, {
+        where: { idVehiculo: placa, idUsuario: usuario.documento }
+      });
+
+      const movimientoActivo = registro ? await this.movimientoRepository.findOne({
+        where: { 
+          idRegistroVehiculo: registro.idRegistroV, 
+          estado: In([EstadoMovimiento.ADENTRO, EstadoMovimiento.TRANSITO]) 
+        }
+      }) : null;
+
+      let resultadoOp;
+      if (movimientoActivo) {
+        resultadoOp = await this.registrarSalida(placa, operador);
+      } else {
+        resultadoOp = await this.registrarEntrada(placa, operador);
+      }
 
       return {
-        ...ingreso, // RF33/RF35: reutiliza payload estándar (bahía asignada, mensaje, etc.).
+        ...resultadoOp, // RF33/RF35: reutiliza payload estándar (bahía asignada, mensaje, etc.).
         modo: 'AUTO', // RF31: indica al frontend que no requiere selección adicional.
-        aprendiz: { nombreCompleto: usuario.nombreCompleto }, // RF33: feedback visual inmediato (sin PII adicional).
-        vehiculo: listaVehiculos[0], // RF31: confirma qué vehículo se procesó.
+        aprendiz: { 
+          nombreCompleto: usuario.nombreCompleto,
+          documento: usuario.documento,
+          fotoPersona: usuario.fotoPersona
+        },
+        vehiculo: {
+          placa: vehiculos[0].placa,
+          tipoVehiculo: vehiculos[0].tipoVehiculo?.tipoVehiculo ?? 'N/D',
+          color: vehiculos[0].color,
+          fotoVehiculo: vehiculos[0].fotoVehiculo,
+          fotoTarjetaP: vehiculos[0].fotoTarjetaP,
+          fotoPlaca: vehiculos[0].fotoPlaca,
+        },
       };
     }
 
     return {
       ok: true,
       modo: 'SELECCION', // RF31: múltiples vehículos => selección manual obligatoria.
-      aprendiz: { nombreCompleto: usuario.nombreCompleto }, // RF33: feedback visual para el vigilante.
+      aprendiz: { 
+        nombreCompleto: usuario.nombreCompleto,
+        documento: usuario.documento,
+        fotoPersona: usuario.fotoPersona
+      },
       codigo: token, // RF31: se devuelve para reenviar en la confirmación (sin mantener estado server-side).
-      vehiculos: listaVehiculos, // RF31: lista para modal de selección.
+      vehiculos: vehiculos.map((v: Vehiculo) => ({
+        placa: v.placa,
+        tipoVehiculo: v.tipoVehiculo?.tipoVehiculo ?? 'N/D',
+        color: v.color,
+        fotoVehiculo: v.fotoVehiculo,
+        fotoTarjetaP: v.fotoTarjetaP,
+        fotoPlaca: v.fotoPlaca,
+      })),
     };
   }
 
@@ -129,23 +176,50 @@ export class OperativoService {
     const placaSeleccionada = String(dto.placa ?? '').trim().toUpperCase(); // RF31: normalización de placa para comparación y registro.
 
     const resultado = await this.usuarioService.buscarPorQR(codigo); // RF31: revalidación del aprendiz.
+    const usuario = resultado.usuario;
     const vehiculos = resultado.vehiculos || []; // RF31: flota del usuario.
 
-    const placaPertenece = vehiculos.some((v: Vehiculo) => v.placa === placaSeleccionada); // RF31: evita ingreso de placa no asociada.
-    if (!placaPertenece) {
+    const vehiculoSeleccionado = vehiculos.find((v: Vehiculo) => v.placa === placaSeleccionada);
+    if (!vehiculoSeleccionado) {
       throw new BadRequestException({
         message: 'El vehículo seleccionado no pertenece al usuario identificado por el código.',
         errorCode: 'VEHICULO_NO_ASOCIADO',
       });
     }
 
-    const ingreso = await this.registrarEntrada(placaSeleccionada, operador); // RF31/RF39: aplica bloqueos y registra entrada real.
+    // CAMBIO: Determinar si es entrada o salida automáticamente
+    const movimientoActivo = await this.movimientoRepository.findOne({
+      where: {
+        registroVehiculo: {
+          idVehiculo: placaSeleccionada,
+          idUsuario: usuario.documento
+        },
+        estado: In([EstadoMovimiento.ADENTRO, EstadoMovimiento.TRANSITO])
+      },
+      relations: ['registroVehiculo']
+    });
+
+    let resultadoOp;
+    if (movimientoActivo) {
+      resultadoOp = await this.registrarSalida(placaSeleccionada, operador);
+    } else {
+      resultadoOp = await this.registrarEntrada(placaSeleccionada, operador);
+    }
 
     return {
-      ...ingreso, // RF33: mensaje y bahía asignada.
+      ...resultadoOp, // RF33: mensaje y bahía asignada.
       modo: 'CONFIRMADO', // RF31: confirma al frontend que el ingreso fue ejecutado tras selección.
-      aprendiz: { nombreCompleto: resultado.usuario.nombreCompleto }, // RF33: feedback visual.
-      vehiculo: { placa: placaSeleccionada }, // RF31: placa confirmada.
+      aprendiz: { 
+        nombreCompleto: usuario.nombreCompleto,
+        documento: usuario.documento,
+        fotoPersona: usuario.fotoPersona
+      },
+      vehiculo: { 
+        placa: placaSeleccionada,
+        fotoVehiculo: vehiculoSeleccionado.fotoVehiculo,
+        fotoTarjetaP: vehiculoSeleccionado.fotoTarjetaP,
+        fotoPlaca: vehiculoSeleccionado.fotoPlaca,
+      },
     };
   }
 
@@ -297,11 +371,31 @@ export class OperativoService {
       // 4. Auditoría, Sockets y Sincronización
       await this.ejecutarPostIngreso(guardado, placa, bahia.nombreBahia, operador);
 
+      // Cargamos datos para el modal profesional del frontend
+      const usuario = await this.usuarioService.findOneByDocumento(registro.idUsuario);
+
       return {
         ok: true,
         mensaje: 'Ingreso procesado exitosamente',
-        movimiento: guardado,
+        movimiento: {
+          idMovimiento: guardado.idMovimiento,
+          horaIngreso: guardado.horaIngreso,
+          estado: guardado.estado,
+        },
         bahia: bahia.nombreBahia,
+        aprendiz: {
+          nombreCompleto: usuario?.nombreCompleto || 'USUARIO DESCONOCIDO',
+          documento: usuario?.documento || registro.idUsuario,
+          fotoPersona: usuario?.fotoPersona
+        },
+        vehiculo: {
+          placa: placa,
+          tipoVehiculo: registro.vehiculo?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
+          color: registro.vehiculo?.color,
+          fotoVehiculo: registro.vehiculo?.fotoVehiculo,
+          fotoTarjetaP: registro.vehiculo?.fotoTarjetaP,
+          fotoPlaca: registro.vehiculo?.fotoPlaca,
+        },
       };
     });
   }
@@ -380,11 +474,31 @@ export class OperativoService {
       // 5. Ejecutar procesos post-ingreso (Auditoría, Sockets, etc.)
       await this.ejecutarPostIngreso(movimientoGuardado, placaARegistrar, bahia.nombreBahia, operador);
 
+      // Cargamos datos para el modal profesional del frontend
+      const usuario = await this.usuarioService.findOneByDocumento(registro.idUsuario);
+
       return {
         ok: true,
         mensaje: 'Ingreso manual por contingencia registrado correctamente',
-        idMovimiento: movimientoGuardado.idMovimiento,
+        movimiento: {
+          idMovimiento: movimientoGuardado.idMovimiento,
+          horaIngreso: movimientoGuardado.horaIngreso,
+          estado: movimientoGuardado.estado,
+        },
         bahia: bahia.nombreBahia,
+        aprendiz: {
+          nombreCompleto: usuario?.nombreCompleto || 'USUARIO DESCONOCIDO',
+          documento: usuario?.documento || registro.idUsuario,
+          fotoPersona: usuario?.fotoPersona
+        },
+        vehiculo: {
+          placa: placaARegistrar,
+          tipoVehiculo: registro.vehiculo?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
+          color: registro.vehiculo?.color,
+          fotoVehiculo: registro.vehiculo?.fotoVehiculo,
+          fotoTarjetaP: registro.vehiculo?.fotoTarjetaP,
+          fotoPlaca: registro.vehiculo?.fotoPlaca,
+        },
       };
     });
   }
@@ -426,10 +540,32 @@ export class OperativoService {
       // 4. Auditoría, Sockets y Sincronización
       await this.ejecutarPostSalida(movimientoActivo, placa, operador);
 
+      // Cargamos datos para el modal profesional del frontend
+      const usuario = await this.usuarioService.findOneByDocumento(registro.idUsuario);
+
       return {
         ok: true,
         mensaje: 'Salida procesada correctamente',
-        movimiento: movimientoActivo,
+        movimiento: {
+          idMovimiento: movimientoActivo.idMovimiento,
+          horaIngreso: movimientoActivo.horaIngreso,
+          horaSalida: movimientoActivo.horaSalida,
+          estado: movimientoActivo.estado,
+        },
+        bahia: bahia?.nombreBahia,
+        aprendiz: {
+          nombreCompleto: usuario?.nombreCompleto || 'USUARIO DESCONOCIDO',
+          documento: usuario?.documento || registro.idUsuario,
+          fotoPersona: usuario?.fotoPersona
+        },
+        vehiculo: {
+          placa: placa,
+          tipoVehiculo: registro.vehiculo?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
+          color: registro.vehiculo?.color,
+          fotoVehiculo: registro.vehiculo?.fotoVehiculo,
+          fotoTarjetaP: registro.vehiculo?.fotoTarjetaP,
+          fotoPlaca: registro.vehiculo?.fotoPlaca,
+        },
       };
     });
   }

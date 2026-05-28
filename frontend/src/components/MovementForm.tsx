@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'; // UI: hooks para estado, refs y efectos (operación en tiempo real).
-import { AlertCircle, CheckCircle2, FileText, ScanLine, XCircle } from 'lucide-react'; // UI: iconos con alto contraste para feedback a distancia (WCAG).
+import { AlertCircle, Car, CheckCircle2, FileText, Hash, ScanLine, ShieldAlert, XCircle } from 'lucide-react'; // UI: iconos con alto contraste para feedback a distancia (WCAG).
 import { operativoService } from '../services/operativo.service'; // RF10/RF14: integración real con backend operativo (entrada/salida/contingencia).
 import { socketService } from '../services/socket.service';
 
@@ -17,7 +17,23 @@ interface OperativoResponse {
   ok: boolean; // RF33: indica éxito de la operación (feedback verde/rojo).
   mensaje: string; // RF33: mensaje semántico para mostrar al vigilante.
   bahia?: string; // RF33: bahía asignada cuando hay ingreso.
-  movimiento?: unknown; // RF32: el backend persiste el movimiento y lo retorna opcionalmente.
+  movimiento?: {
+    horaIngreso?: string;
+    horaSalida?: string;
+  }; // RF32: el backend persiste el movimiento y lo retorna opcionalmente.
+  aprendiz?: {
+    nombreCompleto: string;
+    documento: string;
+    fotoPersona: string;
+  };
+  vehiculo?: {
+    placa: string;
+    tipoVehiculo?: string;
+    color?: string;
+    fotoVehiculo: string;
+    fotoTarjetaP: string;
+    fotoPlaca: string;
+  };
 }
 
 type TurnoIngresoRow = {
@@ -34,14 +50,16 @@ type VehiculoSeleccionable = {
 
 type EscaneoCodigoAutoResponse = OperativoResponse & {
   modo: 'AUTO'; // RF31: ingreso automático (un solo vehículo).
-  aprendiz: { nombreCompleto: string }; // RF33: feedback visual (nombre del usuario).
-  vehiculo: VehiculoSeleccionable; // RF31: vehículo procesado.
 };
 
 type EscaneoCodigoSeleccionResponse = {
   ok: boolean; // RF31: operación de escaneo exitosa, pero requiere selección.
   modo: 'SELECCION'; // RF31: múltiples vehículos => modal de selección obligatorio.
-  aprendiz: { nombreCompleto: string }; // RF33: feedback visual.
+  aprendiz: { 
+    nombreCompleto: string;
+    documento: string;
+    fotoPersona: string;
+  }; // RF33: feedback visual.
   codigo: string; // RF31: se reenvía en la confirmación sin mantener estado server-side.
   vehiculos: VehiculoSeleccionable[]; // RF31: lista para elegir.
 };
@@ -61,6 +79,7 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
   const [codigoPendiente, setCodigoPendiente] = useState<string>(''); // RF31: token escaneado a reenviar en confirmación secundaria.
   const [aprendizPendiente, setAprendizPendiente] = useState<string>(''); // RF31/RF33: nombre visible del aprendiz para confirmación humana.
   const [feedbackOverlayOpen, setFeedbackOverlayOpen] = useState<boolean>(false); // RF33: overlay masivo para lectura a distancia.
+  const [lastResponse, setLastResponse] = useState<OperativoResponse | null>(null);
   const [turnoIngresos, setTurnoIngresos] = useState<TurnoIngresoRow[]>([]);
   const [turnoLoading, setTurnoLoading] = useState<boolean>(true);
 
@@ -181,30 +200,38 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
     window.addEventListener('keydown', handleGlobalKeys); // RF33: registra listener global de teclado.
 
     let timeout: ReturnType<typeof setTimeout> | undefined; // UX: temporizador para cerrar overlays automáticamente.
-    if (feedback.type === 'success') { // RF33: éxito se puede ocultar automático tras confirmación visual.
+    if (feedback.type === 'success' && !lastResponse?.aprendiz) { // RF33: éxito simple se oculta automático.
       timeout = setTimeout(() => { // UX: auto-cierre para operación continua.
-        setFeedback({ type: null, message: '' }); // RF33: limpia banner.
-        setFeedbackOverlayOpen(false); // RF33: limpia overlay masivo.
-      }, 4000); // UX: 4s visible para lectura a distancia sin bloquear el flujo.
-    } // RF33: fin éxito.
+        closeFeedback();
+      }, 4000); 
+    } else if (feedback.type === 'success' && lastResponse?.aprendiz) {
+      // Para el modal profesional, damos más tiempo (10 segundos) o hasta que cierren manualmente.
+      timeout = setTimeout(() => {
+        closeFeedback();
+      }, 10000);
+    }
 
     return () => { // UX: limpieza de listeners al desmontar.
       window.removeEventListener('focus', handleWindowFocus); // UX: cleanup.
       window.removeEventListener('keydown', handleGlobalKeys); // UX: cleanup.
       if (timeout) clearTimeout(timeout); // UX: cleanup del temporizador.
     }; // UX: fin cleanup.
-  }, [feedback.type, showContingencia, multiVehiculos, handleAction]); // RF33/RF34: depende del estado actual del form.
+  }, [feedback.type, lastResponse, showContingencia, multiVehiculos, handleAction]); // RF33/RF34: depende del estado actual del form.
 
   const clearState = () => {
     setInputValue(''); // RF33: prepara el input para el siguiente escaneo.
     setMotivo(''); // RF34: limpia motivo (contingencia).
     setShowContingencia(false); // RF34: vuelve al flujo principal por defecto.
-    setFeedback({ type: null, message: '' }); // RF33: limpia feedback.
-    setFeedbackOverlayOpen(false); // RF33: cierra overlay masivo.
     setMultiVehiculos(null); // RF31: cierra el modal de selección si estaba abierto.
     setCodigoPendiente(''); // RF31: limpia token pendiente para evitar confirmaciones accidentales.
     setAprendizPendiente(''); // RF31: limpia nombre mostrado en la UI.
     setTimeout(() => inputRef.current?.focus(), 50); // RF33: re-enfoca el lector tras limpiar estado.
+  };
+
+  const closeFeedback = () => {
+    setFeedback({ type: null, message: '' }); // RF33: limpia feedback.
+    setFeedbackOverlayOpen(false); // RF33: cierra overlay masivo.
+    setLastResponse(null); // Limpia la respuesta para ocultar el modal.
   };
 
   /**
@@ -233,24 +260,30 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
           const resEntrada: OperativoResponse = await operativoService.registrarEntrada(upper); // RF10: registra entrada por placa (normalizada).
           setFeedback({ 
             type: 'success', 
-            message: `¡INGRESO AUTORIZADO! Bahía Asignada: ${resEntrada.bahia}` 
+            message: resEntrada.mensaje 
           });
+          setLastResponse(resEntrada);
           setFeedbackOverlayOpen(true); // RF33: muestra overlay verde para confirmación a distancia.
           onSuccess(`Ingreso: ${targetValue} -> ${resEntrada.bahia}`);
           loadTurnoIngresos();
-          clearState();
+          setInputValue('');
+          setMotivo('');
+          setShowContingencia(false);
           break;
 
         case 'salida':
-          await operativoService.registrarSalida(upper); // RF11: registra salida por placa (normalizada).
+          const resSalida: OperativoResponse = await operativoService.registrarSalida(upper); // RF11: registra salida por placa (normalizada).
           setFeedback({ 
             type: 'success', 
-            message: `¡SALIDA REGISTRADA! Vehículo ${targetValue} retirado.` 
+            message: resSalida.mensaje 
           });
+          setLastResponse(resSalida);
           setFeedbackOverlayOpen(true); // RF33: muestra overlay verde para confirmación.
           onSuccess(`Salida: ${targetValue}`);
           loadTurnoIngresos();
-          clearState();
+          setInputValue('');
+          setMotivo('');
+          setShowContingencia(false);
           break;
 
         case 'manual':
@@ -260,61 +293,47 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
           const resManual: OperativoResponse = await operativoService.registrarIngresoManual(identificacionLimpia, motivo); // RF34: registro manual con motivo.
           setFeedback({ 
             type: 'success', 
-            message: `¡CONTINGENCIA REGISTRADA! Bahía: ${resManual.bahia}` 
+            message: resManual.mensaje 
           });
+          setLastResponse(resManual);
           setFeedbackOverlayOpen(true); // RF33: overlay para confirmación.
           onSuccess(`Manual: ${targetValue} -> ${resManual.bahia}`);
           loadTurnoIngresos();
-          clearState();
+          setInputValue('');
+          setMotivo('');
+          setShowContingencia(false);
           break;
 
-        case 'codigo': {
-          if (isPlaca) {
-            const resEntrada: OperativoResponse = await operativoService.registrarEntrada(upper); // RF10/RF14: vía alternativa por placa (backend aplica bloqueos DESHABILITADO/LLENO).
-            setFeedback({
-              type: 'success',
-              message: `¡INGRESO AUTORIZADO! Bahía Asignada: ${resEntrada.bahia}`,
-            }); // RF33: feedback verde inmediato.
-            setFeedbackOverlayOpen(true); // RF33: overlay masivo.
-            onSuccess(`Ingreso: ${targetValue} -> ${resEntrada.bahia}`); // RF33: notificación superior.
+        case 'codigo':
+          const resCodigo: EscaneoCodigoResponse = await operativoService.escanearCodigo(upper); // RF33: identifica aprendiz por token opaco.
+
+          if (resCodigo.modo === 'AUTO') { // RF31: un solo vehículo => ingreso/salida directo.
+            setFeedback({ 
+              type: 'success', 
+              message: resCodigo.mensaje
+            });
+            setLastResponse(resCodigo);
+            setFeedbackOverlayOpen(true); // RF33: overlay verde masivo.
+            onSuccess(resCodigo.mensaje);
             loadTurnoIngresos();
-            clearState(); // RF33: listo para siguiente lectura.
-            break;
+            setInputValue('');
+            setMotivo('');
+            setShowContingencia(false);
+          } else { // RF31: múltiples vehículos => abre modal de selección.
+            setMultiVehiculos(resCodigo.vehiculos); // RF31: inyecta lista de opciones.
+            setCodigoPendiente(resCodigo.codigo); // RF31: guarda token para reenvío.
+            setAprendizPendiente(resCodigo.aprendiz?.nombreCompleto || 'USUARIO DESCONOCIDO'); // RF33: muestra nombre del dueño.
+            setLastResponse(null);
+            setFeedback({ type: null, message: '' }); // Limpia carga.
           }
-
-          const resScan: EscaneoCodigoResponse = await operativoService.escanearCodigo(targetValue); // RF31/RF33: flujo unificado barras/QR (token opaco).
-
-          if (resScan.modo === 'AUTO') {
-            setFeedback({
-              type: 'success',
-              message: `ACCESO CONCEDIDO: ${resScan.aprendiz.nombreCompleto} — ${resScan.vehiculo.placa} → ${resScan.bahia}`,
-            }); // RF33: feedback verde inmediato.
-            setFeedbackOverlayOpen(true); // RF33: overlay masivo.
-            onSuccess(`Ingreso: ${resScan.vehiculo.placa} -> ${resScan.bahia}`); // RF33: notificación superior.
-            loadTurnoIngresos();
-            clearState(); // RF33: limpia para siguiente lectura del lector.
-            break;
-          }
-
-          setMultiVehiculos(resScan.vehiculos); // RF31: abre modal con lista de vehículos.
-          setCodigoPendiente(resScan.codigo); // RF31: guarda el token para confirmación secundaria.
-          setAprendizPendiente(resScan.aprendiz.nombreCompleto); // RF33: muestra nombre del aprendiz en el modal.
-          setFeedback({
-            type: 'success',
-            message: `SE REQUIERE CONFIRMACIÓN: ${resScan.aprendiz.nombreCompleto} TIENE ${resScan.vehiculos.length} VEHÍCULOS`,
-          }); // RF31: informa que el flujo se pausa hasta selección.
-          setFeedbackOverlayOpen(false); // RF31: en selección, el overlay masivo se reemplaza por el modal dedicado.
           break;
-        }
       }
     } catch (error: any) {
-      const backendMessage = error?.response?.data?.message; // RF33/RF14/RF39: backend envía mensajes semánticos y códigos.
-      const backendErrorCode = error?.response?.data?.errorCode; // RF33/RF14/RF39: se muestra el errorCode exacto si existe.
-      const errorMsg = backendMessage || error.message || 'ERROR EN LA OPERACIÓN'; // RF33: fallback estable.
-      const printable = backendErrorCode ? `${backendErrorCode}: ${errorMsg}` : errorMsg; // RF33: muestra errorCode para diagnóstico operativo.
-      setFeedback({ type: 'error', message: printable.toUpperCase() }); // RF33: feedback rojo inmediato.
-      setFeedbackOverlayOpen(true); // RF33: overlay masivo rojo para lectura a distancia.
-      onError(printable); // RF33: notificación superior.
+      const msg = error.message || error.response?.data?.message || 'ERROR DE COMUNICACIÓN CON EL SERVIDOR';
+      setFeedback({ type: 'error', message: msg.toUpperCase() }); // RF39: feedback de error institucional.
+      setFeedbackOverlayOpen(true); // RF33: overlay rojo.
+      setLastResponse(null);
+      onError(msg);
     }
   }
 
@@ -324,29 +343,32 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
     }
   };
 
-  const confirmarVehiculo = async (placa: string) => {
-    setFeedback({ type: 'loading', message: 'CONFIRMANDO VEHÍCULO...' }); // RF31/RF33: mantiene feedback mientras se confirma el multivehículo.
+  /**
+   * Procesa la confirmación manual de un vehículo (Aprendiz multi-vehículo).
+   */
+  async function handleConfirmarMultivehiculo(placa: string) {
+    setFeedback({ type: 'loading', message: 'CONFIRMANDO SELECCIÓN...' });
     try {
-      const res: OperativoResponse & { bahia?: string } =
-        await operativoService.confirmarIngresoMultivehiculo(codigoPendiente, placa); // RF31: confirmación secundaria.
-      setFeedback({
-        type: 'success',
-        message: `ACCESO CONCEDIDO: ${aprendizPendiente} — ${placa} → ${res.bahia}`,
-      }); // RF33: feedback verde tras confirmación.
-      setFeedbackOverlayOpen(true); // RF33: overlay masivo tras confirmación.
-      onSuccess(`Ingreso: ${placa} -> ${res.bahia}`); // RF33: notificación superior.
+      const res: OperativoResponse = await operativoService.confirmarIngresoMultivehiculo(codigoPendiente, placa); // RF31: confirma vehículo específico.
+      setFeedback({ 
+        type: 'success', 
+        message: res.mensaje 
+      });
+      setLastResponse(res);
+      setFeedbackOverlayOpen(true);
+      onSuccess(res.mensaje);
       loadTurnoIngresos();
-      clearState(); // RF33: listo para siguiente lectura.
+      setInputValue('');
+      setMotivo('');
+      setShowContingencia(false);
     } catch (error: any) {
-      const backendMessage = error?.response?.data?.message;
-      const backendErrorCode = error?.response?.data?.errorCode;
-      const errorMsg = backendMessage || error.message || 'ERROR EN LA CONFIRMACIÓN';
-      const printable = backendErrorCode ? `${backendErrorCode}: ${errorMsg}` : errorMsg;
-      setFeedback({ type: 'error', message: printable.toUpperCase() }); // RF33: feedback rojo si falla (LLENO/DESHABILITADO, etc.).
-      setFeedbackOverlayOpen(true); // RF33: overlay masivo de error.
-      onError(printable);
+      const msg = error.message || error.response?.data?.message || 'ERROR EN CONFIRMACIÓN';
+      setFeedback({ type: 'error', message: msg.toUpperCase() });
+      setFeedbackOverlayOpen(true);
+      setLastResponse(null);
+      onError(msg);
     }
-  };
+  }
 
   const handleEmergencia = async () => {
     if (!window.confirm('¿CONFIRMA SALIDA DE EMERGENCIA GLOBAL?')) return;
@@ -371,33 +393,41 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
     return null; // UX: sin overlay si no hay estado.
   }, [feedback.type]); // UX: recalcula solo si cambia el tipo.
 
+  // RF33: El modal profesional se muestra cuando hay una respuesta exitosa.
+  const showProfessionalModal = Boolean(feedback.type === 'success' && lastResponse);
+
   return (
     <div className="relative"> {/* UI: wrapper para superponer overlays sin romper el layout del dashboard. */}
-      {feedbackOverlayOpen && overlayTone && feedback.type && ( // RF33: overlay masivo para lectura a 3m cuando hay éxito/error/cargando.
-        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/60 p-4 pt-16"> {/* RF33: overlay centrado con fondo oscuro semitransparente (alto contraste). */}
-          <div className={`w-full max-w-3xl rounded-3xl ${overlayTone.bg} text-white shadow-2xl border border-white/10`}> {/* WCAG: alto contraste y tamaño grande. */}
-            <div className="p-6 sm:p-10 flex items-start gap-6"> {/* UX: padding generoso para lectura rápida. */}
-              <div className="flex-shrink-0"> {/* UX: icono grande sin empujar el texto. */}
-                <overlayTone.icon className="w-16 h-16 sm:w-20 sm:h-20" /> {/* RF33: icono gigante para confirmación visual inmediata. */}
-              </div> {/* UX: fin icono. */}
-              <div className="flex-1"> {/* UX: bloque de texto principal. */}
-                <p className="text-[11px] sm:text-[12px] font-black uppercase tracking-[0.28em] opacity-90">{overlayTone.label}</p> {/* RF33: encabezado institucional. */}
-                <p className="mt-3 text-2xl sm:text-3xl font-black leading-tight break-words">{feedback.message}</p> {/* RF33: mensaje en tamaño “a distancia”. */}
-                <p className="mt-4 text-sm sm:text-base font-bold opacity-90">F2: Enfocar lector • ESC: Limpiar</p> {/* RF33: atajos operativos mouse-free. */}
-              </div> {/* UX: fin bloque texto. */}
-            </div> {/* UI: fin contenido overlay. */}
-            <div className="px-6 sm:px-10 pb-8 flex justify-end"> {/* UX: acciones alineadas al final. */}
+      {/* Overlay de Error o Carga (Simple) */}
+      {feedbackOverlayOpen && overlayTone && feedback.type && (feedback.type !== 'success') && (
+        <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/80 p-4 pt-16 backdrop-blur-md">
+          <div className={`w-full max-w-3xl rounded-3xl ${overlayTone.bg} text-white shadow-[0_0_100px_rgba(0,0,0,0.5)] border border-white/20 animate-in zoom-in duration-300`}>
+            <div className="p-8 sm:p-12 flex items-start gap-8">
+              <div className="flex-shrink-0 bg-white/20 p-4 rounded-2xl">
+                <overlayTone.icon className="w-16 h-16 sm:w-20 sm:h-20" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[12px] sm:text-[14px] font-black uppercase tracking-[0.3em] opacity-80 mb-2">{overlayTone.label}</p>
+                <p className="text-3xl sm:text-4xl font-black leading-tight break-words">{feedback.message}</p>
+                <div className="mt-6 flex items-center gap-4 text-white/60 text-xs font-bold uppercase tracking-widest">
+                  <span>F2: Enfocar</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                  <span>ESC: Limpiar</span>
+                </div>
+              </div>
+            </div>
+            <div className="px-8 sm:px-12 pb-10 flex justify-end">
               <button
                 type="button"
-                onClick={() => setFeedbackOverlayOpen(false)} // RF33: permite al operador cerrar manualmente.
-                className="rounded-xl bg-white/15 hover:bg-white/25 px-5 py-3 text-[12px] font-black uppercase tracking-widest focus:outline-none focus:ring-4 focus:ring-white/40"
+                onClick={closeFeedback}
+                className="rounded-2xl bg-white/10 hover:bg-white/20 px-8 py-4 text-sm font-black uppercase tracking-[0.2em] transition-all focus:outline-none focus:ring-4 focus:ring-white/40 active:scale-95"
               >
-                Cerrar
+                Cerrar Aviso
               </button>
-            </div> {/* UX: fin acciones overlay. */}
-          </div> {/* UI: fin card overlay. */}
-        </div> /* UI: fin overlay */
-      )} {/* RF33: fin render overlay masivo. */}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div
         className="bg-white border border-slate-200 rounded-3xl shadow-[0_18px_55px_rgba(15,23,42,0.10)] overflow-hidden"
@@ -475,7 +505,7 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
             <div className="mt-5 grid grid-cols-2 gap-4"> {/* RF10/RF11: acciones principales entrada/salida. */}
               <button
                 type="button"
-                onClick={() => handleAction('codigo')}
+                onClick={() => handleAction('entrada')}
                 disabled={feedback.type === 'loading'}
                 className="h-14 rounded-2xl bg-[#39A900] text-white font-black uppercase tracking-widest text-[12px] shadow-sm hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-[#39A900]/30 disabled:opacity-60"
               >
@@ -606,42 +636,221 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
         </div>
       </div>
 
-      {multiVehiculos && ( // RF31: modal de selección multivehículo.
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-4xl rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden">
-            <div className="p-6 sm:p-8 border-b border-slate-200 bg-[#003939] text-white">
-              <p className="text-[11px] font-black uppercase tracking-[0.28em] opacity-90">Selección Multi-Vehículo (RF31)</p>
-              <h4 className="mt-2 text-2xl sm:text-3xl font-black">{aprendizPendiente}</h4>
-              <p className="mt-2 text-sm sm:text-base font-semibold opacity-90">Selecciona el vehículo observado físicamente para confirmar el ingreso.</p>
-            </div>
-
-            <div className="p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Overlay de Selección de Vehículo (RF31) */}
+      {multiVehiculos && (
+        <div className="fixed inset-0 z-[100] bg-[#003939]/95 backdrop-blur-sm p-6 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300">
+          <div className="max-w-4xl w-full">
+            <p className="text-[#39A900] text-center text-sm font-black uppercase tracking-[0.4em] mb-4">Aprendiz identificado</p>
+            <h2 className="text-white text-center text-4xl sm:text-6xl font-black uppercase tracking-tighter mb-12">{aprendizPendiente}</h2>
+            
+            <p className="text-white/60 text-center text-[10px] font-black uppercase tracking-widest mb-6">Seleccione el vehículo para registrar el ingreso</p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {multiVehiculos.map((v) => (
                 <button
                   key={v.placa}
                   type="button"
-                  onClick={() => confirmarVehiculo(v.placa)}
+                  onClick={() => handleConfirmarMultivehiculo(v.placa)}
                   disabled={feedback.type === 'loading'}
                   className="group rounded-2xl bg-[#003939] text-white p-6 text-left shadow-sm hover:brightness-110 focus:outline-none focus:ring-4 focus:ring-[#39A900]/25 disabled:opacity-60"
                 >
-                  <p className="text-[11px] font-black uppercase tracking-[0.22em] opacity-85">{v.tipoVehiculo}</p>
-                  <p className="mt-3 text-3xl font-black tracking-tight">{v.placa}</p>
-                  <p className="mt-2 text-sm font-semibold opacity-90">Color: {v.color}</p>
-                  <div className="mt-5 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#39A900]" />
-                    <span className="text-[11px] font-black uppercase tracking-widest">Confirmar ingreso</span>
-                  </div>
+                  <p className="text-4xl font-black tracking-tighter group-hover:scale-105 transition-transform">{v.placa}</p>
+                  <p className="mt-2 text-[10px] font-black uppercase tracking-widest opacity-60">{v.tipoVehiculo} • {v.color}</p>
                 </button>
               ))}
             </div>
 
-            <div className="p-6 sm:p-8 border-t border-slate-200 flex justify-end gap-3 bg-[#F8FAFC]">
-              <button
-                type="button"
-                onClick={clearState}
-                className="h-12 px-6 rounded-xl border-2 border-slate-200 bg-white text-slate-800 font-black uppercase tracking-widest text-[12px] hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[#003939]/15"
+            <button
+              type="button"
+              onClick={clearState}
+              className="mt-12 w-full text-white/40 hover:text-white text-[10px] font-black uppercase tracking-[0.3em] transition-colors"
+            >
+              [ ESC ] Cancelar operación
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Ingreso/Salida (Panel Profesional para el Vigilante) */}
+      {showProfessionalModal && lastResponse && (
+        <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-6xl sm:rounded-[3rem] overflow-hidden shadow-[0_0_150px_rgba(0,0,0,0.9)] animate-in zoom-in duration-500 my-auto border border-white/20">
+            {/* Header de Estado Ultra-Prominente */}
+            <div className={`p-6 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 border-b-[12px] ${lastResponse.movimiento?.horaSalida ? 'bg-orange-600 border-orange-700' : 'bg-[#003939] border-[#39A900]'}`}>
+              <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
+                <div className="bg-white/20 p-5 rounded-[2rem] shadow-2xl backdrop-blur-xl border border-white/30">
+                  <CheckCircle2 size={60} className="text-white" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 mb-3">
+                    <span className={`px-8 py-3 rounded-2xl text-2xl font-black uppercase tracking-[0.5em] shadow-[0_10px_30px_rgba(0,0,0,0.3)] ${lastResponse.movimiento?.horaSalida ? 'bg-white text-orange-600' : 'bg-[#39A900] text-white'}`}>
+                      {lastResponse.movimiento?.horaSalida ? 'SALIDA' : 'INGRESO'}
+                    </span>
+                    <p className="text-white/80 text-sm font-black uppercase tracking-[0.5em] border-l-4 border-white/30 pl-4">Confirmado</p>
+                  </div>
+                  <h3 className="text-white text-6xl sm:text-8xl font-black uppercase tracking-tighter leading-none filter drop-shadow-2xl mb-2">
+                    {lastResponse.vehiculo?.placa}
+                  </h3>
+                  <p className="text-white/90 text-xl font-bold uppercase tracking-[0.2em]">{lastResponse.mensaje}</p>
+                </div>
+              </div>
+              <button 
+                onClick={closeFeedback} 
+                className="group bg-white/10 hover:bg-white/20 p-6 rounded-[2.5rem] transition-all duration-300 shadow-xl border border-white/10"
               >
-                Cancelar
+                <XCircle size={48} className="text-white/60 group-hover:text-white group-hover:scale-110 transition-transform" />
+              </button>
+            </div>
+
+            <div className="p-6 sm:p-12">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12">
+                
+                {/* Columna Izquierda: Usuario y Tiempos */}
+                <div className="lg:col-span-5 space-y-8 sm:space-y-12">
+                  
+                  {/* Perfil del Usuario */}
+                  <div className="bg-slate-50 p-8 rounded-[3rem] border-2 border-slate-100 flex items-center gap-8 shadow-inner">
+                    <div className="relative">
+                      <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-[2.5rem] overflow-hidden border-8 border-white shadow-2xl bg-white">
+                        {lastResponse.aprendiz?.fotoPersona ? (
+                          <img 
+                            src={lastResponse.aprendiz.fotoPersona} 
+                            alt={lastResponse.aprendiz?.nombreCompleto}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-slate-100 text-[#003939]/30">
+                            <span className="text-7xl font-black">
+                              {(lastResponse.aprendiz?.nombreCompleto || 'S').charAt(0)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="absolute -bottom-3 -right-3 bg-[#39A900] text-white px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl border-4 border-white">
+                        VÁLIDO
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[#39A900] text-xs font-black uppercase tracking-[0.3em] mb-2">Identidad del Usuario</p>
+                      <h4 className="text-[#003939] text-3xl sm:text-4xl font-black truncate leading-none mb-3">
+                        {lastResponse.aprendiz?.nombreCompleto || 'USUARIO DESCONOCIDO'}
+                      </h4>
+                      <div className="inline-flex bg-slate-200/50 px-4 py-2 rounded-xl">
+                        <p className="text-slate-600 font-black text-lg tracking-wider">
+                          CC {lastResponse.aprendiz?.documento || '---'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tiempos de Operación */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="bg-slate-900 p-8 rounded-[3rem] shadow-2xl flex flex-col items-center justify-center text-center">
+                      <p className="text-[#39A900] text-xs font-black uppercase tracking-[0.3em] mb-4">Hora de Registro</p>
+                      <span className="text-white text-5xl font-black tracking-tighter tabular-nums leading-none mb-2">
+                        {new Date(lastResponse.movimiento?.horaSalida || lastResponse.movimiento?.horaIngreso || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                      <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Servidor Local SENA</p>
+                    </div>
+
+                    {lastResponse.movimiento?.horaSalida && lastResponse.movimiento?.horaIngreso ? (
+                      <div className="bg-orange-50 p-8 rounded-[3rem] border-4 border-orange-100 flex flex-col items-center justify-center text-center">
+                        <p className="text-orange-600 text-xs font-black uppercase tracking-[0.3em] mb-4">Ingresó el Día</p>
+                        <span className="text-orange-950 text-4xl font-black tracking-tighter tabular-nums leading-none mb-2">
+                          {new Date(lastResponse.movimiento.horaIngreso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <p className="text-orange-600/60 text-[10px] font-bold uppercase tracking-widest">Entrada registrada</p>
+                      </div>
+                    ) : lastResponse.bahia ? (
+                      <div className="bg-[#39A900]/10 p-8 rounded-[3rem] border-4 border-[#39A900]/20 flex flex-col items-center justify-center text-center">
+                        <p className="text-[#39A900] text-xs font-black uppercase tracking-[0.3em] mb-4">Bahía Asignada</p>
+                        <span className="text-[#003939] text-6xl font-black tracking-tighter leading-none mb-2">{lastResponse.bahia}</span>
+                        <p className="text-[#39A900]/60 text-[10px] font-bold uppercase tracking-widest">Zona Autorizada</p>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Columna Derecha: Galería de Inspección */}
+                <div className="lg:col-span-7 space-y-8">
+                  <div className="flex items-center justify-between px-4">
+                    <p className="text-[#003939] text-sm font-black uppercase tracking-[0.5em] border-l-8 border-[#39A900] pl-4">
+                      Evidencia del Registro
+                    </p>
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <ShieldAlert size={18} />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Validación Requerida</span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-8">
+                    {/* Foto Principal: Vehículo */}
+                    <div className="col-span-2 relative group cursor-zoom-in">
+                      <div className="absolute top-6 left-6 z-10 bg-[#003939]/90 backdrop-blur-md text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl border border-white/20">
+                        Vehículo Registrado
+                      </div>
+                      <div className="h-80 sm:h-96 rounded-[3.5rem] overflow-hidden border-8 border-slate-100 shadow-2xl bg-slate-100">
+                        {lastResponse.vehiculo?.fotoVehiculo ? (
+                          <img src={lastResponse.vehiculo.fotoVehiculo} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Vehículo" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-300">
+                            <Car size={100} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Foto Placa */}
+                    <div className="relative group cursor-zoom-in">
+                      <div className="absolute top-5 left-5 z-10 bg-black/70 backdrop-blur-md text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg">
+                        Placa Física
+                      </div>
+                      <div className="h-56 rounded-[3rem] overflow-hidden border-6 border-slate-100 shadow-xl bg-slate-100">
+                        {lastResponse.vehiculo?.fotoPlaca ? (
+                          <img src={lastResponse.vehiculo.fotoPlaca} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Placa" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-300">
+                            <Hash size={60} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tarjeta Propiedad */}
+                    <div className="relative group cursor-zoom-in">
+                      <div className="absolute top-5 left-5 z-10 bg-black/70 backdrop-blur-md text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg">
+                        Documento Legal
+                      </div>
+                      <div className="h-56 rounded-[3rem] overflow-hidden border-6 border-slate-100 shadow-xl bg-slate-100">
+                        {lastResponse.vehiculo?.fotoTarjetaP ? (
+                          <img src={lastResponse.vehiculo.fotoTarjetaP} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Tarjeta" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-300">
+                            <FileText size={60} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-10 bg-slate-50 border-t-2 border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-8">
+              <div className="flex items-center gap-5 text-slate-500 max-w-xl">
+                <div className="bg-orange-500/10 p-3 rounded-2xl text-orange-600">
+                  <ShieldAlert size={32} />
+                </div>
+                <p className="text-xs sm:text-sm font-bold uppercase tracking-wider leading-relaxed">
+                  <span className="text-orange-600 font-black block mb-1">ATENCIÓN VIGILANTE:</span>
+                  Verifique que la placa física coincida exactamente con la digital antes de permitir el movimiento.
+                </p>
+              </div>
+              <button 
+                onClick={closeFeedback}
+                className="w-full sm:w-auto bg-[#003939] hover:bg-[#39A900] text-white px-16 py-7 rounded-[2rem] font-black uppercase tracking-[0.3em] text-lg shadow-[0_20px_50px_rgba(0,57,57,0.3)] transition-all duration-300 hover:scale-105 active:scale-95 border-b-8 border-black/20"
+              >
+                AUTORIZAR Y CERRAR
               </button>
             </div>
           </div>

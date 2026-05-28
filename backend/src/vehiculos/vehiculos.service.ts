@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Vehiculo } from './entities/vehiculo.entity';
 import { TipoVehiculo } from './entities/tipo-vehiculo.entity';
 import { RegistroVehiculo } from './entities/registro-vehiculo.entity';
@@ -39,17 +39,49 @@ export class VehiculosService {
   ) {}
 
   /**
+   * Normalización institucional de placas.
+   * RNF2: Elimina guiones y espacios para evitar duplicidad técnica.
+   */
+  private normalizarPlaca(placa: string): string {
+    return String(placa ?? '').replace(/[- ]/g, '').toUpperCase().trim();
+  }
+
+  /**
    * Registra un vehículo y lo vincula al usuario.
-   * OPTIMIZATION: Si el vehículo existe, solo crea el vínculo.
+   * REFACTOR PROFESIONAL: Implementa Upsert (Update or Insert) manejando Soft Delete.
+   * Evita errores de duplicidad restaurando registros existentes si es necesario.
    */
   async registrarVehiculo(documento: string, dto: CreateVehiculoDto): Promise<{ mensaje: string; vehiculo: Vehiculo }> {
     const tipo = await this.tipoVehiculoRepository.findOne({ where: { idTipoV: dto.idTipoVehiculo } });
     if (!tipo) throw new BadRequestException('Tipo de vehículo no válido');
 
-    const placaNormalizada = dto.placa.toUpperCase().trim();
-    let vehiculo = await this.vehiculoRepository.findOne({ where: { placa: placaNormalizada } });
+    const placaNormalizada = this.normalizarPlaca(dto.placa);
+    
+    // 1. Gestión del Vehículo (Base)
+    let vehiculo = await this.vehiculoRepository.findOne({ 
+      where: { placa: placaNormalizada },
+      withDeleted: true 
+    });
 
-    if (!vehiculo) {
+    if (vehiculo) {
+      // Si el vehículo ya existe (activo o eliminado), actualizamos sus datos y lo restauramos.
+      // Esto es más seguro y profesional que borrar/recrear, ya que mantiene la integridad referencial.
+      Object.assign(vehiculo, { 
+        ...dto, 
+        placa: placaNormalizada, 
+        deletedAt: null // Restaurar si estaba eliminado
+      });
+      vehiculo = await this.vehiculoRepository.save(vehiculo);
+
+      await this.auditoriaService.create({ 
+        accion: 'RESTAURAR_VEHICULO', 
+        entidad: 'VEHICULO', 
+        idEntidad: 0, 
+        idUsuario: documento, 
+        datosNuevos: { placa: vehiculo.placa, color: vehiculo.color, nota: 'Vehículo restaurado y actualizado' }, 
+      });
+    } else {
+      // Si no existe, creación limpia
       vehiculo = this.vehiculoRepository.create({ ...dto, placa: placaNormalizada });
       vehiculo = await this.vehiculoRepository.save(vehiculo);
 
@@ -62,22 +94,33 @@ export class VehiculosService {
       });
     }
 
+    // 2. Gestión del Vínculo (RegistroVehiculo)
     const yaRegistrado = await this.registroRepository.findOne({
       where: { idUsuario: documento, idVehiculo: placaNormalizada },
+      withDeleted: true,
     });
 
-    if (yaRegistrado) throw new ConflictException('Este vehículo ya se encuentra vinculado a tu cuenta');
+    if (yaRegistrado) {
+      if (yaRegistrado.deletedAt) {
+        // Restaurar vínculo previo
+        yaRegistrado.deletedAt = null;
+        await this.registroRepository.save(yaRegistrado);
+      } else {
+        throw new ConflictException('Este vehículo ya se encuentra vinculado a tu cuenta');
+      }
+    } else {
+      // Crear nuevo vínculo
+      const nuevoRegistro = this.registroRepository.create({ idUsuario: documento, idVehiculo: placaNormalizada });
+      const registroGuardado = await this.registroRepository.save(nuevoRegistro);
 
-    const nuevoRegistro = this.registroRepository.create({ idUsuario: documento, idVehiculo: placaNormalizada });
-    const registroGuardado = await this.registroRepository.save(nuevoRegistro);
-
-    await this.auditoriaService.create({
-      accion: 'VINCULAR_VEHICULO',
-      entidad: 'REGISTRO_VEHICULO',
-      idEntidad: registroGuardado.idRegistroV,
-      idUsuario: documento,
-      datosNuevos: { idUsuario: documento, idVehiculo: vehiculo.placa },
-    });
+      await this.auditoriaService.create({
+        accion: 'VINCULAR_VEHICULO',
+        entidad: 'REGISTRO_VEHICULO',
+        idEntidad: registroGuardado.idRegistroV,
+        idUsuario: documento,
+        datosNuevos: { idUsuario: documento, idVehiculo: vehiculo.placa },
+      });
+    }
 
     return { mensaje: 'Vehículo registrado y vinculado correctamente', vehiculo };
   }
@@ -97,6 +140,7 @@ export class VehiculosService {
       placa: reg.vehiculo.placa,
       fotoVehiculo: reg.vehiculo.fotoVehiculo,
       fotoTarjetaP: reg.vehiculo.fotoTarjetaP,
+      fotoPlaca: reg.vehiculo.fotoPlaca,
       color: reg.vehiculo.color,
       tipoVehiculo: reg.vehiculo.tipoVehiculo.tipoVehiculo,
       idTipoVehiculo: reg.vehiculo.tipoVehiculo.idTipoV,
@@ -127,7 +171,7 @@ export class VehiculosService {
   }
 
   async listarVehiculosAdmin(query: AdminListVehiculosQueryDto) {
-    const placa = query.placa?.trim().toUpperCase();
+    const placa = query.placa ? this.normalizarPlaca(query.placa) : null;
     const marca = query.marca?.trim();
     const q = query.q?.trim();
 
@@ -218,7 +262,7 @@ export class VehiculosService {
    * Detalle de vehículo.
    */
   async obtenerDetalle(documento: string, placa: string) {
-    const placaNormalizada = placa.toUpperCase();
+    const placaNormalizada = this.normalizarPlaca(placa);
 
     const registro = await this.registroRepository.findOne({
       where: { idUsuario: documento, idVehiculo: placaNormalizada },
@@ -231,6 +275,7 @@ export class VehiculosService {
       placa: registro.vehiculo.placa,
       fotoVehiculo: registro.vehiculo.fotoVehiculo,
       fotoTarjetaP: registro.vehiculo.fotoTarjetaP,
+      fotoPlaca: registro.vehiculo.fotoPlaca,
       color: registro.vehiculo.color,
       tipoVehiculo: registro.vehiculo.tipoVehiculo.tipoVehiculo,
       idTipoVehiculo: registro.vehiculo.tipoVehiculo.idTipoV,
@@ -242,7 +287,7 @@ export class VehiculosService {
    * Actualiza datos y gestiona Cloudinary.
    */
   async actualizarVehiculo(documento: string, placa: string, dto: ActualizarVehiculoDto): Promise<{ mensaje: string }> {
-    const placaNormalizada = placa.toUpperCase();
+    const placaNormalizada = this.normalizarPlaca(placa);
 
     const registro = await this.registroRepository.findOne({
       where: { idUsuario: documento, idVehiculo: placaNormalizada },
@@ -254,9 +299,11 @@ export class VehiculosService {
 
     const fotoVehiculoVieja = vehiculo.fotoVehiculo;
     const fotoTarjetaVieja = vehiculo.fotoTarjetaP;
+    const fotoPlacaVieja = vehiculo.fotoPlaca;
 
     if (dto.fotoVehiculo) vehiculo.fotoVehiculo = dto.fotoVehiculo;
     if (dto.fotoTarjetaP) vehiculo.fotoTarjetaP = dto.fotoTarjetaP;
+    if (dto.fotoPlaca) vehiculo.fotoPlaca = dto.fotoPlaca;
     if (dto.color) vehiculo.color = dto.color;
     if (dto.idTipoVehiculo) vehiculo.idTipoVehiculo = dto.idTipoVehiculo;
 
@@ -266,6 +313,7 @@ export class VehiculosService {
     const fotosABorrar: string[] = [];
     if (dto.fotoVehiculo && fotoVehiculoVieja && fotoVehiculoVieja !== dto.fotoVehiculo) fotosABorrar.push(fotoVehiculoVieja);
     if (dto.fotoTarjetaP && fotoTarjetaVieja && fotoTarjetaVieja !== dto.fotoTarjetaP) fotosABorrar.push(fotoTarjetaVieja);
+    if (dto.fotoPlaca && fotoPlacaVieja && fotoPlacaVieja !== dto.fotoPlaca) fotosABorrar.push(fotoPlacaVieja);
     
     if (fotosABorrar.length > 0) await this.cloudinaryService.borrarVariasPorUrl(fotosABorrar);
 
@@ -281,25 +329,39 @@ export class VehiculosService {
 
   /**
    * Desvincula usuario y vehículo.
-   * SECURITY: Borra físicamente el vehículo y sus fotos si queda huérfano.
+   * SECURITY: Borra lógicamente el vínculo (Soft Delete) para preservar historial.
    */
   async eliminarRegistro(documento: string, placa: string) {
-    const placaNormalizada = placa.toUpperCase();
+    const placaNormalizada = this.normalizarPlaca(placa);
 
     const registro = await this.registroRepository.findOne({
       where: { idUsuario: documento, idVehiculo: placaNormalizada },
     });
     if (!registro) throw new NotFoundException('El vínculo no existe o ya fue eliminado');
 
-    await this.registroRepository.remove(registro);
+    // SECURITY: Impedir eliminar si el vehículo está dentro
+    const estaAdentro = await this.movimientoRepository.findOne({
+      where: { 
+        idRegistroVehiculo: registro.idRegistroV, 
+        estado: In([EstadoMovimiento.ADENTRO, EstadoMovimiento.TRANSITO]) 
+      }
+    });
+
+    if (estaAdentro) {
+      throw new BadRequestException('No puedes eliminar un vehículo que se encuentra dentro del parqueadero');
+    }
+
+    await this.registroRepository.softRemove(registro);
 
     const otrosRegistros = await this.registroRepository.count({ where: { idVehiculo: placaNormalizada } });
 
     if (otrosRegistros === 0) {
       const vehiculo = await this.vehiculoRepository.findOne({ where: { placa: placaNormalizada } });
       if (vehiculo) {
-        await this.cloudinaryService.borrarVariasPorUrl([vehiculo.fotoVehiculo, vehiculo.fotoTarjetaP]);
-        await this.vehiculoRepository.remove(vehiculo);
+        // Mantenemos el vehículo en la DB pero lo marcamos como eliminado si no tiene más dueños
+        // Las fotos se quedan en Cloudinary si queremos auditoría, o se borran si es borrado físico.
+        // Por consistencia con Soft Delete del registro, usamos softRemove en vehículo también.
+        await this.vehiculoRepository.softRemove(vehiculo);
       }
     }
 
