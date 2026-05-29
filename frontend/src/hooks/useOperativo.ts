@@ -1,13 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { socketService } from '../services/socket.service';
 import { bahiasService, operativoService } from '../services/operativo.service';
-import type { Bahia, BahiaEstado, BahiaModificadaPayload, ConteoGlobalDisponiblesPayload, Movement } from '../types';
+import type {
+  BahiaSensorizada,
+  EstadoPanel,
+  BahiaModificadaPayload,
+  ConteoGlobalDisponiblesPayload,
+  Movement,
+} from '../types';
 
 interface OperativoStats {
   total: number;
   ocupados: number;
   disponibles: number;
+  /** Incluye vehículos ADENTRO + en SALIDA_PENDIENTE. */
   vehiculosActivos: number;
+  /** Vehículos en tránsito de ingreso (QR escaneado, sin bahía asignada aún). */
+  enTransitoIngreso: number;
 }
 
 interface Alert {
@@ -18,143 +27,172 @@ interface Alert {
 }
 
 /**
- * Hook personalizado para encapsular la lógica del Dashboard Operativo.
- * FEATURE: Maneja la sincronización de estados y la integración con WebSockets.
+ * Hook del Panel Operativo.
+ *
+ * - Fuente de verdad para el mapa de bahías: `GET /bahias/sensorizadas`
+ *   (solo las 3 bahías con sensor activo, con `estadoPanel` pre-calculado).
+ * - Los conteos globales se mantienen desde `GET /operativo/resumen-turno`
+ *   y se actualizan en tiempo real vía WebSocket `conteo_global_disponibles`.
+ * - Polling de 4 segundos como respaldo cuando el socket no está disponible.
  */
 export const useOperativo = () => {
-  const [stats, setStats] = useState<OperativoStats>({ total: 0, ocupados: 0, disponibles: 0, vehiculosActivos: 0 });
-  const [bahias, setBahias] = useState<Bahia[]>([]);
+  const [stats, setStats] = useState<OperativoStats>({
+    total: 0,
+    ocupados: 0,
+    disponibles: 0,
+    vehiculosActivos: 0,
+    enTransitoIngreso: 0,
+  });
+  const [bahias, setBahias] = useState<BahiaSensorizada[]>([]);
   const [vehiculos, setVehiculos] = useState<Movement[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ msg: string; tipo: 'success' | 'error' } | null>(null);
 
-  /**
-   * Muestra una notificación temporal en la interfaz.
-   */
   const showToast = useCallback((msg: string, tipo: 'success' | 'error' = 'success') => {
     setToast({ msg, tipo });
     setTimeout(() => setToast(null), 5000);
   }, []);
 
-  /**
-   * Mapea el estado de las bahías a una lista de vehículos activos.
-   * REFACTOR: Transformación de datos tipada para la UI.
-   */
-  const mapActivosFromBahias = useCallback((bahiasList: Bahia[]): Movement[] => {
-    return bahiasList
-      .filter(b => (b as any).ocupada || (b as any).estado === 'OCCUPIED' || (b as any).estado === 'DISCREPANCIA')
-      .map(b => ({
+  /** Extrae la lista de movimientos activos desde las bahías sensorizadas. */
+  const mapActivosFromSensorizadas = useCallback((lista: BahiaSensorizada[]): Movement[] => {
+    return lista
+      .filter((b) => b.placa && (b.estadoPanel === 'OCUPADO' || b.estadoPanel === 'SALIDA_PENDIENTE'))
+      .map((b) => ({
         idMovimiento: b.idBahia,
-        placa: b.placa || '???-000',
-        horaIngreso: b.horaIngreso || new Date().toISOString(),
+        placa: b.placa ?? '???',
+        horaIngreso: b.ultimaTelemetriaAt ?? new Date().toISOString(),
         bahia: b.nombreBahia,
-        estado: 'ADENTRO',
-        usuario: 'Cargando...'
+        estado: b.estadoPanel === 'SALIDA_PENDIENTE' ? 'SALIDA_PENDIENTE' : 'ADENTRO',
+        usuario: 'Cargando...',
       }));
   }, []);
 
   /**
-   * Carga inicial de datos desde la API REST.
-   * API: Consumo de /dashboard/resumen para sincronización inicial.
+   * Carga inicial desde REST.
+   * - Bahías sensorizadas → mapa del panel (solo las 3 activas).
+   * - Resumen de turno → conteos y alertas técnicas.
    */
   const loadInitialData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await operativoService.resumenTurno();
-      const { ocupacion } = res;
-      
+
+      const [sensorizadas, resumen] = await Promise.all([
+        bahiasService.getSensorizadas() as Promise<BahiaSensorizada[]>,
+        operativoService.resumenTurno(),
+      ]);
+
+      setBahias(sensorizadas);
+      setVehiculos(mapActivosFromSensorizadas(sensorizadas));
+
+      // Las métricas se derivan del array de bahías sensorizadas para garantizar
+      // que "total" = número de sensores activos (3) y no el total de bahías en BD.
+      const total = sensorizadas.length;
+      const libres = sensorizadas.filter((b) => b.estadoPanel === 'LIBRE').length;
+      const ocupados = total - libres;
       setStats({
-        total: ocupacion.total,
-        ocupados: ocupacion.ocupados,
-        disponibles: ocupacion.disponibles,
-        vehiculosActivos: ocupacion.ocupados
+        total,
+        ocupados,
+        disponibles: libres,
+        vehiculosActivos: sensorizadas.filter(
+          (b) => b.estadoPanel === 'OCUPADO' || b.estadoPanel === 'SALIDA_PENDIENTE',
+        ).length,
+        enTransitoIngreso: 0,
       });
-      setBahias(ocupacion.bahias);
-      setVehiculos(mapActivosFromBahias(ocupacion.bahias));
-    } catch (error) {
-      showToast('Error de conexión: No se pudieron cargar los datos de infraestructura', 'error');
+      // resumen se conserva para estadoParqueadero y alertas técnicas (sin uso directo en stats).
+      void resumen;
+    } catch {
+      showToast('Error de conexión: no se pudieron cargar los datos de infraestructura', 'error');
     } finally {
       setLoading(false);
     }
-  }, [mapActivosFromBahias, showToast]);
+  }, [mapActivosFromSensorizadas, showToast]);
 
-  /**
-   * Procesa una salida rápida desde la tabla de vehículos.
-   * API: Consumo de /operativo/registrar-salida.
-   */
   const handleQuickSalida = async (placa: string) => {
     try {
       await operativoService.registrarSalida(placa);
       showToast(`Vehículo ${placa} retirado exitosamente`, 'success');
     } catch (error: any) {
-      showToast(error.message || error.response?.data?.message || 'No se pudo procesar la salida', 'error');
+      showToast(
+        error?.response?.data?.message || error?.message || 'No se pudo procesar la salida',
+        'error',
+      );
     }
   };
 
   useEffect(() => {
     loadInitialData();
 
-    let pollTimer: number | null = null;
+    // ── Polling de respaldo ─────────────────────────────────────────────────
+    let pollTimer: ReturnType<typeof window.setInterval> | null = null;
     const startPolling = () => {
       if (pollTimer) return;
       pollTimer = window.setInterval(async () => {
         try {
-          const ocupacion = await bahiasService.getOcupacion();
-          setStats({
-            total: ocupacion.total,
-            ocupados: ocupacion.ocupados,
-            disponibles: ocupacion.disponibles,
-            vehiculosActivos: ocupacion.ocupados,
-          });
-          setBahias(ocupacion.bahias);
-          setVehiculos(mapActivosFromBahias(ocupacion.bahias));
+          const sensorizadas = (await bahiasService.getSensorizadas()) as BahiaSensorizada[];
+          setBahias(sensorizadas);
+          setVehiculos(mapActivosFromSensorizadas(sensorizadas));
         } catch {
+          // fallo silencioso — el socket es la fuente principal
         }
       }, 4000);
     };
     startPolling();
-    
-    // SOCKET: Suscripción a eventos operativos realtime
+
+    // ── Handlers WebSocket ──────────────────────────────────────────────────
+
     const handleConteoGlobal = (data: ConteoGlobalDisponiblesPayload) => {
-      setStats({
+      setStats((prev) => ({
+        ...prev,
         total: data.total,
         ocupados: data.ocupados,
         disponibles: data.disponibles,
         vehiculosActivos: data.ocupados,
-      });
+      }));
 
       if (data.disponibles === 0 && data.total > 0) {
-        setAlerts(prev => {
-          if (prev.some(a => a.id === 'full-alert')) return prev;
-          return [{
-            id: 'full-alert',
-            tipo: 'SISTEMA',
-            mensaje: '¡CAPACIDAD MÁXIMA ALCANZADA! El parqueadero está lleno.',
-            fecha: new Date()
-          }, ...prev];
-        });
+        setAlerts((prev) =>
+          prev.some((a) => a.id === 'full-alert')
+            ? prev
+            : [
+                {
+                  id: 'full-alert',
+                  tipo: 'SISTEMA',
+                  mensaje: '¡CAPACIDAD MÁXIMA ALCANZADA! El parqueadero está lleno.',
+                  fecha: new Date(),
+                },
+                ...prev,
+              ],
+        );
       } else {
-        setAlerts(prev => prev.filter(a => a.id !== 'full-alert'));
+        setAlerts((prev) => prev.filter((a) => a.id !== 'full-alert'));
       }
     };
 
-    const mapNuevoEstadoToBahiaEstado = (nuevo: BahiaModificadaPayload['nuevoEstado']): BahiaEstado => {
-      switch (nuevo) {
-        case 'LIBRE':
-          return 'AVAILABLE';
+    /**
+     * Cuando llega `bahia_modificada`, actualizamos el `estadoPanel` de la
+     * bahía afectada mapeando el `nuevoEstado` (formato backend reconciliado)
+     * al `EstadoPanel` que usa el frontend.
+     */
+    const mapNuevoEstadoToEstadoPanel = (
+      nuevoEstado: BahiaModificadaPayload['nuevoEstado'],
+    ): EstadoPanel => {
+      switch (nuevoEstado) {
         case 'OCUPADO':
-          return 'OCCUPIED';
+          return 'OCUPADO';
+        case 'LIBRE':
+          return 'LIBRE';
         case 'TRANSITO':
-          return 'TRANSITO';
+          // El backend emite TRANSITO cuando la bahía tiene salida pendiente
+          return 'SALIDA_PENDIENTE';
         case 'DISCREPANCIA':
           return 'DISCREPANCIA';
         case 'OFFLINE':
           return 'OFFLINE';
         case 'DESHABILITADO':
-          return 'DISABLED';
+          return 'DESHABILITADO';
         default:
-          return 'AVAILABLE';
+          return 'LIBRE';
       }
     };
 
@@ -163,49 +201,86 @@ export const useOperativo = () => {
       return match ? Number(match[1]) : null;
     };
 
-    const handleBahiaModificada = (data: BahiaModificadaPayload) => {
+    /**
+     * Handler de `bahia_modificada` en dos fases:
+     *
+     * **Fase 1 — optimista** (síncrona, 0 ms):
+     * Actualiza `estadoPanel` de la bahía afectada usando la tabla local de
+     * mapeo. El color cambia instantáneamente en pantalla.
+     *
+     * **Fase 2 — autoritativa** (asíncrona, ~1 RTT):
+     * Re-fetcha `/bahias/sensorizadas` para obtener el `estadoPanel` real del
+     * backend (que incluye `SALIDA_PENDIENTE` cuando bahía=LIBRE + movimiento
+     * TRANSITO con bahía) y la `placa` del vehículo vinculado.
+     * Si el fetch falla, la actualización optimista permanece.
+     */
+    const handleBahiaModificada = async (data: BahiaModificadaPayload) => {
+      // Fase 1: color inmediato
       const id = parseIdBahia(data.idBahia);
-      if (!id) return;
-
-      const estado = mapNuevoEstadoToBahiaEstado(data.nuevoEstado);
-
-      setBahias(prev => (Array.isArray(prev) ? prev.map((b: any) => (b.idBahia === id ? { ...b, estado } : b)) : prev));
-    };
-
-    const handleIngreso = (data: any) => {
-      showToast(`Nuevo ingreso detectado: ${data.placa} en ${data.bahia}`, 'success');
-    };
-
-    const handleRetirado = (data: any) => {
-      showToast(`Salida detectada: ${data.placa}`, 'success');
-    };
-
-    const handleAlerta = (data: any) => {
-      setAlerts(prev => [{
-        id: Math.random().toString(),
-        tipo: data.tipo,
-        mensaje: data.mensaje,
-        fecha: data.fecha
-      }, ...prev]);
-    };
-
-    const handleSensorOffline = (data: any) => {
-      setAlerts(prev => [{
-        id: Math.random().toString(),
-        tipo: 'SENSOR_OFFLINE',
-        mensaje: `Pérdida de conexión con sensor ${data.sensorId} (Bahía ${data.idBahia})`,
-        fecha: data.fecha
-      }, ...prev]);
-
-      if (data.idBahia) {
-        setBahias(prev => prev.map(b => 
-          b.idBahia === data.idBahia ? { ...b, fueraServicio: true } : b
-        ));
+      if (id) {
+        const estadoPanel = mapNuevoEstadoToEstadoPanel(data.nuevoEstado);
+        setBahias((prev) =>
+          Array.isArray(prev)
+            ? prev.map((b) => (b.idBahia === id ? { ...b, estadoPanel } : b))
+            : prev,
+        );
+      }
+      // Fase 2: estado completo (placa + SALIDA_PENDIENTE correcto)
+      try {
+        const sensorizadas = (await bahiasService.getSensorizadas()) as BahiaSensorizada[];
+        setBahias(sensorizadas);
+        setVehiculos(mapActivosFromSensorizadas(sensorizadas));
+      } catch {
+        // actualización optimista ya aplicada — se mantiene
       }
     };
 
+    const handleIngreso = (data: any) => {
+      const bahiaInfo = data.bahia === 'EN_TRANSITO' ? 'en tránsito (bahía por asignar)' : `en ${data.bahia}`;
+      showToast(`Nuevo ingreso: ${data.placa} — ${bahiaInfo}`, 'success');
+      if (data.bahia !== 'EN_TRANSITO') {
+        setStats((prev) => ({ ...prev, enTransitoIngreso: Math.max(0, prev.enTransitoIngreso - 1) }));
+      } else {
+        setStats((prev) => ({ ...prev, enTransitoIngreso: prev.enTransitoIngreso + 1 }));
+      }
+    };
+
+    const handleRetirado = (data: any) => {
+      showToast(`Salida registrada: ${data.placa}`, 'success');
+    };
+
+    const handleAlerta = (data: any) => {
+      setAlerts((prev) => [
+        { id: Math.random().toString(), tipo: data.tipo, mensaje: data.mensaje, fecha: data.fecha },
+        ...prev,
+      ]);
+    };
+
+    const handleSensorOffline = (data: any) => {
+      setAlerts((prev) => [
+        {
+          id: Math.random().toString(),
+          tipo: 'SENSOR_OFFLINE',
+          mensaje: `Pérdida de conexión con sensor ${data.sensorId} (Bahía ${data.idBahia})`,
+          fecha: data.fecha,
+        },
+        ...prev,
+      ]);
+
+      if (data.idBahia) {
+        setBahias((prev) =>
+          prev.map((b) =>
+            b.idBahia === data.idBahia ? { ...b, estadoPanel: 'OFFLINE' as EstadoPanel } : b,
+          ),
+        );
+      }
+    };
+
+    // El wrapper void evita que TypeScript infiera `Promise` en la firma del listener.
+    const onBahiaModificada = (data: BahiaModificadaPayload) => void handleBahiaModificada(data);
+
     socketService.on('conteo_global_disponibles', handleConteoGlobal);
-    socketService.on('bahia_modificada', handleBahiaModificada);
+    socketService.on('bahia_modificada', onBahiaModificada);
     socketService.on('vehiculo_ingresado', handleIngreso);
     socketService.on('vehiculo_retirado', handleRetirado);
     socketService.on('alerta_parqueadero', handleAlerta);
@@ -217,13 +292,13 @@ export const useOperativo = () => {
         pollTimer = null;
       }
       socketService.off('conteo_global_disponibles', handleConteoGlobal);
-      socketService.off('bahia_modificada', handleBahiaModificada);
+      socketService.off('bahia_modificada', onBahiaModificada);
       socketService.off('vehiculo_ingresado', handleIngreso);
       socketService.off('vehiculo_retirado', handleRetirado);
       socketService.off('alerta_parqueadero', handleAlerta);
       socketService.off('sensor_offline', handleSensorOffline);
     };
-  }, [loadInitialData, mapActivosFromBahias, showToast]);
+  }, [loadInitialData, mapActivosFromSensorizadas, showToast]);
 
   return {
     stats,
@@ -234,6 +309,6 @@ export const useOperativo = () => {
     toast,
     showToast,
     handleQuickSalida,
-    refresh: loadInitialData
+    refresh: loadInitialData,
   };
 };

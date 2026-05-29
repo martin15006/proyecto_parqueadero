@@ -17,6 +17,41 @@ import { RegistroVehiculo } from '../vehiculos/entities/registro-vehiculo.entity
 import { BahiaReconciliacionEstadoEnum } from '../common/enums/bahia-reconciliacion-estado.enum';
 
 /**
+ * Estado visual calculado para cada bahía sensorizada en el Panel Operativo.
+ * Combina el estado físico del sensor con el estado lógico del movimiento activo.
+ */
+export enum EstadoPanelEnum {
+  /** Bahía vacía y sensor operativo. */
+  LIBRE = 'LIBRE',
+  /** Vehículo físicamente presente y movimiento ADENTRO registrado. */
+  OCUPADO = 'OCUPADO',
+  /** Vehículo retirado físicamente; operario aún no confirmó salida en portería. */
+  SALIDA_PENDIENTE = 'SALIDA_PENDIENTE',
+  /** Inconsistencia entre sensor e historial lógico. */
+  DISCREPANCIA = 'DISCREPANCIA',
+  /** Sensor sin reporte (heartbeat fallido). */
+  OFFLINE = 'OFFLINE',
+  /** Bahía deshabilitada manualmente por administración. */
+  DESHABILITADO = 'DESHABILITADO',
+}
+
+/** Shape tipado de cada bahía devuelta por `obtenerBahiasSensorizadas`. */
+export interface BahiaSensorizadaDto {
+  idBahia: number;
+  nombreBahia: string;
+  tipoBahia: string;
+  estadoReconciliado: BahiaReconciliacionEstadoEnum;
+  estadoSensor: IotStatusEnum;
+  /** Estado calculado listo para renderizar en el panel sin lógica adicional. */
+  estadoPanel: EstadoPanelEnum;
+  /** Placa del vehículo asociado al movimiento activo (null si la bahía está libre). */
+  placa: string | null;
+  /** Estado del movimiento vigente (null si no hay movimiento activo). */
+  estadoMovimiento: EstadoMovimiento | null;
+  ultimaTelemetriaAt: Date | null;
+}
+
+/**
  * Servicio encargado de la gestión de la infraestructura física (Bahías).
  * Proporciona información de disponibilidad y ocupación en tiempo real.
  */
@@ -127,6 +162,89 @@ export class BahiasService implements OnModuleInit {
     return await this.bahiaRepository.find({
       relations: ['tipoBahia', 'tipoControl'],
     });
+  }
+
+  /**
+   * Devuelve únicamente las bahías que tienen un sensor **activo** asociado,
+   * enriquecidas con el estado del movimiento vigente.
+   *
+   * Es la fuente de verdad que debe usar el Panel Operativo para renderizar el
+   * mapa físico del parqueadero, ya que filtra las bahías manuales o sin hardware.
+   *
+   * ### Cálculo del `estadoPanel`
+   * | `estadoReconciliado` | Movimiento activo | `estadoPanel` |
+   * |---|---|---|
+   * | `OCUPADO` | `ADENTRO` | `'OCUPADO'` |
+   * | `LIBRE` | `TRANSITO` (con bahía) | `'SALIDA_PENDIENTE'` |
+   * | `LIBRE` | ninguno | `'LIBRE'` |
+   * | `OFFLINE` / `DISCREPANCIA` / `DESHABILITADO` | cualquiera | refleja el estado |
+   */
+  async obtenerBahiasSensorizadas(): Promise<BahiaSensorizadaDto[]> {
+    const sensores = await this.bahiaRepository.manager.find(Sensor, {
+      where: { activo: true },
+    });
+
+    if (sensores.length === 0) return [];
+
+    const idsBahias = sensores.map((s) => s.idBahia);
+
+    const bahias = await this.bahiaRepository.find({
+      where: { idBahia: In(idsBahias) },
+      relations: ['tipoBahia'],
+      order: { idBahia: 'ASC' },
+    });
+
+    const movimientosActivos = await this.movimientoRepository.find({
+      where: [
+        { idBahia: In(idsBahias), estado: EstadoMovimiento.ADENTRO },
+        { idBahia: In(idsBahias), estado: EstadoMovimiento.TRANSITO },
+      ],
+      relations: ['registroVehiculo', 'registroVehiculo.vehiculo'],
+    });
+
+    return bahias.map((b) => {
+      const sensor = sensores.find((s) => s.idBahia === b.idBahia)!;
+      const movimiento = movimientosActivos.find((m) => m.idBahia === b.idBahia);
+
+      const estadoPanel = this.derivarEstadoPanel(b.estadoReconciliado, movimiento);
+
+      return {
+        idBahia: b.idBahia,
+        nombreBahia: b.nombreBahia,
+        tipoBahia: b.tipoBahia?.tipoBahia ?? 'Estándar',
+        estadoReconciliado: b.estadoReconciliado,
+        estadoSensor: sensor.estadoActual,
+        estadoPanel,
+        placa: movimiento?.registroVehiculo?.vehiculo?.placa ?? null,
+        estadoMovimiento: movimiento?.estado ?? null,
+        ultimaTelemetriaAt: b.ultimaTelemetriaAt,
+      };
+    });
+  }
+
+  /** Mapea estado físico + movimiento al valor visual que consume el frontend. */
+  private derivarEstadoPanel(
+    estadoReconciliado: BahiaReconciliacionEstadoEnum,
+    movimiento: MovimientoVehiculo | undefined,
+  ): EstadoPanelEnum {
+    switch (estadoReconciliado) {
+      case BahiaReconciliacionEstadoEnum.OCUPADO:
+        return EstadoPanelEnum.OCUPADO;
+      case BahiaReconciliacionEstadoEnum.DISCREPANCIA:
+        return EstadoPanelEnum.DISCREPANCIA;
+      case BahiaReconciliacionEstadoEnum.OFFLINE:
+        return EstadoPanelEnum.OFFLINE;
+      case BahiaReconciliacionEstadoEnum.DESHABILITADO:
+        return EstadoPanelEnum.DESHABILITADO;
+      case BahiaReconciliacionEstadoEnum.LIBRE:
+        // Bahía libre físicamente pero con movimiento en tránsito de salida.
+        if (movimiento?.estado === EstadoMovimiento.TRANSITO && movimiento.idBahia != null) {
+          return EstadoPanelEnum.SALIDA_PENDIENTE;
+        }
+        return EstadoPanelEnum.LIBRE;
+      default:
+        return EstadoPanelEnum.LIBRE;
+    }
   }
 
   /**
@@ -323,9 +441,18 @@ export class BahiasService implements OnModuleInit {
       });
     }
 
-    const conteo = await this.obtenerConteoGlobal();
+    const [metricas, conteo] = await Promise.all([
+      this.obtenerMetricasSensorizadas(),
+      this.obtenerConteoGlobal(),
+    ]);
+    const estadoParqueaderoSocket: 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO' = conteo.parqueaderoDeshabilitado
+      ? 'DESHABILITADO'
+      : metricas.bahiasDisponibles <= 0 && metricas.totalBahias > 0 ? 'LLENO' : 'DISPONIBLE';
     this.eventosGateway.emitirConteoGlobalDisponibles({
-      ...conteo,
+      total: metricas.totalBahias,
+      ocupados: metricas.bahiasOcupadas,
+      disponibles: metricas.bahiasDisponibles,
+      estadoParqueadero: estadoParqueaderoSocket,
       actualizadoEn: new Date(),
     });
 
@@ -437,9 +564,18 @@ export class BahiasService implements OnModuleInit {
       userAgent: actor.userAgent,
     });
 
-    const conteo = await this.obtenerConteoGlobal();
+    const [metricasForzar, conteoForzar] = await Promise.all([
+      this.obtenerMetricasSensorizadas(),
+      this.obtenerConteoGlobal(),
+    ]);
+    const estadoForzar: 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO' = conteoForzar.parqueaderoDeshabilitado
+      ? 'DESHABILITADO'
+      : metricasForzar.bahiasDisponibles <= 0 && metricasForzar.totalBahias > 0 ? 'LLENO' : 'DISPONIBLE';
     this.eventosGateway.emitirConteoGlobalDisponibles({
-      ...conteo,
+      total: metricasForzar.totalBahias,
+      ocupados: metricasForzar.bahiasOcupadas,
+      disponibles: metricasForzar.bahiasDisponibles,
+      estadoParqueadero: estadoForzar,
       actualizadoEn: new Date(),
     });
 
@@ -563,6 +699,37 @@ export class BahiasService implements OnModuleInit {
     });
   }
 
+  /**
+   * Punto de entrada de toda señal IoT proveniente del `SerialBridgeService`.
+   *
+   * ## Máquina de estados (flujo IoT completo)
+   *
+   * ### Ingreso
+   * ```
+   * QR scan → MovimientoVehiculo(TRANSITO, idBahia=null)
+   *   ↓  sensor dispara OCCUPIED
+   * procesarTelemetriaSensor(LIBRE → ocupado)
+   *   → vincula movimiento flotante más antiguo a esta bahía
+   *   → Movimiento: TRANSITO → ADENTRO
+   *   → Bahía:      LIBRE    → OCUPADO
+   * ```
+   *
+   * ### Salida
+   * ```
+   * Vehículo se retira físicamente
+   *   ↓  sensor dispara AVAILABLE
+   * procesarTelemetriaSensor(OCUPADO → libre)
+   *   → Movimiento: ADENTRO → TRANSITO  (idBahia conservado — señal para operario)
+   *   → Bahía:      OCUPADO → LIBRE     (el espacio queda físicamente disponible)
+   *   ↓  operario escanea en portería → registrarSalida()
+   *   → Movimiento: TRANSITO → SALIDA
+   * ```
+   *
+   * @param sensorId      Código del sensor (p.ej. `SN-001`).
+   * @param fisicoOcupado `true` cuando la distancia cae en `[3, 12)` cm (OCCUPIED),
+   *                      `false` cuando supera los 12 cm (AVAILABLE).
+   *                      Los rangos exactos los calcula {@link SerialBridgeService.handleLine}.
+   */
   async procesarTelemetriaSensor(sensorId: string, fisicoOcupado: boolean) {
     const codigo = String(sensorId ?? '').trim();
     if (!codigo) {
@@ -572,97 +739,295 @@ export class BahiasService implements OnModuleInit {
       });
     }
 
-    return await this.bahiaRepository.manager.transaction(async (manager) => {
-      const sensor = await manager.findOne(Sensor, {
-        where: { codigo },
-        lock: { mode: 'pessimistic_write' },
-      });
-      if (!sensor) {
-        throw new NotFoundException('Sensor no registrado.');
-      }
+    this.logger.verbose(`[IoT] → procesarTelemetriaSensor  sensor=${codigo}  fisicoOcupado=${fisicoOcupado}`);
 
-      const bahia = await manager.findOne(Bahia, {
-        where: { idBahia: sensor.idBahia },
-        lock: { mode: 'pessimistic_write' },
-      });
-      if (!bahia) {
-        throw new NotFoundException('Bahía asociada al sensor no encontrada.');
-      }
-
-      const ahora = new Date();
-      bahia.ultimaTelemetriaAt = ahora;
-      bahia.ultimoFisicoOcupado = Boolean(fisicoOcupado);
-
-      const estadoActual = bahia.estadoReconciliado ?? BahiaReconciliacionEstadoEnum.LIBRE;
-
-      if (fisicoOcupado) {
-        if (estadoActual === BahiaReconciliacionEstadoEnum.TRANSITO) {
-          bahia.estadoReconciliado = BahiaReconciliacionEstadoEnum.OCUPADO;
-          bahia.transitoDesde = null;
-
-          const movimientoTransito = await manager.findOne(MovimientoVehiculo, {
-            where: { idBahia: bahia.idBahia, estado: EstadoMovimiento.TRANSITO },
-            order: { horaIngreso: 'DESC' },
-            lock: { mode: 'pessimistic_write' },
-          });
-
-          if (movimientoTransito) {
-            movimientoTransito.estado = EstadoMovimiento.ADENTRO;
-            await manager.save(MovimientoVehiculo, movimientoTransito);
-          }
-        } else if (estadoActual === BahiaReconciliacionEstadoEnum.LIBRE) {
-          bahia.estadoReconciliado = BahiaReconciliacionEstadoEnum.DISCREPANCIA;
-          bahia.discrepanciaDesde = bahia.discrepanciaDesde ?? ahora;
-
-          this.eventosGateway.emitirAlertaParqueadero({
-            tipo: 'DISCREPANCIA_OCUPACION_SIN_PORTERIA',
-            mensaje: `Discrepancia detectada: Bahía ${bahia.nombreBahia} ocupada físicamente sin registro de portería.`,
-            fecha: ahora,
-          });
-        } else if (estadoActual === BahiaReconciliacionEstadoEnum.OFFLINE) {
-          bahia.estadoReconciliado = BahiaReconciliacionEstadoEnum.DISCREPANCIA;
-          bahia.discrepanciaDesde = bahia.discrepanciaDesde ?? ahora;
+    /**
+     * Cierre reutilizable que encapsula un ciclo completo de la máquina de estados:
+     * - Lectura con lock pesimista de sensor + bahía.
+     * - Transición de estado vía `manejarSensorOcupado` / `manejarSensorLibre`.
+     * - Persistencia y emisión WebSocket.
+     *
+     * Se llama dos veces cuando se detecta un posible race condition entre el
+     * escaneo de QR en portería (HTTP) y la señal OCCUPIED del sensor (serial):
+     *   1.er ciclo → DISCREPANCIA (TRANSITO aún no committed)
+     *   350 ms de espera FUERA de la transacción (sin locks activos)
+     *   2.º ciclo → OCUPADO (TRANSITO ya disponible en BD) o DISCREPANCIA definitiva
+     */
+    const ejecutarCiclo = () =>
+      this.bahiaRepository.manager.transaction(async (manager) => {
+        const sensor = await manager.findOne(Sensor, {
+          where: { codigo },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!sensor) {
+          this.logger.error(`[IoT] Sensor ${codigo} NO encontrado en DB — verifica tabla 'sensor'`);
+          throw new NotFoundException('Sensor no registrado.');
         }
-      } else {
-        if (estadoActual === BahiaReconciliacionEstadoEnum.OCUPADO) {
-          const activoLogico = await manager.findOne(MovimientoVehiculo, {
-            where: { idBahia: bahia.idBahia, estado: EstadoMovimiento.ADENTRO },
-            lock: { mode: 'pessimistic_write' },
-          });
 
-          if (activoLogico) {
-            bahia.estadoReconciliado = BahiaReconciliacionEstadoEnum.DISCREPANCIA;
-            bahia.discrepanciaDesde = bahia.discrepanciaDesde ?? ahora;
-
-            this.eventosGateway.emitirAlertaParqueadero({
-              tipo: 'DISCREPANCIA_SALIDA_FISICA_SIN_PORTERIA',
-              mensaje: `Discrepancia detectada: Bahía ${bahia.nombreBahia} quedó libre físicamente sin salida registrada en portería.`,
-              fecha: ahora,
-            });
-          } else {
-            bahia.estadoReconciliado = BahiaReconciliacionEstadoEnum.LIBRE;
-            bahia.discrepanciaDesde = null;
-          }
+        const bahia = await manager.findOne(Bahia, {
+          where: { idBahia: sensor.idBahia },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!bahia) {
+          this.logger.error(`[IoT] Bahía idBahia=${sensor.idBahia} NO encontrada (sensor ${codigo})`);
+          throw new NotFoundException('Bahía asociada al sensor no encontrada.');
         }
-      }
 
-      const guardada = await manager.save(Bahia, bahia);
+        const ahora = new Date();
+        bahia.ultimaTelemetriaAt = ahora;
+        bahia.ultimoFisicoOcupado = Boolean(fisicoOcupado);
 
-      this.eventosGateway.emitirBahiaModificada(
-        {
-          idBahia: `B-${guardada.idBahia}`,
-          nuevoEstado: guardada.estadoReconciliado,
-          actualizadoEn: new Date(),
-        },
-        { source: 'IOT' },
+        const estadoActual = bahia.estadoReconciliado ?? BahiaReconciliacionEstadoEnum.LIBRE;
+        this.logger.verbose(
+          `[IoT] sensor=${codigo} → bahía ${bahia.idBahia}(${bahia.nombreBahia}) | estado=${estadoActual} | fisicoOcupado=${fisicoOcupado}`,
+        );
+
+        if (fisicoOcupado) {
+          await this.manejarSensorOcupado(manager, bahia, estadoActual, ahora);
+        } else {
+          await this.manejarSensorLibre(manager, bahia, estadoActual, ahora);
+        }
+
+        const guardada = await manager.save(Bahia, bahia);
+
+        this.logger.log(
+          `[IoT] ✓ Bahía ${guardada.idBahia} guardada → estadoReconciliado=${guardada.estadoReconciliado}`,
+        );
+
+        this.eventosGateway.emitirBahiaModificada(
+          { idBahia: `B-${guardada.idBahia}`, nuevoEstado: guardada.estadoReconciliado, actualizadoEn: new Date() },
+          { source: 'IOT' },
+        );
+
+        return { ok: true, idBahia: guardada.idBahia, estado: guardada.estadoReconciliado };
+      });
+
+    let resultado = await ejecutarCiclo();
+
+    // Guard de race condition: si una señal OCCUPIED desemboca en DISCREPANCIA en el
+    // primer ciclo, es probable que el commit del QR de portería aún no haya terminado
+    // (ventana típica: 100-400 ms). Se espera 350 ms FUERA de cualquier transacción
+    // (sin locks activos) y se reintenta UNA vez. En el 2.º ciclo la bahía estará en
+    // DISCREPANCIA, que está dentro de `puedeVincular`, por lo que si el TRANSITO ya
+    // existe en BD se empareja y la bahía pasa a OCUPADO. Si sigue sin haber TRANSITO
+    // el estado queda DISCREPANCIA definitiva (vehículo no autorizado).
+    if (fisicoOcupado && resultado.estado === BahiaReconciliacionEstadoEnum.DISCREPANCIA) {
+      this.logger.warn(
+        `[IoT] sensor=${codigo} → bahía ${resultado.idBahia}: DISCREPANCIA en 1.er ciclo ` +
+        `— posible race condition QR-portería. Reintentando en 350 ms…`,
+      );
+      await new Promise<void>((r) => setTimeout(r, 350));
+      resultado = await ejecutarCiclo();
+      this.logger.log(
+        `[IoT] sensor=${codigo} → bahía ${resultado.idBahia}: estado tras reintento = ${resultado.estado}`,
+      );
+    }
+
+    return resultado;
+  }
+
+  /**
+   * Maneja la transición cuando el sensor reporta presencia física (OCCUPIED).
+   *
+   * ### Estados aceptados para vincular un movimiento flotante
+   * | Estado bahía | Acción |
+   * |---|---|
+   * | `LIBRE` | Flujo IoT normal: vincula el TRANSITO flotante más antiguo. |
+   * | `TRANSITO` | Bahía pre-reservada (portería legacy); cierra el tránsito. |
+   * | `DISCREPANCIA` | Bahía en estado sucio (test anterior): intenta igualmente vincular. |
+   * | `OFFLINE` | Sensor reconectado con objeto: DISCREPANCIA. |
+   * | `OCUPADO` | Ya procesado; idempotente, no hace nada. |
+   *
+   * ### Búsqueda del movimiento flotante
+   * Usa `findOne` con `IsNull()` de TypeORM (type-safe) en lugar de raw SQL
+   * `'mov.id_bahia IS NULL'` que no garantiza traducción por NamingStrategy.
+   * Ordena por `horaIngreso ASC` para tomar el más antiguo (FIFO).
+   */
+  private async manejarSensorOcupado(
+    manager: EntityManager,
+    bahia: Bahia,
+    estadoActual: BahiaReconciliacionEstadoEnum,
+    ahora: Date,
+  ): Promise<void> {
+    const TAG = `[IoT:OCCUPIED] Bahía ${bahia.idBahia}(${bahia.nombreBahia}) | estado=${estadoActual}`;
+    this.logger.verbose(`${TAG} → evaluando transición`);
+
+    const puedeVincular =
+      estadoActual === BahiaReconciliacionEstadoEnum.LIBRE ||
+      estadoActual === BahiaReconciliacionEstadoEnum.TRANSITO ||
+      estadoActual === BahiaReconciliacionEstadoEnum.DISCREPANCIA;
+
+    if (estadoActual === BahiaReconciliacionEstadoEnum.OCUPADO) {
+      this.logger.verbose(`${TAG} → ya OCUPADO, idempotente — sin cambio`);
+      return;
+    }
+
+    if (estadoActual === BahiaReconciliacionEstadoEnum.OFFLINE) {
+      this.logger.warn(`${TAG} → OFFLINE con presencia física → DISCREPANCIA`);
+      bahia.estadoReconciliado = BahiaReconciliacionEstadoEnum.DISCREPANCIA;
+      bahia.discrepanciaDesde = bahia.discrepanciaDesde ?? ahora;
+      return;
+    }
+
+    if (!puedeVincular) {
+      this.logger.warn(`${TAG} → estado inesperado, sin acción`);
+      return;
+    }
+
+    // Busca el movimiento flotante más reciente (TRANSITO sin bahía asignada).
+    // "Más reciente" = el último QR escaneado en portería, que físicamente es el vehículo
+    // que acaba de llegar al sensor. Orden DESC por horaIngreso.
+    // IMPORTANTE: IsNull() garantiza traducción correcta por NamingStrategy de TypeORM;
+    // raw SQL 'id_bahia IS NULL' puede fallar según la versión del driver.
+    const movimientoFlotante = await manager.findOne(MovimientoVehiculo, {
+      where: {
+        estado: EstadoMovimiento.TRANSITO,
+        idBahia: IsNull(),
+      },
+      order: { horaIngreso: 'DESC' },
+      lock: { mode: 'pessimistic_write' },
+    });
+
+    if (movimientoFlotante) {
+      this.logger.verbose(
+        `${TAG} → movimiento flotante encontrado id=${movimientoFlotante.idMovimiento} ` +
+        `(registroV=${movimientoFlotante.idRegistroVehiculo}) → asignando bahía y pasando a ADENTRO`,
       );
 
-      return {
-        ok: true,
-        idBahia: guardada.idBahia,
-        estado: guardada.estadoReconciliado,
-      };
+      movimientoFlotante.idBahia = bahia.idBahia;
+      movimientoFlotante.estado = EstadoMovimiento.ADENTRO;
+      await manager.save(MovimientoVehiculo, movimientoFlotante);
+
+      bahia.estadoReconciliado = BahiaReconciliacionEstadoEnum.OCUPADO;
+      bahia.transitoDesde = null;
+      bahia.discrepanciaDesde = null;
+
+      this.logger.verbose(`${TAG} → ✓ LIBRE→OCUPADO | idMovimiento=${movimientoFlotante.idMovimiento}`);
+    } else {
+      // Sin QR escaneado previo → vehículo no autorizado
+      this.logger.warn(
+        `${TAG} → sin movimiento TRANSITO flotante en DB. ` +
+        `Posibles causas: (1) QR no escaneado, (2) race condition si el HTTP aún no hizo commit, ` +
+        `(3) el movimiento ya fue asignado a otra bahía.`,
+      );
+
+      bahia.estadoReconciliado = BahiaReconciliacionEstadoEnum.DISCREPANCIA;
+      bahia.discrepanciaDesde = bahia.discrepanciaDesde ?? ahora;
+
+      this.eventosGateway.emitirAlertaParqueadero({
+        tipo: 'DISCREPANCIA_OCUPACION_SIN_PORTERIA',
+        mensaje: `Discrepancia: ${bahia.nombreBahia} ocupada físicamente sin tránsito autorizado en portería.`,
+        fecha: ahora,
+      });
+    }
+  }
+
+  /**
+   * Maneja la transición cuando el sensor reporta bahía vacía (AVAILABLE).
+   *
+   * - `OCUPADO` + movimiento ADENTRO → vehículo se retiró; mueve a TRANSITO de salida.
+   *   La bahía queda LIBRE de inmediato (fisicamente disponible).
+   *   El operario en portería debe confirmar la salida con `registrarSalida`.
+   * - `OCUPADO` sin movimiento ADENTRO → reconciliación directa a LIBRE.
+   * - `DISCREPANCIA` → se resuelve como LIBRE.
+   */
+  private async manejarSensorLibre(
+    manager: EntityManager,
+    bahia: Bahia,
+    estadoActual: BahiaReconciliacionEstadoEnum,
+    ahora: Date,
+  ): Promise<void> {
+    const TAG = `[IoT:AVAILABLE] Bahía ${bahia.idBahia}(${bahia.nombreBahia}) | estado=${estadoActual}`;
+    this.logger.verbose(`${TAG} → evaluando transición`);
+
+    if (estadoActual === BahiaReconciliacionEstadoEnum.OCUPADO) {
+      const movimientoAdentro = await manager.findOne(MovimientoVehiculo, {
+        where: { idBahia: bahia.idBahia, estado: EstadoMovimiento.ADENTRO },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (movimientoAdentro) {
+        this.logger.verbose(
+          `${TAG} → vehículo retirado físicamente (idMovimiento=${movimientoAdentro.idMovimiento}) → OCUPADO→LIBRE + movimiento→TRANSITO salida`,
+        );
+        movimientoAdentro.estado = EstadoMovimiento.TRANSITO;
+        await manager.save(MovimientoVehiculo, movimientoAdentro);
+
+        this.eventosGateway.emitirAlertaParqueadero({
+          tipo: 'SALIDA_FISICA_PENDIENTE_CONFIRMACION',
+          mensaje: `${bahia.nombreBahia}: vehículo retirado físicamente, pendiente confirmación en portería.`,
+          fecha: ahora,
+        });
+      } else {
+        this.logger.verbose(`${TAG} → OCUPADO sin movimiento ADENTRO → reconciliación directa a LIBRE`);
+      }
+
+      bahia.estadoReconciliado = BahiaReconciliacionEstadoEnum.LIBRE;
+      bahia.discrepanciaDesde = null;
+    } else if (estadoActual === BahiaReconciliacionEstadoEnum.DISCREPANCIA) {
+      this.logger.log(`${TAG} → DISCREPANCIA resuelta → LIBRE`);
+      bahia.estadoReconciliado = BahiaReconciliacionEstadoEnum.LIBRE;
+      bahia.discrepanciaDesde = null;
+    } else if (estadoActual === BahiaReconciliacionEstadoEnum.TRANSITO) {
+      this.logger.log(`${TAG} → TRANSITO sin confirmación física → LIBRE (vehículo abandonó)`);
+      bahia.estadoReconciliado = BahiaReconciliacionEstadoEnum.LIBRE;
+      bahia.transitoDesde = null;
+    } else {
+      this.logger.debug(`${TAG} → sin transición (${estadoActual} es idempotente en AVAILABLE)`);
+    }
+    // LIBRE y OFFLINE no se modifican.
+  }
+
+  /**
+   * Calcula las métricas de ocupación basadas **únicamente** en las bahías que
+   * tienen un sensor activo registrado en la tabla `sensor`.
+   *
+   * Fórmulas:
+   * - `totalBahias`          = COUNT bahías con sensor activo.
+   * - `bahiasOcupadas`       = bahías en estado `OCUPADO` o `DISCREPANCIA`.
+   * - `bahiasDisponibles`    = bahías en estado `LIBRE` o `TRANSITO`.
+   * - `porcentajeOcupacion`  = (ocupadas / total) × 100, redondeado a 1 decimal.
+   */
+  async obtenerMetricasSensorizadas(): Promise<{
+    totalBahias: number;
+    bahiasOcupadas: number;
+    bahiasDisponibles: number;
+    porcentajeOcupacion: number;
+  }> {
+    const sensores = await this.bahiaRepository.manager.find(Sensor, {
+      where: { activo: true },
     });
+
+    const idsBahias = sensores.map((s) => s.idBahia);
+
+    if (idsBahias.length === 0) {
+      return { totalBahias: 0, bahiasOcupadas: 0, bahiasDisponibles: 0, porcentajeOcupacion: 0 };
+    }
+
+    const bahias = await this.bahiaRepository.find({
+      where: { idBahia: In(idsBahias) },
+    });
+
+    const totalBahias = bahias.length;
+
+    const bahiasOcupadas = bahias.filter(
+      (b) =>
+        b.estadoReconciliado === BahiaReconciliacionEstadoEnum.OCUPADO ||
+        b.estadoReconciliado === BahiaReconciliacionEstadoEnum.DISCREPANCIA,
+    ).length;
+
+    const bahiasDisponibles = bahias.filter(
+      (b) =>
+        b.estadoReconciliado === BahiaReconciliacionEstadoEnum.LIBRE ||
+        b.estadoReconciliado === BahiaReconciliacionEstadoEnum.TRANSITO,
+    ).length;
+
+    const porcentajeOcupacion =
+      totalBahias > 0
+        ? parseFloat(((bahiasOcupadas / totalBahias) * 100).toFixed(1))
+        : 0;
+
+    return { totalBahias, bahiasOcupadas, bahiasDisponibles, porcentajeOcupacion };
   }
 
   async marcarBahiaOfflinePorSensor(sensorId: string) {

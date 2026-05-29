@@ -10,6 +10,7 @@ import { AuthModule } from '../auth/auth.module';
 
 import { TelemetriaController } from './telemetria.controller';
 import { TelemetriaGateway } from './telemetria.gateway';
+import { SerialBridgeService } from './serial-bridge.service';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { TelemetriaGateway } from './telemetria.gateway';
     AuthModule,
   ],
   controllers: [TelemetriaController],
-  providers: [TelemetriaService, TelemetriaGateway],
+  providers: [TelemetriaService, TelemetriaGateway, SerialBridgeService],
   exports: [TelemetriaService, TelemetriaGateway],
 })
 export class TelemetriaModule {}

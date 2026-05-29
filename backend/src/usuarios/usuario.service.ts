@@ -205,24 +205,39 @@ export class UsuarioService {
    * Búsqueda institucional por código QR, Documento o Placa.
    * RF31/RF33: Permite identificación unificada en portería.
    */
+  /**
+   * Búsqueda institucional unificada por QR, documento o placa de vehículo.
+   *
+   * Estrategia de resolución en cascada (RF31/RF33):
+   * 1. Token QR — soporta UUID con guiones y hex-32 sin guiones (lectores Code128).
+   * 2. Documento numérico — 6 a 12 dígitos.
+   * 3. Placa de vehículo — normalizada (sin guiones/espacios, mayúsculas).
+   *
+   * @param token - Valor escaneado o ingresado en portería.
+   * @throws {BadRequestException} Si el token está vacío.
+   * @throws {BadRequestException} Si el usuario existe pero fue desactivado (soft-delete).
+   * @throws {NotFoundException} Si ninguna estrategia resuelve una identidad activa.
+   */
   async buscarIdentidadUnificada(token: string) {
     const entrada = String(token ?? '').trim();
     if (!entrada) throw new BadRequestException('El código es obligatorio');
 
     let placaDetectada: string | null = null;
 
-    // 1. Intentar por QR/Token (Normalizado)
+    // Estrategia 1 — QR/Token UUID.
+    // Soporta hex-32 sin guiones (Code128) reconvirtiéndolo al formato estándar de la BD.
     const esHex32 = /^[0-9a-fA-F]{32}$/.test(entrada);
     const normalizado = (esHex32
       ? `${entrada.slice(0, 8)}-${entrada.slice(8, 12)}-${entrada.slice(12, 16)}-${entrada.slice(16, 20)}-${entrada.slice(20)}`
-      : entrada).toLowerCase();
+      : entrada
+    ).toLowerCase();
 
     let usuario = await this.usuarioRepository.findOne({
       where: { qr: normalizado },
       relations: ['tipoUsuario', 'formacion'],
     });
 
-    // 2. Intentar por Documento directo
+    // Estrategia 2 — Documento numérico.
     if (!usuario && /^[0-9]{6,12}$/.test(entrada)) {
       usuario = await this.usuarioRepository.findOne({
         where: { documento: entrada },
@@ -230,21 +245,39 @@ export class UsuarioService {
       });
     }
 
-    // 3. Intentar por Placa de vehículo
+    // Estrategia 3 — Placa de vehículo vinculada a un usuario.
     if (!usuario) {
       const placaNormal = entrada.replace(/[- ]/g, '').toUpperCase();
       const registro = await this.usuarioRepository.manager.findOne(RegistroVehiculo, {
         where: { idVehiculo: placaNormal },
         relations: ['usuario', 'usuario.tipoUsuario', 'usuario.formacion'],
       });
-      if (registro) {
+      if (registro?.usuario) {
         usuario = registro.usuario;
         placaDetectada = placaNormal;
       }
     }
 
     if (!usuario) {
-      throw new NotFoundException('Identidad no reconocida en el sistema');
+      // Diagnóstico diferenciado: distingue "nunca existió" de "fue desactivado".
+      // Evita exponer datos sensibles al exterior; solo mejora la trazabilidad interna.
+      const existeInactivo = await this.usuarioRepository.findOne({
+        where: { qr: normalizado },
+        withDeleted: true,
+        select: ['documento'],
+      });
+
+      if (existeInactivo) {
+        throw new BadRequestException({
+          message: 'El acceso de este usuario ha sido desactivado.',
+          errorCode: 'USUARIO_DESACTIVADO',
+        });
+      }
+
+      throw new NotFoundException({
+        message: 'Identidad no reconocida en el sistema',
+        errorCode: 'IDENTIDAD_NO_ENCONTRADA',
+      });
     }
 
     const vehiculos = await this.vehiculosService.findByUsuario(usuario.documento);

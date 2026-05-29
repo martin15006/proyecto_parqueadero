@@ -499,8 +499,6 @@ export class AuthService implements OnModuleInit {
       expiraEn,
     });
 
-    this.logger.debug(`OTP Generado para ${documento}: ${codigo} (Expira: ${expiraEn.toLocaleTimeString()})`);
-
     return { idOtp: creado.idOtp, codigo, expiraEn };
   }
 

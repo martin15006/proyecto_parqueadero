@@ -46,9 +46,14 @@ export interface DashboardStats {
   parqueaderoDeshabilitado?: boolean;
   estadoParqueadero?: 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO';
   ocupacion: {
+    /** Total de bahías con sensor activo (≠ total bahías en DB). */
     total: number;
+    /** Bahías en estado OCUPADO o DISCREPANCIA. */
     ocupados: number;
+    /** Bahías en estado LIBRE o TRANSITO. */
     disponibles: number;
+    /** (ocupados / total) × 100, 1 decimal. Undefined en respuestas antiguas. */
+    porcentajeOcupacion?: number;
   };
   ingresosHoy: number;
   ingresosMes: number;
@@ -63,6 +68,29 @@ export type BahiaEstado =
   | 'OFFLINE'
   | 'ERROR'
   | 'DISABLED';
+
+/** Espejo del `EstadoPanelEnum` del backend — estado visual calculado por el servidor. */
+export type EstadoPanel =
+  | 'LIBRE'
+  | 'OCUPADO'
+  | 'SALIDA_PENDIENTE'   // Vehículo salió físicamente; confirmación de portería pendiente.
+  | 'DISCREPANCIA'
+  | 'OFFLINE'
+  | 'DESHABILITADO';
+
+/** Shape de cada bahía devuelta por `GET /api/bahias/sensorizadas`. */
+export interface BahiaSensorizada {
+  idBahia: number;
+  nombreBahia: string;
+  tipoBahia: string;
+  estadoPanel: EstadoPanel;
+  estadoSensor: string;
+  /** Placa del vehículo con movimiento activo (null si libre). */
+  placa: string | null;
+  /** Estado del movimiento vigente (`ADENTRO`, `TRANSITO`, etc.). */
+  estadoMovimiento: string | null;
+  ultimaTelemetriaAt: string | null;
+}
 
 export interface OcupacionPayload {
   total: number;

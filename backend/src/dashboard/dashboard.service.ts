@@ -30,53 +30,69 @@ export class DashboardService {
   ) {}
 
   /**
-   * Obtiene un resumen consolidado de los indicadores clave de rendimiento (KPIs).
+   * Resumen consolidado de KPIs del dashboard.
+   *
+   * ### Fuente de métricas de ocupación
+   * Los conteos (`total`, `ocupados`, `disponibles`, `porcentajeOcupacion`) se
+   * calculan **únicamente** sobre las bahías con sensor activo registrado en la
+   * tabla `sensor`, de modo que el total refleja la infraestructura física real
+   * (actualmente 3 bahías: SN-001, SN-002, SN-003).
+   *
+   * Las 7 queries se ejecutan en paralelo para minimizar latencia.
    */
   async obtenerResumen() {
-    const totalUsuarios = await this.usuarioRepository.count();
-    const totalVehiculos = await this.vehiculoRepository.count();
-    const ocupacion = await this.bahiasService.obtenerOcupacion();
-
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-
-    // Ingresos registrados en el día actual
-    const ingresosHoy = await this.movimientoRepository
-      .createQueryBuilder('movimiento')
-      .where('movimiento.hora_ingreso >= :hoy', { hoy })
-      .getCount();
-
     const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    
-    // Ingresos acumulados en el mes actual
-    const ingresosMes = await this.movimientoRepository
-      .createQueryBuilder('movimiento')
-      .where('movimiento.hora_ingreso >= :primerDiaMes', { primerDiaMes })
-      .getCount();
-
-    // Conteo de alertas críticas de sistema en las últimas 24 horas
     const hace24Horas = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const alertasRaw = await this.movimientoRepository.manager.query(`
-      SELECT count(*) as cantidad 
-      FROM alerta_sistema 
-      WHERE created_at >= $1
-    `, [hace24Horas]);
-    
-    const alertasActivas = parseInt(alertasRaw[0]?.cantidad || '0', 10);
+
+    const [
+      totalUsuarios,
+      totalVehiculos,
+      estadoGlobal,
+      metricas,
+      ingresosHoy,
+      ingresosMes,
+      alertasRaw,
+    ] = await Promise.all([
+      this.usuarioRepository.count(),
+      this.vehiculoRepository.count(),
+      // Estado administrativo: parqueaderoDeshabilitado + estadoParqueadero
+      this.bahiasService.obtenerOcupacion(),
+      // Conteos basados en el estado físico de los sensores activos
+      this.bahiasService.obtenerMetricasSensorizadas(),
+      this.movimientoRepository
+        .createQueryBuilder('m')
+        .where('m.hora_ingreso >= :hoy', { hoy })
+        .getCount(),
+      this.movimientoRepository
+        .createQueryBuilder('m')
+        .where('m.hora_ingreso >= :primerDiaMes', { primerDiaMes })
+        .getCount(),
+      this.movimientoRepository.manager.query(
+        `SELECT count(*) AS cantidad FROM alerta_sistema WHERE created_at >= $1`,
+        [hace24Horas],
+      ),
+    ]);
 
     return {
       totalUsuarios,
       totalVehiculos,
-      parqueaderoDeshabilitado: ocupacion.parqueaderoDeshabilitado,
-      estadoParqueadero: ocupacion.estadoParqueadero,
+      parqueaderoDeshabilitado: estadoGlobal.parqueaderoDeshabilitado,
+      estadoParqueadero: estadoGlobal.estadoParqueadero,
       ocupacion: {
-        total: ocupacion.total,
-        ocupados: ocupacion.ocupados,
-        disponibles: ocupacion.disponibles,
+        /** Bahías con sensor activo (fuente de verdad física). */
+        total: metricas.totalBahias,
+        /** Bahías en estado OCUPADO o DISCREPANCIA. */
+        ocupados: metricas.bahiasOcupadas,
+        /** Bahías en estado LIBRE o TRANSITO. */
+        disponibles: metricas.bahiasDisponibles,
+        /** (ocupados / total) × 100, 1 decimal. */
+        porcentajeOcupacion: metricas.porcentajeOcupacion,
       },
       ingresosHoy,
       ingresosMes,
-      alertasActivas,
+      alertasActivas: parseInt(alertasRaw[0]?.cantidad || '0', 10),
     };
   }
 
@@ -203,7 +219,7 @@ export class DashboardService {
         id: m.idMovimiento,
         placa: m.registroVehiculo.vehiculo.placa,
         usuario: m.registroVehiculo.usuario.nombreCompleto,
-        bahia: m.bahia.nombreBahia,
+        bahia: m.bahia?.nombreBahia ?? 'N/A',
         ingreso: m.horaIngreso,
         salida: m.horaSalida || 'N/A',
         estado: m.estado,
@@ -249,7 +265,7 @@ export class DashboardService {
     // Listado de movimientos
     movimientos.forEach((m, index) => {
       doc.fontSize(11).fillColor('#2c3e50').text(`${index + 1}. ${m.registroVehiculo.vehiculo.placa} - ${m.registroVehiculo.usuario.nombreCompleto}`);
-      doc.fontSize(9).fillColor('#7f8c8d').text(`   Ubicación: ${m.bahia.nombreBahia} | Ingreso: ${m.horaIngreso.toLocaleString()} | Estado: ${m.estado}`);
+      doc.fontSize(9).fillColor('#7f8c8d').text(`   Ubicación: ${m.bahia?.nombreBahia ?? 'N/A'} | Ingreso: ${m.horaIngreso.toLocaleString()} | Estado: ${m.estado}`);
       doc.moveDown(0.5);
     });
 

@@ -42,9 +42,13 @@ export class OperativoController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
   @Post('escanear-qr')
-  escanearQr(@Body() dto: EscanearQrDto) {
-    // COMPATIBILIDAD: se mantiene el endpoint histórico para clientes antiguos (solo consulta usuario+vehículos).
-    return this.operativoService.escanearQr(dto.qr);
+  escanearQr(
+    @Body() dto: EscanearQrDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    // Inicia tránsito de ingreso SIN asignar bahía.
+    // El SerialBridgeService vincula el vehículo a la bahía física al detectar presencia (<umbral cm).
+    return this.operativoService.escanearQr(dto.qr, { ...req.user, ip: req.ip });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard) // RF31: solo personal autorizado puede operar el acceso.

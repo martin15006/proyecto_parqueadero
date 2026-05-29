@@ -27,9 +27,15 @@ export class MovimientoVehiculo {
   @Column({ type: 'int' })
   idRegistroVehiculo: number;
 
-  @Index() // PERFORMANCE: Optimiza búsquedas de historial por bahía
-  @Column({ type: 'smallint' })
-  idBahia: number;
+  /**
+   * Bahía asignada al movimiento.
+   * Es `null` mientras el vehículo está en tránsito de ingreso (QR escaneado,
+   * sensor aún no ha detectado presencia física). El `SerialBridgeService` es
+   * el único responsable de asignar este valor al disparar `OCCUPIED`.
+   */
+  @Index()
+  @Column({ type: 'smallint', nullable: true })
+  idBahia: number | null;
 
   @Index() // PERFORMANCE: Filtrado rápido por estado (ADENTRO/SALIDA)
   @Column({
@@ -56,7 +62,7 @@ export class MovimientoVehiculo {
   @JoinColumn({ name: 'id_registro_vehiculo' })
   registroVehiculo: RegistroVehiculo;
 
-  @ManyToOne(() => Bahia, (bahia) => bahia.movimientos)
+  @ManyToOne(() => Bahia, (bahia) => bahia.movimientos, { nullable: true })
   @JoinColumn({ name: 'id_bahia' })
-  bahia: Bahia;
+  bahia: Bahia | null;
 }

@@ -30,53 +30,67 @@ export class TelemetriaService {
 
   /**
    * Procesa la telemetría enviada por el hardware.
-   * IOT_CONTRACT: Espera un JSON validado por TelemetryPayloadDto.
-   * PERFORMANCE: Implementa Throttling en memoria para evitar escrituras redundantes en DB.
+   *
+   * ### Separación throttle / lógica de negocio (FIX crítico)
+   *
+   * El throttle **solo suprime la escritura del sensor en DB** cuando el estado
+   * no cambia en menos de 30 s.  La llamada a `gestionarImpactoOperativo` ocurre
+   * **siempre**, porque el estado de la bahía puede haber cambiado a nivel lógico
+   * (p. ej. QR escaneado mientras el sensor ya estaba en OCCUPIED en caché) y la
+   * máquina de estados de `BahiasService` necesita verlo para vincular el movimiento
+   * flotante al espacio físico.
+   *
+   * Sin esta separación el pipeline queda mudo en cualquier test repetido dentro de
+   * la ventana de 30 s.
    */
   async procesarLectura(dto: TelemetryPayloadDto) {
     const { sensorId, status, battery, rssi } = dto;
 
-    // 1. Validación de Throttling: ¿El estado ha cambiado realmente?
+    // Throttle: ¿escribir en DB el registro del sensor?
     const ultimaLectura = this.cacheLecturas.get(sensorId);
-    if (ultimaLectura && ultimaLectura.status === status) {
-      const tiempoTranscurrido = Date.now() - ultimaLectura.timestamp;
-      // PERFORMANCE: Si el estado es el mismo y pasaron menos de 30s, ignoramos el guardado en DB
-      if (tiempoTranscurrido < 30000) {
-        return { ok: true, mensaje: 'Lectura duplicada ignorada (Throttling)' };
-      }
-    }
+    const tiempoTranscurrido = ultimaLectura ? Date.now() - ultimaLectura.timestamp : Infinity;
+    const mismoEstado = ultimaLectura?.status === status;
+    const dentroVentana = tiempoTranscurrido < 30_000;
+    const omitirDbSensor = mismoEstado && dentroVentana;
 
-    // 2. Localizar sensor en infraestructura
+    this.logger.debug(
+      `[Telemetría] ${sensorId} | ${status} | mismo=${mismoEstado} | ${Math.round(tiempoTranscurrido / 1000)}s | omitirDB=${omitirDbSensor}`,
+    );
+
+    // Localizar sensor siempre (necesario para `gestionarImpactoOperativo`)
     const sensor = await this.sensorRepository.findOne({ where: { codigo: sensorId } });
     if (!sensor) {
-      this.logger.error(`[IOT ERROR] Dispositivo no registrado intentando reportar: ${sensorId}`);
+      this.logger.error(`[IOT ERROR] Sensor no registrado: ${sensorId}`);
       throw new BadRequestException('Dispositivo IoT no reconocido');
     }
 
-    // 3. Actualizar estado del sensor
-    const estadoAnterior = sensor.estadoActual;
-    sensor.estadoActual = status;
-    sensor.bateria = battery ?? sensor.bateria;
-    sensor.ultimaLectura = new Date();
-    sensor.metadata = { ...sensor.metadata, rssi, lastUpdate: sensor.ultimaLectura };
-    
-    await this.sensorRepository.save(sensor);
-    
-    // Actualizar cache en memoria
-    this.cacheLecturas.set(sensorId, { status, timestamp: Date.now() });
+    if (!omitirDbSensor) {
+      // Escribir en DB solo cuando hay cambio real o venció la ventana
+      const estadoAnterior = sensor.estadoActual;
+      sensor.estadoActual = status;
+      sensor.bateria = battery ?? sensor.bateria;
+      sensor.ultimaLectura = new Date();
+      sensor.metadata = { ...sensor.metadata, rssi, lastUpdate: sensor.ultimaLectura };
+      await this.sensorRepository.save(sensor);
 
-    // 4. Auditoría Técnica: Registro del evento histórico
-    const evento = this.eventoRepository.create({
-      idSensor: sensor.idSensor,
-      tipoEvento: status,
-      payload: { battery, rssi, previousStatus: estadoAnterior },
-    });
-    await this.eventoRepository.save(evento);
+      this.cacheLecturas.set(sensorId, { status, timestamp: Date.now() });
 
-    // 5. Lógica de Negocio y Notificaciones Realtime
+      const evento = this.eventoRepository.create({
+        idSensor: sensor.idSensor,
+        tipoEvento: status,
+        payload: { battery, rssi, previousStatus: estadoAnterior },
+      });
+      await this.eventoRepository.save(evento);
+    } else {
+      // Actualizamos el objeto en memoria para que gestionarImpactoOperativo tenga el estado correcto
+      sensor.estadoActual = status;
+    }
+
+    // Lógica de negocio SIEMPRE: permite detectar nuevos movimientos flotantes
+    // incluso cuando el status del sensor no cambió (OCCUPIED repetido con nuevo QR escaneado)
     await this.gestionarImpactoOperativo(sensor, status);
 
-    return { ok: true, mensaje: 'Telemetría procesada exitosamente' };
+    return { ok: true, mensaje: omitirDbSensor ? 'Telemetría procesada (DB omitida por throttle)' : 'Telemetría procesada exitosamente' };
   }
 
   /**

@@ -130,5 +130,12 @@ export const bahiasService = {
     const response = await api.get('/bahias/ocupacion');
     const payload = (response.data && response.data.data) ? response.data.data : response.data;
     return payload;
-  }
+  },
+
+  /** Devuelve solo las bahías con sensor activo, con `estadoPanel` calculado. */
+  getSensorizadas: async () => {
+    const response = await api.get('/bahias/sensorizadas');
+    const payload = (response.data && response.data.data) ? response.data.data : response.data;
+    return payload;
+  },
 };
