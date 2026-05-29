@@ -150,6 +150,14 @@ export class OperativoService {
    * - TRANSITO con bahía / ADENTRO → el sensor detectó salida; el operario confirma.
    * - Sin movimiento → inicia tránsito de ingreso (sin asignar bahía).
    */
+  /**
+   * Lógica de portería simplificada:
+   * - Si el vehículo NO tiene movimiento activo → ingreso (ADENTRO, sin bahía).
+   * - Si el vehículo ya está ADENTRO → salida.
+   *
+   * El sensor es independiente: solo gestiona el estado visual de las bahías.
+   * La portería no asigna ni libera bahías.
+   */
   private async resolverAccionPorEstado(
     placa: string,
     documentoUsuario: string,
@@ -164,30 +172,15 @@ export class OperativoService {
       return await this.iniciarTransitoIngreso(placa, operador, usuarioInfo);
     }
 
-    // Tránsito de ingreso activo (sensor aún no ha detectado al vehículo en la bahía)
-    const transitoIngreso = await this.movimientoRepository.findOne({
-      where: {
-        idRegistroVehiculo: registro.idRegistroV,
-        estado: EstadoMovimiento.TRANSITO,
-        idBahia: null as any,
-      },
-    });
-    if (transitoIngreso) {
-      throw new BadRequestException({
-        message: 'El vehículo ya tiene un tránsito de ingreso activo. Diríjase a la bahía; el sensor confirmará su llegada.',
-        errorCode: 'VEHICULO_EN_TRANSITO_INGRESO',
-      });
-    }
-
-    // Movimiento que necesita cierre (ADENTRO o TRANSITO de salida con bahía asignada)
-    const movimientoParaSalida = await this.movimientoRepository.findOne({
+    // Si tiene movimiento activo (ADENTRO o TRANSITO legacy) → salida.
+    const movimientoActivo = await this.movimientoRepository.findOne({
       where: [
         { idRegistroVehiculo: registro.idRegistroV, estado: EstadoMovimiento.ADENTRO },
         { idRegistroVehiculo: registro.idRegistroV, estado: EstadoMovimiento.TRANSITO },
       ],
     });
 
-    if (movimientoParaSalida) {
+    if (movimientoActivo) {
       return await this.registrarSalida(placa, operador);
     }
 
@@ -383,48 +376,45 @@ export class OperativoService {
    * @param placa Identificador del vehículo
    * @param operador Datos del operador que registra
    */
+  /**
+   * Registra el ingreso de un vehículo identificado por placa.
+   * Sin asignación de bahía: el sensor gestiona el estado visual de forma independiente.
+   * Mismo modelo que `iniciarTransitoIngreso` (flujo QR).
+   */
   async registrarEntrada(placa: string, operador: IJwtPayload & { ip: string }) {
-    await this.bahiasService.validarIngresoPermitido(); // RF14/RF39: se valida antes de cualquier operación para impedir bypass (operativo/contingencia).
+    await this.bahiasService.validarIngresoPermitido();
     return await this.movimientoRepository.manager.transaction(async (manager) => {
-      // 1. Validaciones de existencia y estado
       const { registro } = await this.validarVehiculoYRegistro(placa, manager);
       await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
 
-      // 2. Asignación de infraestructura con Lock
-      const bahia = await this.asignarBahiaDisponible(manager);
-
-      // 3. Registro del movimiento
       const nuevoMovimiento = manager.create(MovimientoVehiculo, {
         horaIngreso: new Date(),
         idRegistroVehiculo: registro.idRegistroV,
-        idBahia: bahia.idBahia,
+        idBahia: null,   // Sin asignación — el vehículo elige libremente la bahía.
         estado: EstadoMovimiento.ADENTRO,
       });
 
       const guardado = await manager.save(nuevoMovimiento);
 
-      // 4. Auditoría, Sockets y Sincronización
-      await this.ejecutarPostIngreso(guardado, placa, bahia.nombreBahia, operador);
+      await this.ejecutarPostIngreso(guardado, placa, 'LIBRE', operador);
 
-      // Cargamos datos para el modal profesional del frontend
       const usuario = await this.usuarioService.findOneByDocumento(registro.idUsuario);
 
       return {
         ok: true,
-        mensaje: 'Ingreso procesado exitosamente',
+        mensaje: 'Vehículo registrado. Puede estacionarse en cualquier bahía disponible.',
         movimiento: {
           idMovimiento: guardado.idMovimiento,
           horaIngreso: guardado.horaIngreso,
           estado: guardado.estado,
         },
-        bahia: bahia.nombreBahia,
         aprendiz: {
           nombreCompleto: usuario?.nombreCompleto || 'USUARIO DESCONOCIDO',
           documento: usuario?.documento || registro.idUsuario,
-          fotoPersona: usuario?.fotoPersona
+          fotoPersona: usuario?.fotoPersona,
         },
         vehiculo: {
-          placa: placa,
+          placa,
           tipoVehiculo: registro.vehiculo?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
           color: registro.vehiculo?.color,
           fotoVehiculo: registro.vehiculo?.fotoVehiculo,
@@ -854,6 +844,13 @@ export class OperativoService {
    * @param operador Contexto JWT del operativo autorizante.
    * @param usuarioInfo Datos opcionales del aprendiz (evita una re-consulta).
    */
+  /**
+   * Registra el ingreso de un vehículo.
+   *
+   * Crea un MovimientoVehiculo con estado ADENTRO e idBahia=null.
+   * El sensor gestiona el estado visual de las bahías de forma completamente
+   * independiente — la portería no asigna ni conoce la bahía donde se estacionará.
+   */
   private async iniciarTransitoIngreso(
     placa: string,
     operador: IJwtPayload & { ip: string },
@@ -865,19 +862,18 @@ export class OperativoService {
       const { registro } = await this.validarVehiculoYRegistro(placa, manager);
       await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
 
-      // idBahia = null — el sensor es el único dueño de esta asignación física.
       const nuevoMovimiento = manager.create(MovimientoVehiculo, {
         horaIngreso: new Date(),
         idRegistroVehiculo: registro.idRegistroV,
-        idBahia: null,
-        estado: EstadoMovimiento.TRANSITO,
+        idBahia: null,           // Sin asignación de bahía — el vehículo elige libremente.
+        estado: EstadoMovimiento.ADENTRO,
         esManual: false,
       });
 
       const guardado = await manager.save(nuevoMovimiento);
 
       await this.auditoriaService.create({
-        accion: 'INICIAR_TRANSITO_INGRESO',
+        accion: 'REGISTRAR_ENTRADA',
         entidad: 'MOVIMIENTO_VEHICULO',
         idEntidad: guardado.idMovimiento,
         idUsuario: operador?.sub || 'SISTEMA',
@@ -889,7 +885,7 @@ export class OperativoService {
       this.eventosGateway.emitirVehiculoIngresado({
         placa,
         fecha: guardado.horaIngreso,
-        bahia: 'EN_TRANSITO',
+        bahia: 'LIBRE',
       });
       await this.sincronizarEstadoGlobal();
 
@@ -898,8 +894,8 @@ export class OperativoService {
 
       return {
         ok: true,
-        mensaje: 'Vehículo autorizado. Diríjase a la bahía — el sensor confirmará el ingreso.',
-        estado: EstadoMovimiento.TRANSITO,
+        mensaje: 'Vehículo registrado. Puede estacionarse en cualquier bahía disponible.',
+        estado: EstadoMovimiento.ADENTRO,
         movimiento: {
           idMovimiento: guardado.idMovimiento,
           horaIngreso: guardado.horaIngreso,

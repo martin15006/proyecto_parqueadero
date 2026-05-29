@@ -85,15 +85,25 @@ export const useOperativo = () => {
       setBahias(sensorizadas);
       setVehiculos(mapActivosFromSensorizadas(sensorizadas));
 
-      // Las métricas se derivan del array de bahías sensorizadas para garantizar
-      // que "total" = número de sensores activos (3) y no el total de bahías en BD.
+      // Métricas derivadas del array sensorizado.
+      // Regla de negocio:
+      //   OCUPADO / DISCREPANCIA → presencia física confirmada → cuenta como ocupado.
+      //   LIBRE / SALIDA_PENDIENTE → bahía físicamente disponible → cuenta como libre.
+      //   OFFLINE / DESHABILITADO → no cuentan en ninguno de los dos lados.
+      // SALIDA_PENDIENTE NO es "ocupado": el sensor ya confirmó que el vehículo se fue;
+      // la bahía puede recibir otro vehículo. Solo falta la confirmación de portería.
       const total = sensorizadas.length;
-      const libres = sensorizadas.filter((b) => b.estadoPanel === 'LIBRE').length;
-      const ocupados = total - libres;
+      const ocupados = sensorizadas.filter(
+        (b) => b.estadoPanel === 'OCUPADO' || b.estadoPanel === 'DISCREPANCIA',
+      ).length;
+      const libres = sensorizadas.filter(
+        (b) => b.estadoPanel === 'LIBRE' || b.estadoPanel === 'SALIDA_PENDIENTE',
+      ).length;
       setStats({
         total,
         ocupados,
         disponibles: libres,
+        // vehiculosActivos incluye SALIDA_PENDIENTE: el operario aún debe confirmar la salida.
         vehiculosActivos: sensorizadas.filter(
           (b) => b.estadoPanel === 'OCUPADO' || b.estadoPanel === 'SALIDA_PENDIENTE',
         ).length,
@@ -121,6 +131,11 @@ export const useOperativo = () => {
   };
 
   useEffect(() => {
+    // Garantizar que el socket use el JWT vigente antes de suscribir listeners
+    // o cargar datos: destruye cualquier conexión previa con token expirado y abre
+    // una nueva con el access_token más reciente del localStorage.
+    socketService.reconnectWithFreshToken();
+
     loadInitialData();
 
     // ── Polling de respaldo ─────────────────────────────────────────────────

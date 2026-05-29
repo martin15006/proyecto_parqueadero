@@ -30,7 +30,7 @@ const ESTADO_STYLES: Record<
     wrapper: 'bg-red-500/10 border-red-500/60 shadow-[0_0_20px_rgba(239,68,68,0.25)]',
     text: 'text-red-500',
     badge: 'bg-red-600',
-    label: 'Ocupado (S/A)',
+    label: 'Ocupado',
   },
   OFFLINE: {
     wrapper: 'bg-gray-900 border-gray-800 opacity-50 grayscale',
@@ -58,7 +58,7 @@ interface BahiaCardProps {
  * - **OCUPADO** — rojo, muestra placa con animación.
  * - **SALIDA_PENDIENTE** — ámbar, vehículo salió físicamente pero el operario
  *   aún no confirmó en portería. Muestra placa y badge parpadeante.
- * - **DISCREPANCIA** — rojo de alerta, sensor detecta presencia sin QR autorizado. Label "Ocupado (S/A)".
+ * - **DISCREPANCIA** — sensor detecta presencia física; se muestra igual que OCUPADO.
  * - **OFFLINE / DESHABILITADO** — gris con overlay.
  */
 export const BahiaCard: React.FC<BahiaCardProps> = ({ bahia }) => {
@@ -101,12 +101,7 @@ export const BahiaCard: React.FC<BahiaCardProps> = ({ bahia }) => {
         </span>
       )}
 
-      {/* Badge de DISCREPANCIA: presencia física sin autorización previa */}
-      {bahia.estadoPanel === 'DISCREPANCIA' && (
-        <span className="mt-1 text-[8px] font-black text-red-400 uppercase tracking-tight animate-pulse">
-          {styles.label}
-        </span>
-      )}
+    
 
       {/* Overlay para estados inactivos */}
       {isInactive && (

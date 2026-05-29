@@ -22,7 +22,7 @@ async function bootstrap() {
 
   const isDev = process.env.NODE_ENV !== 'production';
   // CORRECCIÓN 1: Agregar patrones comunes de IP local o permitir la IP del Wi-Fi en desarrollo
-  const devAllowedHosts = new Set(['localhost', '127.0.0.1', '192.168.101.84']);
+  const devAllowedHosts = new Set(['localhost', '127.0.0.1', '192.168.137.225']);
 
   const corsOrigins = (process.env.CORS_ORIGINS ?? '')
     .split(',')
@@ -124,7 +124,7 @@ async function bootstrap() {
     }
     throw error;
   }
-  logger.log(`Servidor corriendo en red local. Accesible en http://192.168.101.84:${port}`);
+  logger.log(`Servidor corriendo en red local. Accesible en http://192.168.137.225:${port}`);
 }
 bootstrap().catch((error) => {
   const logger = new Logger('Bootstrap');

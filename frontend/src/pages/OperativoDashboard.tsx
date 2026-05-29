@@ -4,6 +4,7 @@ import { useAuth } from '../AuthContext'; // UX: mantiene el hook de autenticaci
 import { MovementForm } from '../components/MovementForm'; // RF10/RF11/RF14: pasarela de acceso (escaneo/placa/contingencia).
 import { useOperativo } from '../hooks/useOperativo'; // RF15/RF18: fuente única de datos en vivo (REST + WebSocket) para ocupación/alertas.
 import { useNotification } from '../contexts/NotificationContext'; // UX: notificaciones en UI sin romper integración existente.
+import type { BahiaSensorizada } from '../types'; // RF15: tipo con estadoPanel calculado por el backend (LIBRE/OCUPADO/SALIDA_PENDIENTE/etc).
 
 /**
  * Dashboard Operativo (Vista Principal) — Rediseño UI/UX SENA.
@@ -194,52 +195,72 @@ const TelemetrySkeleton: React.FC = () => ( // UI: placeholder de telemetría (r
   </div>
 );
 
-const MapaBahias: React.FC<{ bahias: Array<{ idBahia: number; nombreBahia: string; ocupada: boolean; fueraServicio?: boolean; placa?: string; tipoBahia?: { tipoBahia: string } }> }> = ({ bahias }) => ( // RF15: mapa operativo con estados visibles.
-  <div className="rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)] overflow-hidden"> {/* UI: contenedor. */}
-    <div className="p-6 border-b border-slate-200 flex items-center justify-between gap-4"> {/* UI: header del mapa. */}
-      <div>
-        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-slate-500">Mapa de disponibilidad</p>
-        <p className="mt-1 text-lg font-black text-[#003939]">Bahías en tiempo real</p>
+const MapaBahias: React.FC<{ bahias: BahiaSensorizada[] }> = ({ bahias }) => { // RF15: mapa operativo — usa estadoPanel calculado por el backend.
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)] overflow-hidden">
+      <div className="p-6 border-b border-slate-200 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.28em] text-slate-500">Mapa de disponibilidad</p>
+          <p className="mt-1 text-lg font-black text-[#003939]">Bahías en tiempo real</p>
+        </div>
+        <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-slate-600">
+          <LegendDot color="bg-[#39A900]" label="Libre" />
+          <LegendDot color="bg-[#D32F2F]" label="Ocupada" />
+          <LegendDot color="bg-slate-400" label="Offline" />
+        </div>
       </div>
-      <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-slate-600">
-        <LegendDot color="bg-[#39A900]" label="Libre" />
-        <LegendDot color="bg-[#D32F2F]" label="Ocupada" />
-        <LegendDot color="bg-slate-400" label="Offline" />
+      <div className="p-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          {bahias.length === 0 ? (
+            <div className="col-span-full py-16 text-center text-slate-500 font-semibold">Cargando infraestructura...</div>
+          ) : (
+            bahias.map((b) => {
+              // RF15: la fuente de verdad es estadoPanel (calculado por BahiasService.derivarEstadoPanel).
+              // NO usar b.ocupada — ese campo no existe en BahiaSensorizada y siempre sería undefined.
+              const isOffline = b.estadoPanel === 'OFFLINE' || b.estadoPanel === 'DESHABILITADO';
+              const isOcupado = b.estadoPanel === 'OCUPADO'
+                || b.estadoPanel === 'SALIDA_PENDIENTE'
+                || b.estadoPanel === 'DISCREPANCIA';
+
+              return (
+                <div
+                  key={b.idBahia}
+                  className={[
+                    'rounded-2xl border-2 p-4 min-h-[92px] flex flex-col items-center justify-center text-center transition-all duration-500',
+                    isOffline
+                      ? 'border-slate-300 bg-slate-100 text-slate-500'
+                      : isOcupado
+                        ? 'border-[#D32F2F]/50 bg-[#D32F2F]/5'
+                        : 'border-[#39A900]/40 bg-[#39A900]/5',
+                  ].join(' ')}
+                >
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-600">{b.nombreBahia}</p>
+                  {isOffline ? (
+                    <p className="mt-2 text-[12px] font-black uppercase tracking-widest">{b.estadoPanel}</p>
+                  ) : b.estadoPanel === 'SALIDA_PENDIENTE' ? (
+                    <>
+                      <p className="mt-2 text-base font-black text-[#D32F2F]">{b.placa || 'OCUPADA'}</p>
+                      <p className="text-[9px] font-black text-amber-600 uppercase tracking-tight animate-pulse">Confirmar salida</p>
+                    </>
+                  ) : b.estadoPanel === 'DISCREPANCIA' ? (
+                    <>
+                      <p className="mt-2 text-base font-black text-[#D32F2F]">OCUPADO</p>
+                      <p className="text-[9px] font-black text-[#D32F2F] uppercase tracking-tight animate-pulse">S/A</p>
+                    </>
+                  ) : isOcupado ? (
+                    <p className="mt-2 text-base font-black text-[#D32F2F]">{b.placa || 'OCUPADA'}</p>
+                  ) : (
+                    <p className="mt-2 text-[12px] font-black uppercase tracking-widest text-[#39A900]">LIBRE</p>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
-    <div className="p-6">
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-        {bahias.length === 0 ? (
-          <div className="col-span-full py-16 text-center text-slate-500 font-semibold">Cargando infraestructura...</div>
-        ) : (
-          bahias.map((b) => (
-            <div
-              key={b.idBahia}
-              className={[
-                'rounded-2xl border-2 p-4 min-h-[92px] flex flex-col items-center justify-center text-center',
-                b.fueraServicio
-                  ? 'border-slate-300 bg-slate-100 text-slate-500'
-                  : b.ocupada
-                    ? 'border-[#D32F2F]/40 bg-[#D32F2F]/5'
-                    : 'border-[#39A900]/40 bg-[#39A900]/5',
-              ].join(' ')}
-              title={b.tipoBahia?.tipoBahia || 'Bahía'} // UX: tooltip nativo.
-            >
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-600">{b.nombreBahia}</p>
-              {b.fueraServicio ? (
-                <p className="mt-2 text-[12px] font-black uppercase tracking-widest">OFFLINE</p>
-              ) : b.ocupada ? (
-                <p className="mt-2 text-base font-black text-[#D32F2F]">{b.placa || 'OCUPADA'}</p>
-              ) : (
-                <p className="mt-2 text-[12px] font-black uppercase tracking-widest text-[#39A900]">LIBRE</p>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  </div>
-);
+  );
+};
 
 const LegendDot: React.FC<{ color: string; label: string }> = ({ color, label }) => ( // UI: componente de leyenda accesible.
   <span className="inline-flex items-center gap-2">

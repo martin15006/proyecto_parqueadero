@@ -239,36 +239,24 @@ export class EventosGateway
   }
 
   emitirBahiaModificada(payload: IBahiaModificadaPayload, opts?: { source?: 'IOT' | 'PORTERIA' | 'ADMIN' }) {
-    const source = opts?.source ?? 'ADMIN';
-    if (source !== 'IOT') {
-      this.emitirEvento('bahia_modificada', payload, this.ROOMS.PARQUEADERO_BAHIAS);
-      return;
-    }
-
     const key = payload.idBahia;
     const current = this.bahiaDebounce.get(key);
     const lastEmitState = current?.lastEmitState ?? null;
 
+    // Si el estado no cambió respecto al último emitido, ignorar
     if (lastEmitState === payload.nuevoEstado) return;
 
+    // Cancelar timer anterior si existe
     if (current?.timer) {
       clearTimeout(current.timer);
     }
 
-    const timer = setTimeout(() => {
-      const updated = this.bahiaDebounce.get(key);
-      if (!updated) return;
-      const toEmit = updated.pending;
-      this.emitirEvento('bahia_modificada', toEmit, this.ROOMS.PARQUEADERO_BAHIAS);
-      updated.lastEmitState = toEmit.nuevoEstado;
-      updated.timer = null;
-      this.bahiaDebounce.set(key, updated);
-    }, 2000);
-
+    // Emitir inmediatamente sin esperar el debounce
+    this.emitirEvento('bahia_modificada', payload, this.ROOMS.PARQUEADERO_BAHIAS);
     this.bahiaDebounce.set(key, {
-      timer,
+      timer: null,
       pending: payload,
-      lastEmitState,
+      lastEmitState: payload.nuevoEstado,
     });
   }
 }

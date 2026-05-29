@@ -10,35 +10,74 @@ class SocketService {
   private readonly URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
   private lastConnectionError: string | null = null;
 
+  /** Lee el token JWT más reciente desde localStorage (soporta los tres formatos de clave). */
+  private readToken(): string | undefined {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      return user.accessToken || user.access_token || user.token || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   /**
-   * Establece una conexión única con el servidor de WebSockets.
-   * FEATURE: Implementa patrón Singleton para garantizar una sola instancia.
-   * SOCKET: Gestiona la autenticación mediante handshake JWT.
+   * Establece una conexión con el servidor de WebSockets.
+   *
+   * Si ya existe una instancia conectada la reutiliza (patrón singleton por ciclo de vida).
+   * Si existe pero está en estado `disconnected` (p.ej. JWT expirado silenciosamente),
+   * la destruye limpiamente antes de crear una nueva con el token fresco del localStorage.
    */
   connect() {
-    if (!this.socket) {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      // FIX: Soportar ambos formatos de token tras normalización global
-      const token = user.accessToken || user.access_token || user.token;
-      
-      this.socket = io(this.URL, {
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        transports: ['websocket'],
-        auth: {
-          token: token
-        }
-      });
-
-      this.socket.on('connect', () => {
-        this.lastConnectionError = null;
-      });
-
-      this.socket.on('connect_error', (error) => {
-        this.lastConnectionError = error?.message || 'Error de conexión WebSocket';
-      });
+    // Reutilizar solo si el socket existe Y está actualmente conectado.
+    if (this.socket?.connected) {
+      return this.socket;
     }
+
+    // Socket huérfano (expiró, fue desconectado o se cerró): limpiar antes de recrear.
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
+
+    const token = this.readToken();
+
+    this.socket = io(this.URL, {
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      transports: ['websocket'],
+      auth: { token },
+    });
+
+    this.socket.on('connect', () => {
+      this.lastConnectionError = null;
+    });
+
+    this.socket.on('connect_error', (error) => {
+      this.lastConnectionError = error?.message || 'Error de conexión WebSocket';
+    });
+
     return this.socket;
+  }
+
+  /**
+   * Destruye la conexión actual (incluyendo todos sus listeners) y crea una nueva
+   * leyendo el token más reciente del localStorage.
+   *
+   * Usar cuando el componente monta para garantizar que el socket use el JWT vigente
+   * y no uno que haya expirado silenciosamente durante la sesión anterior.
+   */
+  reconnectWithFreshToken() {
+    // Desconectar y purgar listeners de la sesión anterior.
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    this.lastConnectionError = null;
+
+    // Crear nueva conexión con el token fresco.
+    return this.connect();
   }
 
   /**
@@ -46,6 +85,7 @@ class SocketService {
    */
   disconnect() {
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
     }
