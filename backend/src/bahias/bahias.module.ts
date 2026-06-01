@@ -15,6 +15,7 @@ import { GatewayModule } from '../gateway/gateway.module';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { AuthModule } from '../auth/auth.module';
+import { InfraestructuraSeedService } from './infraestructura-seed.service';
 
 @Module({
   imports: [
@@ -26,7 +27,7 @@ import { AuthModule } from '../auth/auth.module';
     AuthModule, // RNF2: necesario para que JwtAuthGuard inyecte AuthService correctamente en BahiasController.
   ],
   controllers: [BahiasController, BahiasAdminController],
-  providers: [BahiasService],
+  providers: [BahiasService, InfraestructuraSeedService],
   exports: [BahiasService, TypeOrmModule],
 })
 export class BahiasModule {}

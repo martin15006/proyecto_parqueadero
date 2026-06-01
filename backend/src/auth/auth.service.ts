@@ -457,8 +457,19 @@ export class AuthService implements OnModuleInit {
    * Genera un código OTP y lo envía.
    * SECURITY: Implementa protección contra ráfagas (burst) y condiciones de carrera.
    */
+  private get isDevEmailDisabled(): boolean {
+    return (
+      this.configService.get<string>('NODE_ENV') !== 'production' &&
+      this.configService.get<string>('DISABLE_EMAILS') === 'true'
+    );
+  }
+
   private async generarYEnviarOtp(usuario: Usuario): Promise<void> {
     const { idOtp, codigo } = await this.crearOtp(usuario.documento);
+    if (this.isDevEmailDisabled) {
+      this.logger.warn(`[DEV] OTP para ${usuario.correo}: ${codigo}`);
+      return;
+    }
     try {
       await this.mailService.enviarCodigoOtp(usuario.correo, codigo, usuario.nombreCompleto);
     } catch (error) {
@@ -478,7 +489,9 @@ export class AuthService implements OnModuleInit {
       const tiempoTranscurrido = Date.now() - ultimoOtp.createdAt.getTime();
 
       if (tiempoTranscurrido < UN_MINUTO) {
-        // RNF2 (Privacidad): no registramos documento/cédula (PII). Registramos solo el control de rate-limit.
+        if (this.isDevEmailDisabled) {
+          return { idOtp: ultimoOtp.idOtp, codigo: ultimoOtp.codigo, expiraEn: ultimoOtp.expiraEn };
+        }
         this.logger.warn('Intento de generación de OTP bloqueado por rate-limit (1min).');
         throw new BadRequestException(AuthService.OTP_RATE_LIMIT_MSG);
       }
@@ -489,7 +502,7 @@ export class AuthService implements OnModuleInit {
       { usado: true },
     );
 
-    const codigo = crypto.randomInt(100000, 1000000).toString();
+    const codigo = this.isDevEmailDisabled ? '000000' : crypto.randomInt(100000, 1000000).toString();
     const expiraEn = new Date();
     expiraEn.setMinutes(expiraEn.getMinutes() + 5);
 

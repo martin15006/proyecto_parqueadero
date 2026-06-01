@@ -252,8 +252,6 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
     
     try {
       const upper = targetValue.toUpperCase(); // RF33: normalización para evaluar formatos.
-      const isCodigoHex32 = /^[0-9A-F]{32}$/.test(upper); // RF31: token Code128 normalizado (32 hex sin guiones).
-      const isPlaca = /^[A-Z0-9-]{4,10}$/.test(upper) && !isCodigoHex32; // RF34: permite operar por placa si no se escanea token.
 
       switch (action) {
         case 'entrada':

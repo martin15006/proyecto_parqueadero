@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'; // UI: hooks para render reactivo del panel operativo (tiempo real).
+﻿import React, { useMemo, useState } from 'react'; // UI: hooks para render reactivo del panel operativo (tiempo real).
 import { AlertTriangle, CheckCircle2, RefreshCw, ShieldAlert } from 'lucide-react'; // UI: iconografía accesible y de alto contraste (WCAG).
 import { useAuth } from '../AuthContext'; // UX: mantiene el hook de autenticación existente (sesión/operador/logout).
 import { MovementForm } from '../components/MovementForm'; // RF10/RF11/RF14: pasarela de acceso (escaneo/placa/contingencia).
@@ -138,9 +138,8 @@ export const OperativoDashboard: React.FC = () => {
             />
           </div>
 
-          <div className="lg:col-span-5 space-y-6"> {/* Sección A (parte): telemetría placeholder + mapa. */}
-            <TelemetrySkeleton /> {/* RF15/RF18: placeholder visual para “Telemetría IoT” sin romper UI actual. */}
-            <MapaBahias bahias={bahias} /> {/* RF15: mapa de disponibilidad consumiendo data real del hook. */}
+          <div className="lg:col-span-5 space-y-6">
+            <MapaBahias bahias={bahias} />
           </div>
 
           <div className="lg:col-span-3 space-y-6"> {/* Sección D: historial y alertas. */}
@@ -177,23 +176,6 @@ const Kpi: React.FC<{ label: string; value: string | number; highlight?: boolean
   </div>
 );
 
-const TelemetrySkeleton: React.FC = () => ( // UI: placeholder de telemetría (requisito de diseño).
-  <div className="rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)] overflow-hidden"> {/* UI: contenedor premium. */}
-    <div className="p-6 border-b border-slate-200 bg-[#003939] text-white"> {/* Paleta: encabezado verde oscuro. */}
-      <p className="text-[11px] font-black uppercase tracking-[0.28em] opacity-90">Telemetría IoT de Bahías</p> {/* RF15: texto literal solicitado. */}
-      <p className="mt-2 text-sm font-semibold opacity-90">Esperando sincronización de hardware real</p> {/* RF15: mensaje de skeleton. */}
-    </div>
-    <div className="p-6 space-y-4 animate-pulse"> {/* UX: skeleton loading interactivo. */}
-      <div className="h-4 w-2/3 rounded-full bg-slate-200" /> {/* Skeleton line 1. */}
-      <div className="h-4 w-1/2 rounded-full bg-slate-200" /> {/* Skeleton line 2. */}
-      <div className="grid grid-cols-3 gap-3 pt-2"> {/* Skeleton blocks. */}
-        <div className="h-16 rounded-2xl bg-slate-200" />
-        <div className="h-16 rounded-2xl bg-slate-200" />
-        <div className="h-16 rounded-2xl bg-slate-200" />
-      </div>
-    </div>
-  </div>
-);
 
 const MapaBahias: React.FC<{ bahias: BahiaSensorizada[] }> = ({ bahias }) => { // RF15: mapa operativo — usa estadoPanel calculado por el backend.
   return (
