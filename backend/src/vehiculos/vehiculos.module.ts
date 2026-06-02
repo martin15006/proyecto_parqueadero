@@ -7,9 +7,12 @@ import { Vehiculo } from './entities/vehiculo.entity';
 import { TipoVehiculo } from './entities/tipo-vehiculo.entity';
 import { RegistroVehiculo } from './entities/registro-vehiculo.entity';
 import { MovimientoVehiculo } from './entities/movimiento-vehiculo.entity';
+import { Compartir } from './entities/compartir.entity';
+import { SolicitudVehiculo } from './entities/solicitud-vehiculo.entity';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { AuditoriaModule } from '../auditoria/auditoria.module';
 import { AuthModule } from '../auth/auth.module';
+import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 
 @Module({
   imports: [
@@ -18,10 +21,13 @@ import { AuthModule } from '../auth/auth.module';
       TipoVehiculo,
       RegistroVehiculo,
       MovimientoVehiculo,
+      Compartir,
+      SolicitudVehiculo,
     ]),
     forwardRef(() => UsuariosModule),
     AuditoriaModule,
     AuthModule,
+    NotificacionesModule,
   ],
   controllers: [VehiculosController, AdminVehiculosController],
   providers: [VehiculosService],

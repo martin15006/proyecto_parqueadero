@@ -23,6 +23,9 @@ import Footer from '../components/Footer';
 import SuccessCheck from '../components/SuccessCheck';
 import BotonTema from '../components/BotonTema';
 import MedidorContrasena from '../components/MedidorContrasena';
+import OtpModal from '../components/OtpModal';
+import { useAuth } from '../context/AuthContext';
+import { Usuario } from '../types/usuario';
 import { validarContrasenaSegura } from '../utils/validacionContrasena';
 
 interface FormState {
@@ -49,12 +52,15 @@ const FORM_INICIAL: FormState = {
 
 export default function RegisterScreen({ navigation }: any) {
   const { colores, esOscuro } = useTheme();
+  const { iniciarSesion } = useAuth();
   const [form, setForm] = useState<FormState>(FORM_INICIAL);
   const [errores, setErrores] = useState<Partial<Record<keyof FormState | 'foto', string>>>({});
   const [fotoLocal, setFotoLocal] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [mensajeCargando, setMensajeCargando] = useState('');
   const [exitoVisible, setExitoVisible] = useState(false);
+  const [otpVisible, setOtpVisible] = useState(false);
+  const [correoParaOtp, setCorreoParaOtp] = useState('');
   const paddingTopSeguro =
     Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 50;
 
@@ -143,7 +149,7 @@ export default function RegisterScreen({ navigation }: any) {
       const urlFoto = await subirImagen(fotoLocal!);
 
       setMensajeCargando('Registrando...');
-      await usuarioService.registrar({
+      const respuesta = await usuarioService.registrar({
         documento: form.documento,
         fotoPersona: urlFoto,
         nombreCompleto: form.nombreCompleto,
@@ -154,23 +160,27 @@ export default function RegisterScreen({ navigation }: any) {
         idFormacion: form.idFormacion,
       });
 
-      setExitoVisible(true);
-      const correoRegistrado = form.correo;
-      setTimeout(() => {
-        setExitoVisible(false);
-        setForm(FORM_INICIAL);
-        setFotoLocal(null);
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Login', params: { correo: correoRegistrado } }],
-        });
-      }, 900);
+      // Abrir el modal de verificación OTP de registro
+      setCorreoParaOtp(respuesta.correo);
+      setOtpVisible(true);
     } catch (error: any) {
       Alert.alert('Error en el registro', error.message);
     } finally {
       setCargando(false);
       setMensajeCargando('');
     }
+  };
+
+  const handleOtpRegistroExito = async (token: string, usuarioData: Usuario) => {
+    setOtpVisible(false);
+    setExitoVisible(true);
+    // Pequeña pausa para mostrar el check y luego iniciar sesión
+    setTimeout(async () => {
+      setExitoVisible(false);
+      setForm(FORM_INICIAL);
+      setFotoLocal(null);
+      await iniciarSesion(usuarioData, token);
+    }, 800);
   };
 
   return (
@@ -344,7 +354,14 @@ export default function RegisterScreen({ navigation }: any) {
           <Footer />
         </KeyboardAwareScrollView>
       </View>
-      <SuccessCheck visible={exitoVisible} mensaje="¡Registro exitoso!" />
+      <SuccessCheck visible={exitoVisible} mensaje="¡Cuenta verificada!" />
+      <OtpModal
+        visible={otpVisible}
+        correo={correoParaOtp}
+        modo="registro"
+        onCerrar={() => setOtpVisible(false)}
+        onExito={handleOtpRegistroExito}
+      />
     </>
   );
 }

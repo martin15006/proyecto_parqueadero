@@ -1,5 +1,13 @@
 import api from '../api/axios';
-import type { AdminVehiculoItem, BackendEnvelope, CreateVehiculoDto, TipoVehiculo, Vehiculo } from '../types';
+import type {
+  AdminVehiculoItem,
+  BackendEnvelope,
+  CreateVehiculoDto,
+  TipoVehiculo,
+  Vehiculo,
+  SolicitudVehiculoAdmin,
+  EstadoSolicitudVehiculo,
+} from '../types';
 
 /**
  * Servicio de Gestión de Vehículos.
@@ -77,6 +85,36 @@ export const vehiculosService = {
 
   salidaEmergenciaAdmin: async (payload: { placa?: string; idRegistroVehiculo?: number; motivo: string }): Promise<BackendEnvelope<any>> => {
     const response = await api.post('/admin/movimientos/salida-emergencia', payload);
+    return response.data;
+  },
+
+  // ─── SOLICITUDES DE REGISTRO DE VEHÍCULO (Admin) ─────────────────────────
+
+  /**
+   * Lista las solicitudes de registro de vehículos.
+   * Filtro opcional por estado.
+   */
+  listarSolicitudes: async (
+    estado?: EstadoSolicitudVehiculo,
+  ): Promise<BackendEnvelope<SolicitudVehiculoAdmin[]>> => {
+    const suffix = estado ? `?estado=${estado}` : '';
+    const response = await api.get(`/admin/vehiculos/solicitudes${suffix}`);
+    return response.data;
+  },
+
+  /**
+   * Aprueba o rechaza una solicitud de registro.
+   * Si estado = 'RECHAZADO', motivoRechazo es obligatorio.
+   */
+  resolverSolicitud: async (
+    idSolicitud: number,
+    estado: 'APROBADO' | 'RECHAZADO',
+    motivoRechazo?: string,
+  ): Promise<BackendEnvelope<{ mensaje: string }>> => {
+    const response = await api.patch(`/admin/vehiculos/solicitudes/${idSolicitud}`, {
+      estado,
+      motivoRechazo,
+    });
     return response.data;
   },
 };

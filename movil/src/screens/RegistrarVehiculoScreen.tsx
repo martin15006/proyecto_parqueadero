@@ -133,8 +133,8 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
       const urlTarjeta = await subirImagen(fotoTarjeta!);
       const urlPlaca = await subirImagen(fotoPlaca!);
 
-      setMensajeCargando('Registrando...');
-      await vehiculoService.registrar({
+      setMensajeCargando('Enviando solicitud...');
+      await vehiculoService.solicitarRegistro({
         placa: placa.toUpperCase().trim(),
         fotoVehiculo: urlVehiculo,
         fotoTarjetaP: urlTarjeta,
@@ -146,8 +146,12 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
       setExitoVisible(true);
       setTimeout(() => {
         setExitoVisible(false);
-        navigation.navigate('Vehiculos');
-      }, 1800);
+        Alert.alert(
+          'Solicitud enviada',
+          'Tu solicitud fue enviada al administrador. Recibirás una notificación cuando sea revisada.',
+          [{ text: 'OK', onPress: () => navigation.navigate('Vehiculos') }],
+        );
+      }, 1500);
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
@@ -365,8 +369,14 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
           )}
 
           <View style={{ marginTop: espacios.medio }}>
+            <View style={[styles.aviso, { backgroundColor: esOscuro ? 'rgba(255,193,7,0.10)' : '#FFF8E1', borderColor: '#FFC107' }]}>
+              <Text style={[styles.avisoTexto, { color: esOscuro ? '#FFD54F' : '#856404' }]}>
+                ⚠ Tu solicitud será revisada por un administrador. El vehículo solo
+                quedará registrado cuando sea aprobado.
+              </Text>
+            </View>
             <AnimatedButton
-              texto="Registrar Vehículo"
+              texto="Enviar Solicitud"
               onPress={handleRegistrar}
               cargando={cargando}
               mensajeCargando={mensajeCargando}
@@ -375,7 +385,7 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
         </FadeInView>
       </KeyboardAwareScrollView>
 
-      <SuccessCheck visible={exitoVisible} mensaje="¡Vehículo registrado!" />
+      <SuccessCheck visible={exitoVisible} mensaje="¡Solicitud enviada!" />
     </View>
   );
 }
@@ -442,5 +452,15 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     paddingHorizontal: 12,
     paddingVertical: 4,
+  },
+  aviso: {
+    borderRadius: 12,
+    padding: espacios.normal,
+    borderWidth: 1,
+    marginBottom: espacios.normal,
+  },
+  avisoTexto: {
+    fontSize: fonts.pequeno,
+    lineHeight: 18,
   },
 });

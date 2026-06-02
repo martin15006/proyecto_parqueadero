@@ -45,9 +45,11 @@ export class UsuarioService {
   ) {}
 
   /**
-   * Crea un nuevo usuario en el sistema con contraseña encriptada y QR inicial.
+   * Registra un nuevo usuario y le envía un OTP al correo para verificarlo.
+   * El usuario NO puede iniciar sesión hasta completar la verificación (correoVerificado = false).
+   * Retorna { mensaje, correo } para que el frontend redirija a la pantalla de verificación OTP.
    */
-  async create(createUsuarioDto: CreateUsuarioDto | CreateUsuarioAdminDto): Promise<Omit<Usuario, 'contra'>> {
+  async create(createUsuarioDto: CreateUsuarioDto | CreateUsuarioAdminDto): Promise<{ mensaje: string; correo: string }> {
     const { documento, correo, contra } = createUsuarioDto;
     const correoNormalizado = String(correo ?? '').trim().toLowerCase();
     const idTipoUsr = (
@@ -60,7 +62,7 @@ export class UsuarioService {
       where: [{ documento }, { correo: correoNormalizado }],
       withDeleted: true,
     });
-    
+
     if (existente) {
       const campo = existente.documento === documento ? 'documento' : 'correo';
       throw new ConflictException(`El ${campo} ya se encuentra registrado`);
@@ -78,12 +80,70 @@ export class UsuarioService {
         contra: hashedPassword,
         qr: qrValue,
         correo: correoNormalizado,
+        correoVerificado: false,
       });
 
       const usuarioGuardado = await this.usuarioRepository.save(nuevoUsuario);
 
       await this.auditoriaService.create({
         accion: 'CREAR_USUARIO',
+        entidad: 'USUARIO',
+        idEntidad: parseInt(usuarioGuardado.documento),
+        idUsuario: usuarioGuardado.documento,
+        datosNuevos: { correo: usuarioGuardado.correo, nombre: usuarioGuardado.nombreCompleto },
+      });
+
+      // Enviar OTP de verificación al correo registrado
+      await this.authService.generarYEnviarOtpPublico(usuarioGuardado);
+
+      return {
+        mensaje: 'Registro exitoso. Te enviamos un código de verificación a tu correo para activar tu cuenta.',
+        correo: correoNormalizado,
+      };
+    } catch (error) {
+      const pgError = error as { code?: string; constraint?: string };
+      if (pgError.code === '23503' && pgError.constraint === 'usuario_idformacion_fkey') {
+        throw new BadRequestException('La ficha de formación proporcionada no es válida.');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Crea usuario administrativo/operativo (ya verificado, sin OTP).
+   * Solo usable desde el panel admin.
+   */
+  async createAdmin(createUsuarioDto: CreateUsuarioAdminDto): Promise<Omit<Usuario, 'contra'>> {
+    const { documento, correo, contra } = createUsuarioDto;
+    const correoNormalizado = String(correo ?? '').trim().toLowerCase();
+
+    const existente = await this.usuarioRepository.findOne({
+      where: [{ documento }, { correo: correoNormalizado }],
+      withDeleted: true,
+    });
+
+    if (existente) {
+      const campo = existente.documento === documento ? 'documento' : 'correo';
+      throw new ConflictException(`El ${campo} ya se encuentra registrado`);
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(contra, salt);
+    const qrValue = randomUUID();
+
+    try {
+      const nuevoUsuario = this.usuarioRepository.create({
+        ...createUsuarioDto,
+        contra: hashedPassword,
+        qr: qrValue,
+        correo: correoNormalizado,
+        correoVerificado: true, // Admin crea usuarios ya verificados
+      });
+
+      const usuarioGuardado = await this.usuarioRepository.save(nuevoUsuario);
+
+      await this.auditoriaService.create({
+        accion: 'CREAR_USUARIO_ADMIN',
         entidad: 'USUARIO',
         idEntidad: parseInt(usuarioGuardado.documento),
         idUsuario: usuarioGuardado.documento,
@@ -379,7 +439,8 @@ export class UsuarioService {
       idTipoUsr: TipoUsuarioEnum.OPERATIVO,
     };
 
-    return await this.create(payload);
+    // Los operativos se crean desde el panel admin → ya verificados, sin OTP
+    return await this.createAdmin(payload);
   }
 
   async listarOperativosAdmin(): Promise<Array<Omit<Usuario, 'contra'>>> {

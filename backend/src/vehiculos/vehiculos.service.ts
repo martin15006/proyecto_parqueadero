@@ -11,12 +11,17 @@ import { Vehiculo } from './entities/vehiculo.entity';
 import { TipoVehiculo } from './entities/tipo-vehiculo.entity';
 import { RegistroVehiculo } from './entities/registro-vehiculo.entity';
 import { MovimientoVehiculo, EstadoMovimiento } from './entities/movimiento-vehiculo.entity';
+import { Compartir } from './entities/compartir.entity';
+import { SolicitudVehiculo, EstadoSolicitud } from './entities/solicitud-vehiculo.entity';
 import { Bahia } from '../bahias/entities/bahia.entity';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
 import { ActualizarVehiculoDto } from './dto/actualizar-vehiculo.dto';
 import { AdminListVehiculosQueryDto } from './dto/admin-list-vehiculos.query.dto';
+import { CompartirVehiculoDto } from './dto/compartir-vehiculo.dto';
+import { ResolverSolicitudDto } from './dto/resolver-solicitud.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 
 /**
  * Servicio de Gestión de Vehículos.
@@ -34,8 +39,13 @@ export class VehiculosService {
     private readonly registroRepository: Repository<RegistroVehiculo>,
     @InjectRepository(MovimientoVehiculo)
     private readonly movimientoRepository: Repository<MovimientoVehiculo>,
+    @InjectRepository(Compartir)
+    private readonly compartirRepository: Repository<Compartir>,
+    @InjectRepository(SolicitudVehiculo)
+    private readonly solicitudRepository: Repository<SolicitudVehiculo>,
     private readonly cloudinaryService: CloudinaryService,
     private readonly auditoriaService: AuditoriaService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
 
   /**
@@ -47,82 +57,308 @@ export class VehiculosService {
   }
 
   /**
-   * Registra un vehículo y lo vincula al usuario.
-   * REFACTOR PROFESIONAL: Implementa Upsert (Update or Insert) manejando Soft Delete.
-   * Evita errores de duplicidad restaurando registros existentes si es necesario.
+   * Crea una SOLICITUD de registro de vehículo.
+   * El vehículo NO se registra de inmediato; queda pendiente de aprobación del administrador.
    */
-  async registrarVehiculo(documento: string, dto: CreateVehiculoDto): Promise<{ mensaje: string; vehiculo: Vehiculo }> {
+  async solicitarRegistroVehiculo(documento: string, dto: CreateVehiculoDto): Promise<{ mensaje: string; idSolicitud: number }> {
     const tipo = await this.tipoVehiculoRepository.findOne({ where: { idTipoV: dto.idTipoVehiculo } });
     if (!tipo) throw new BadRequestException('Tipo de vehículo no válido');
 
     const placaNormalizada = this.normalizarPlaca(dto.placa);
-    
-    // 1. Gestión del Vehículo (Base)
-    let vehiculo = await this.vehiculoRepository.findOne({ 
+
+    // Verificar que la placa no esté ya registrada en el sistema
+    const vehiculoExistente = await this.vehiculoRepository.findOne({
       where: { placa: placaNormalizada },
-      withDeleted: true 
+    });
+    if (vehiculoExistente) {
+      throw new ConflictException('Esta placa ya se encuentra registrada en el sistema');
+    }
+
+    // Verificar que no haya una solicitud PENDIENTE del mismo usuario para la misma placa
+    const solicitudPendiente = await this.solicitudRepository.findOne({
+      where: { documento, placa: placaNormalizada, estado: EstadoSolicitud.PENDIENTE },
+    });
+    if (solicitudPendiente) {
+      throw new ConflictException('Ya tienes una solicitud pendiente para esta placa');
+    }
+
+    const solicitud = this.solicitudRepository.create({
+      documento,
+      placa: placaNormalizada,
+      fotoVehiculo: dto.fotoVehiculo,
+      fotoTarjetaP: dto.fotoTarjetaP,
+      fotoPlaca: dto.fotoPlaca ?? null,
+      color: dto.color,
+      idTipoVehiculo: dto.idTipoVehiculo,
+      estado: EstadoSolicitud.PENDIENTE,
+    });
+
+    const guardada = await this.solicitudRepository.save(solicitud);
+
+    await this.auditoriaService.create({
+      accion: 'SOLICITAR_REGISTRO_VEHICULO',
+      entidad: 'SOLICITUD_VEHICULO',
+      idEntidad: guardada.idSolicitud,
+      idUsuario: documento,
+      datosNuevos: { placa: placaNormalizada },
+    });
+
+    // Notificar a los administradores (tipo 2)
+    await this.notificacionesService.notificarAdmins({
+      tipo: 'SOLICITUD_VEHICULO',
+      titulo: 'Nueva solicitud de vehículo',
+      mensaje: `El usuario ${documento} solicita registrar el vehículo con placa ${placaNormalizada}.`,
+      metadata: { idSolicitud: guardada.idSolicitud, placa: placaNormalizada, documento },
+    });
+
+    return {
+      mensaje: 'Solicitud enviada correctamente. El administrador la revisará pronto.',
+      idSolicitud: guardada.idSolicitud,
+    };
+  }
+
+  // ─── ADMIN: gestión de solicitudes ───────────────────────────────────────────
+
+  /** Lista solicitudes (filtro opcional por estado) */
+  async listarSolicitudes(estado?: EstadoSolicitud) {
+    const where = estado ? { estado } : {};
+    return this.solicitudRepository.find({
+      where,
+      relations: ['usuario', 'tipoVehiculo'],
+      order: { creadoEn: 'DESC' },
+    });
+  }
+
+  /** Aprueba o rechaza una solicitud */
+  async resolverSolicitud(idSolicitud: number, dto: ResolverSolicitudDto, adminDocumento: string): Promise<{ mensaje: string }> {
+    const solicitud = await this.solicitudRepository.findOne({
+      where: { idSolicitud },
+      relations: ['usuario'],
+    });
+    if (!solicitud) throw new NotFoundException('Solicitud no encontrada');
+    if (solicitud.estado !== EstadoSolicitud.PENDIENTE) {
+      throw new BadRequestException('Esta solicitud ya fue resuelta');
+    }
+
+    if (dto.estado === EstadoSolicitud.RECHAZADO) {
+      if (!dto.motivoRechazo?.trim()) {
+        throw new BadRequestException('Debes indicar el motivo del rechazo');
+      }
+      solicitud.estado = EstadoSolicitud.RECHAZADO;
+      solicitud.motivoRechazo = dto.motivoRechazo.trim();
+      solicitud.resueltoEn = new Date();
+      await this.solicitudRepository.save(solicitud);
+
+      // Notificar al usuario del rechazo
+      await this.notificacionesService.notificarUsuario({
+        idUsuario: solicitud.documento,
+        tipo: 'SOLICITUD_VEHICULO_RECHAZADA',
+        titulo: 'Solicitud de vehículo rechazada',
+        mensaje: `Tu solicitud para registrar el vehículo con placa ${solicitud.placa} fue rechazada. Motivo: ${dto.motivoRechazo}`,
+        actorNombre: adminDocumento,
+        metadata: { placa: solicitud.placa, motivo: dto.motivoRechazo },
+      });
+
+      return { mensaje: 'Solicitud rechazada y usuario notificado.' };
+    }
+
+    // APROBADO: crear Vehiculo + RegistroVehiculo
+    let vehiculo = await this.vehiculoRepository.findOne({
+      where: { placa: solicitud.placa },
+      withDeleted: true,
     });
 
     if (vehiculo) {
-      // Si el vehículo ya existe (activo o eliminado), actualizamos sus datos y lo restauramos.
-      // Esto es más seguro y profesional que borrar/recrear, ya que mantiene la integridad referencial.
-      Object.assign(vehiculo, { 
-        ...dto, 
-        placa: placaNormalizada, 
-        deletedAt: null // Restaurar si estaba eliminado
+      Object.assign(vehiculo, {
+        fotoVehiculo: solicitud.fotoVehiculo,
+        fotoTarjetaP: solicitud.fotoTarjetaP,
+        fotoPlaca: solicitud.fotoPlaca,
+        color: solicitud.color,
+        idTipoVehiculo: solicitud.idTipoVehiculo,
+        deletedAt: null,
       });
       vehiculo = await this.vehiculoRepository.save(vehiculo);
-
-      await this.auditoriaService.create({ 
-        accion: 'RESTAURAR_VEHICULO', 
-        entidad: 'VEHICULO', 
-        idEntidad: 0, 
-        idUsuario: documento, 
-        datosNuevos: { placa: vehiculo.placa, color: vehiculo.color, nota: 'Vehículo restaurado y actualizado' }, 
-      });
     } else {
-      // Si no existe, creación limpia
-      vehiculo = this.vehiculoRepository.create({ ...dto, placa: placaNormalizada });
-      vehiculo = await this.vehiculoRepository.save(vehiculo);
-
-      await this.auditoriaService.create({ 
-        accion: 'CREAR_VEHICULO', 
-        entidad: 'VEHICULO', 
-        idEntidad: 0, 
-        idUsuario: documento, 
-        datosNuevos: { placa: vehiculo.placa, color: vehiculo.color }, 
+      vehiculo = this.vehiculoRepository.create({
+        placa: solicitud.placa,
+        fotoVehiculo: solicitud.fotoVehiculo,
+        fotoTarjetaP: solicitud.fotoTarjetaP,
+        fotoPlaca: solicitud.fotoPlaca ?? undefined,
+        color: solicitud.color,
+        idTipoVehiculo: solicitud.idTipoVehiculo,
       });
+      vehiculo = await this.vehiculoRepository.save(vehiculo);
     }
 
-    // 2. Gestión del Vínculo (RegistroVehiculo)
     const yaRegistrado = await this.registroRepository.findOne({
-      where: { idUsuario: documento, idVehiculo: placaNormalizada },
+      where: { idUsuario: solicitud.documento, idVehiculo: solicitud.placa },
       withDeleted: true,
     });
 
     if (yaRegistrado) {
-      if (yaRegistrado.deletedAt) {
-        // Restaurar vínculo previo
-        yaRegistrado.deletedAt = null;
-        await this.registroRepository.save(yaRegistrado);
-      } else {
-        throw new ConflictException('Este vehículo ya se encuentra vinculado a tu cuenta');
-      }
+      yaRegistrado.deletedAt = null;
+      await this.registroRepository.save(yaRegistrado);
     } else {
-      // Crear nuevo vínculo
-      const nuevoRegistro = this.registroRepository.create({ idUsuario: documento, idVehiculo: placaNormalizada });
-      const registroGuardado = await this.registroRepository.save(nuevoRegistro);
-
-      await this.auditoriaService.create({
-        accion: 'VINCULAR_VEHICULO',
-        entidad: 'REGISTRO_VEHICULO',
-        idEntidad: registroGuardado.idRegistroV,
-        idUsuario: documento,
-        datosNuevos: { idUsuario: documento, idVehiculo: vehiculo.placa },
-      });
+      await this.registroRepository.save(
+        this.registroRepository.create({ idUsuario: solicitud.documento, idVehiculo: solicitud.placa }),
+      );
     }
 
-    return { mensaje: 'Vehículo registrado y vinculado correctamente', vehiculo };
+    solicitud.estado = EstadoSolicitud.APROBADO;
+    solicitud.resueltoEn = new Date();
+    await this.solicitudRepository.save(solicitud);
+
+    await this.auditoriaService.create({
+      accion: 'APROBAR_SOLICITUD_VEHICULO',
+      entidad: 'SOLICITUD_VEHICULO',
+      idEntidad: solicitud.idSolicitud,
+      idUsuario: adminDocumento,
+      datosNuevos: { placa: solicitud.placa, propietario: solicitud.documento },
+    });
+
+    // Notificar al usuario de la aprobación
+    await this.notificacionesService.notificarUsuario({
+      idUsuario: solicitud.documento,
+      tipo: 'SOLICITUD_VEHICULO_APROBADA',
+      titulo: '¡Vehículo registrado!',
+      mensaje: `Tu solicitud para el vehículo con placa ${solicitud.placa} fue aprobada. Ya puedes usarlo en el parqueadero.`,
+      actorNombre: adminDocumento,
+      metadata: { placa: solicitud.placa },
+    });
+
+    return { mensaje: 'Solicitud aprobada. Vehículo registrado exitosamente.' };
+  }
+
+  /** Lista las solicitudes del usuario autenticado */
+  async listarMisSolicitudes(documento: string) {
+    return this.solicitudRepository.find({
+      where: { documento },
+      relations: ['tipoVehiculo'],
+      order: { creadoEn: 'DESC' },
+    });
+  }
+
+  // ─── COMPARTIR VEHÍCULO ───────────────────────────────────────────────────────
+
+  /**
+   * Comparte un vehículo con otro usuario.
+   * Reglas:
+   *  - Solo el propietario del registro puede compartir.
+   *  - Un vehículo solo puede ser compartido 1 vez.
+   *  - El receptor puede tener máximo 2 vehículos compartidos.
+   */
+  async compartirVehiculo(documentoPropietario: string, placa: string, dto: CompartirVehiculoDto): Promise<{ mensaje: string }> {
+    const placaNormalizada = this.normalizarPlaca(placa);
+
+    // Verificar que el propietario tiene registrado ese vehículo
+    const registro = await this.registroRepository.findOne({
+      where: { idUsuario: documentoPropietario, idVehiculo: placaNormalizada },
+    });
+    if (!registro) throw new ForbiddenException('No tienes este vehículo registrado en tu cuenta');
+
+    // No puede compartirse con uno mismo
+    if (dto.documentoReceptor === documentoPropietario) {
+      throw new BadRequestException('No puedes compartir un vehículo contigo mismo');
+    }
+
+    // Verificar que el receptor existe
+    const receptor = await this.compartirRepository.manager
+      .getRepository('usuario')
+      .findOne({ where: { documento: dto.documentoReceptor } });
+    if (!receptor) throw new NotFoundException('El usuario receptor no existe');
+
+    // Un vehículo solo puede compartirse 1 vez (una fila activa por id_registro_v)
+    const yaCompartido = await this.compartirRepository.findOne({
+      where: { idRegistroV: registro.idRegistroV },
+    });
+    if (yaCompartido) {
+      throw new ConflictException('Este vehículo ya fue compartido con otro usuario');
+    }
+
+    // El receptor no puede tener más de 2 vehículos compartidos
+    const totalCompartidosReceptor = await this.compartirRepository.count({
+      where: { documento: dto.documentoReceptor },
+    });
+    if (totalCompartidosReceptor >= 2) {
+      throw new BadRequestException('El usuario receptor ya tiene el máximo de 2 vehículos compartidos');
+    }
+
+    await this.compartirRepository.save(
+      this.compartirRepository.create({
+        documento: dto.documentoReceptor,
+        idRegistroV: registro.idRegistroV,
+      }),
+    );
+
+    return { mensaje: `Vehículo ${placaNormalizada} compartido exitosamente con ${dto.documentoReceptor}` };
+  }
+
+  /**
+   * Elimina el compartido de un vehículo (solo el propietario puede hacerlo).
+   */
+  async quitarCompartido(documentoPropietario: string, placa: string): Promise<{ mensaje: string }> {
+    const placaNormalizada = this.normalizarPlaca(placa);
+
+    const registro = await this.registroRepository.findOne({
+      where: { idUsuario: documentoPropietario, idVehiculo: placaNormalizada },
+    });
+    if (!registro) throw new ForbiddenException('No tienes este vehículo registrado en tu cuenta');
+
+    const compartido = await this.compartirRepository.findOne({
+      where: { idRegistroV: registro.idRegistroV },
+    });
+    if (!compartido) throw new NotFoundException('Este vehículo no tiene ningún compartido activo');
+
+    await this.compartirRepository.remove(compartido);
+    return { mensaje: 'Vehículo dejó de estar compartido' };
+  }
+
+  /**
+   * Lista los vehículos que otros usuarios han compartido con el usuario autenticado.
+   */
+  async listarVehiculosCompartidosConmigo(documento: string) {
+    const compartidos = await this.compartirRepository.find({
+      where: { documento },
+      relations: ['registroVehiculo', 'registroVehiculo.vehiculo', 'registroVehiculo.vehiculo.tipoVehiculo', 'registroVehiculo.usuario'],
+    });
+
+    return compartidos.map((c) => ({
+      idCompartir: c.idCompartir,
+      placa: c.registroVehiculo.vehiculo.placa,
+      fotoVehiculo: c.registroVehiculo.vehiculo.fotoVehiculo,
+      fotoTarjetaP: c.registroVehiculo.vehiculo.fotoTarjetaP,
+      color: c.registroVehiculo.vehiculo.color,
+      tipoVehiculo: c.registroVehiculo.vehiculo.tipoVehiculo.tipoVehiculo,
+      propietario: c.registroVehiculo.usuario.nombreCompleto,
+      compartidoDesde: c.createdAt,
+    }));
+  }
+
+  /**
+   * Información del compartido de un vehículo propio (con quién está compartido).
+   */
+  async infoCompartidoMio(documentoPropietario: string, placa: string) {
+    const placaNormalizada = this.normalizarPlaca(placa);
+    const registro = await this.registroRepository.findOne({
+      where: { idUsuario: documentoPropietario, idVehiculo: placaNormalizada },
+    });
+    if (!registro) throw new ForbiddenException('No tienes este vehículo registrado en tu cuenta');
+
+    const compartido = await this.compartirRepository.findOne({
+      where: { idRegistroV: registro.idRegistroV },
+      relations: ['usuarioReceptor'],
+    });
+
+    if (!compartido) return { compartido: false };
+
+    return {
+      compartido: true,
+      receptor: {
+        documento: compartido.usuarioReceptor.documento,
+        nombre: compartido.usuarioReceptor.nombreCompleto,
+        compartidoDesde: compartido.createdAt,
+      },
+    };
   }
 
   /**

@@ -8,16 +8,16 @@ export interface ActualizarPerfilDto {
 }
 
 export const usuarioService = {
-  async registrar(datos: CreateUsuarioDto): Promise<Usuario> {
-    try {
-      const respuesta = await apiRequest<Usuario>('/usuarios', {
-        method: 'POST',
-        body: JSON.stringify(datos),
-      });
-      return respuesta;
-    } catch (error: any) {
-      throw error;
-    }
+  /**
+   * Registra un nuevo usuario.
+   * El backend envía un OTP al correo y devuelve { mensaje, correo }.
+   * El usuario debe verificar el OTP antes de poder iniciar sesión.
+   */
+  async registrar(datos: CreateUsuarioDto): Promise<{ mensaje: string; correo: string }> {
+    return apiRequest<{ mensaje: string; correo: string }>('/usuarios', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    });
   },
 
   async cambiarContrasena(

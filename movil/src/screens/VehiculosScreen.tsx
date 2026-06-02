@@ -136,6 +136,24 @@ export default function VehiculosScreen({ navigation }: any) {
             tintColor={colores.verde}
           />
         }
+        ListHeaderComponent={
+          <TouchableOpacity
+            style={[styles.banner, { borderColor: colores.verde, backgroundColor: esOscuro ? 'rgba(95,217,36,0.10)' : colores.verdeMuyClaro }]}
+            onPress={() => navigation.navigate('MisSolicitudes')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.bannerEmoji]}>📋</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.bannerTitulo, { color: colores.verde }]}>
+                Ver mis solicitudes
+              </Text>
+              <Text style={[styles.bannerSub, { color: colores.textoSecundario }]}>
+                Revisa el estado de tus solicitudes de registro
+              </Text>
+            </View>
+            <Text style={[styles.bannerFlecha, { color: colores.verde }]}>›</Text>
+          </TouchableOpacity>
+        }
         ListEmptyComponent={
           <View style={styles.vacioContainer}>
             <Text style={styles.vacioEmoji}>🚗</Text>
@@ -143,7 +161,7 @@ export default function VehiculosScreen({ navigation }: any) {
               Sin vehículos registrados
             </Text>
             <Text style={[styles.vacioSubtitulo, { color: colores.textoSecundario }]}>
-              Registra tu primer vehículo para comenzar
+              Solicita el registro de tu primer vehículo
             </Text>
           </View>
         }
@@ -151,7 +169,7 @@ export default function VehiculosScreen({ navigation }: any) {
 
       <View style={styles.fab}>
         <AnimatedButton
-          texto="+ Registrar Nuevo Vehículo"
+          texto="+ Solicitar Registro de Vehículo"
           onPress={() => navigation.navigate('RegistrarVehiculo')}
         />
       </View>
@@ -224,4 +242,17 @@ const styles = StyleSheet.create({
     left: espacios.medio,
     right: espacios.medio,
   },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: espacios.normal,
+    borderWidth: 1,
+    marginBottom: espacios.normal,
+    gap: 12,
+  },
+  bannerEmoji: { fontSize: 24 },
+  bannerTitulo: { fontSize: fonts.normal, fontWeight: '700' },
+  bannerSub: { fontSize: fonts.pequeno, marginTop: 2 },
+  bannerFlecha: { fontSize: 28, fontWeight: '300' },
 });

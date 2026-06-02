@@ -102,6 +102,14 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    if (!usuario.correoVerificado) {
+      // Reenviar OTP para que pueda verificar y activar su cuenta
+      try {
+        await this.generarYEnviarOtp(usuario);
+      } catch (_) { /* ignorar rate-limit aquí */ }
+      throw new UnauthorizedException('Debes verificar tu correo antes de iniciar sesión. Te reenviamos el código de verificación.');
+    }
+
     try {
       await this.generarYEnviarOtp(usuario);
     } catch (error) {
@@ -462,6 +470,80 @@ export class AuthService implements OnModuleInit {
       this.configService.get<string>('NODE_ENV') !== 'production' &&
       this.configService.get<string>('DISABLE_EMAILS') === 'true'
     );
+  }
+
+  /**
+   * Versión pública de generarYEnviarOtp para uso externo (ej: registro de usuario).
+   */
+  async generarYEnviarOtpPublico(usuario: Usuario): Promise<void> {
+    return this.generarYEnviarOtp(usuario);
+  }
+
+  /**
+   * Verifica el OTP enviado al registrar un usuario.
+   * Si es válido → marca correoVerificado = true y emite tokens (login automático).
+   */
+  async verificarRegistroOtp(dto: VerificarOtpDto): Promise<{
+    access_token: string;
+    refresh_token: string;
+    usuario: Omit<Usuario, 'contra'> & { rol: string };
+  }> {
+    return await this.otpRepository.manager.transaction(async (manager) => {
+      const correoNormalizado = String(dto?.correo ?? '').trim().toLowerCase();
+      const usuario = await manager
+        .createQueryBuilder(Usuario, 'usuario')
+        .where('LOWER(usuario.correo) = :correo', { correo: correoNormalizado })
+        .getOne();
+
+      if (!usuario) throw new NotFoundException('Usuario no encontrado');
+
+      if (usuario.correoVerificado) {
+        throw new BadRequestException('El correo ya fue verificado. Inicia sesión normalmente.');
+      }
+
+      const otp = await manager.findOne(CodigoOtp, {
+        where: { documento: usuario.documento, usado: false },
+        order: { createdAt: 'DESC' },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!otp) throw new BadRequestException('No hay código activo. Solicita uno nuevo.');
+
+      if (new Date() > otp.expiraEn) {
+        otp.usado = true;
+        await manager.save(otp);
+        throw new BadRequestException('El código ha expirado. Solicita uno nuevo.');
+      }
+
+      const maxIntentos = this.configService.get<number>('OTP_MAX_ATTEMPTS') ?? 3;
+      if (otp.intentos >= maxIntentos) {
+        otp.usado = true;
+        await manager.save(otp);
+        throw new BadRequestException('Demasiados intentos fallidos. Solicita un código nuevo.');
+      }
+
+      if (otp.codigo !== dto.codigo) {
+        otp.intentos += 1;
+        await manager.save(otp);
+        throw new UnauthorizedException(`Código incorrecto. Intentos restantes: ${maxIntentos - otp.intentos}`);
+      }
+
+      otp.usado = true;
+      await manager.save(otp);
+
+      // Activar cuenta
+      usuario.correoVerificado = true;
+      await manager.save(usuario);
+
+      const tokens = await this.generarTokens(usuario, manager);
+      const rolNombre = TipoUsuarioEnum[usuario.idTipoUsr] || 'APRENDIZ';
+      const { contra, ...usuarioSinContrasena } = usuario;
+
+      return {
+        ...tokens,
+        usuario: { ...usuarioSinContrasena, idTipoUsr: usuario.idTipoUsr, rol: rolNombre },
+      };
+    });
   }
 
   private async generarYEnviarOtp(usuario: Usuario): Promise<void> {

@@ -152,6 +152,33 @@ export interface AdminVehiculoItem extends Vehiculo {
   isAdentro: boolean;
 }
 
+export type EstadoSolicitudVehiculo = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+
+export interface SolicitudVehiculoAdmin {
+  idSolicitud: number;
+  documento: string;
+  placa: string;
+  fotoVehiculo: string;
+  fotoTarjetaP: string;
+  fotoPlaca: string | null;
+  color: string;
+  idTipoVehiculo: number;
+  estado: EstadoSolicitudVehiculo;
+  motivoRechazo: string | null;
+  creadoEn: string;
+  resueltoEn: string | null;
+  usuario?: {
+    documento: string;
+    nombreCompleto: string;
+    correo: string;
+    numTelf?: string;
+  };
+  tipoVehiculo?: {
+    idTipoV: number;
+    tipoVehiculo: string;
+  };
+}
+
 export interface CreateVehiculoDto {
   placa: string;
   fotoVehiculo: string;

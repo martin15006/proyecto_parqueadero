@@ -49,15 +49,38 @@ export default function LoginScreen({ navigation, route }: any) {
     return Object.keys(e).length === 0;
   };
 
+  const [modoOtp, setModoOtp] = useState<'login' | 'registro'>('login');
+
   const handleLogin = async () => {
     if (!validar()) return;
     setCargando(true);
     try {
       const respuesta = await authService.loginPaso1({ correo, contra });
       setCorreoParaOtp(respuesta.correo);
+      setModoOtp('login');
       setModalVisible(true);
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      // Si el correo no está verificado, el backend reenvía OTP de registro
+      const mensaje = error.message || '';
+      if (mensaje.toLowerCase().includes('verificar tu correo')) {
+        Alert.alert(
+          'Cuenta no verificada',
+          'Te enviamos un código a tu correo para activar tu cuenta.',
+          [
+            {
+              text: 'Verificar ahora',
+              onPress: () => {
+                setCorreoParaOtp(correo);
+                setModoOtp('registro');
+                setModalVisible(true);
+              },
+            },
+            { text: 'Cancelar', style: 'cancel' },
+          ],
+        );
+      } else {
+        Alert.alert('Error', mensaje);
+      }
     } finally {
       setCargando(false);
     }
@@ -214,6 +237,7 @@ export default function LoginScreen({ navigation, route }: any) {
       <OtpModal
         visible={modalVisible}
         correo={correoParaOtp}
+        modo={modoOtp}
         onCerrar={() => {
           setModalVisible(false);
           setContra('');

@@ -33,6 +33,58 @@ export class NotificacionesService {
   }
 
   /**
+   * Registra una notificación para un usuario específico.
+   */
+  async notificarUsuario(params: {
+    idUsuario: string;
+    tipo: string;
+    titulo: string;
+    mensaje: string;
+    actorNombre?: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    const notificacion = this.notificacionRepository.create({
+      idUsuario: params.idUsuario,
+      tipo: params.tipo,
+      titulo: params.titulo,
+      mensaje: params.mensaje,
+      actorNombre: params.actorNombre ?? null,
+      metadata: params.metadata ?? null,
+      leidaAt: null,
+    });
+    await this.notificacionRepository.save(notificacion);
+  }
+
+  /**
+   * Notifica a todos los administradores del sistema.
+   */
+  async notificarAdmins(params: {
+    tipo: string;
+    titulo: string;
+    mensaje: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    const admins = await this.usuarioRepository.find({
+      where: { idTipoUsr: TipoUsuarioEnum.ADMIN },
+      select: ['documento'],
+    });
+    if (admins.length === 0) return;
+
+    const rows = admins.map((u) =>
+      this.notificacionRepository.create({
+        idUsuario: u.documento,
+        tipo: params.tipo,
+        titulo: params.titulo,
+        mensaje: params.mensaje,
+        actorNombre: null,
+        metadata: params.metadata ?? null,
+        leidaAt: null,
+      }),
+    );
+    await this.notificacionRepository.save(rows);
+  }
+
+  /**
    * RF25 (Salida de emergencia): Registra una notificación dirigida al usuario dueño del vehículo afectado.
    */
   async registrarSalidaEmergencia(params: {

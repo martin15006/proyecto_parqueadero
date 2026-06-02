@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { 
+import {
   LayoutDashboard, Users, Car,
   ShieldCheck, LogOut, ChevronRight,
-  Database, Menu, FileText
+  Database, Menu, FileText, Inbox
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 
@@ -26,6 +26,7 @@ export const AdminLayout: React.FC = () => {
     { path: '/appadmin', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { path: '/appadmin/usuarios', label: 'Usuarios', icon: <Users size={20} /> },
     { path: '/appadmin/vehiculos', label: 'Vehículos', icon: <Car size={20} /> },
+    { path: '/appadmin/solicitudes', label: 'Solicitudes', icon: <Inbox size={20} /> },
     { path: '/appadmin/auditoria', label: 'Auditoría', icon: <Database size={20} /> },
     { path: '/appadmin/informes', label: 'Reportes', icon: <FileText size={20} /> },
   ];
@@ -34,6 +35,7 @@ export const AdminLayout: React.FC = () => {
     { label: 'Dashboard', path: '/appadmin' },
     { label: 'Usuarios', path: '/appadmin/usuarios' },
     { label: 'Vehículos', path: '/appadmin/vehiculos' },
+    { label: 'Solicitudes', path: '/appadmin/solicitudes' },
     { label: 'Auditoría', path: '/appadmin/auditoria' },
     { label: 'Reportes', path: '/appadmin/informes' },
   ]), []);
@@ -52,6 +54,7 @@ export const AdminLayout: React.FC = () => {
       '': { title: 'Dashboard', subtitle: 'Consola ejecutiva y métricas del sistema' },
       usuarios: { title: 'Usuarios', subtitle: 'Administración de cuentas institucionales' },
       vehiculos: { title: 'Vehículos', subtitle: 'Control de flota y contingencias' },
+      solicitudes: { title: 'Solicitudes', subtitle: 'Aprobación de registros de vehículos' },
       auditoria: { title: 'Auditoría', subtitle: 'Trazabilidad de operaciones críticas' },
       informes: { title: 'Reportes', subtitle: 'Exportación institucional' },
     };

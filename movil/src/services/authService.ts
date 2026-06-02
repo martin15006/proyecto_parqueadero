@@ -31,6 +31,17 @@ export const authService = {
   },
 
   /**
+   * Verifica el OTP enviado al registrarse.
+   * Si es correcto, activa la cuenta y devuelve tokens (login automático).
+   */
+  async verificarRegistro(datos: VerificarOtpDto): Promise<VerificarOtpResponse> {
+    return apiRequest<VerificarOtpResponse>('/auth/verificar-registro', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    });
+  },
+
+  /**
    * Solicita el reenvío de un nuevo código OTP.
    */
   async reenviarOtp(correo: string): Promise<{ mensaje: string }> {

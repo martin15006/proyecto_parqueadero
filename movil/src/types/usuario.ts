@@ -8,6 +8,8 @@ export interface Usuario {
   idTipoUsr: number;
   idFormacion?: string | null;
   qr?: string | null;
+  correoVerificado?: boolean;
+  rol?: string;
 }
 
 export interface CreateUsuarioDto {
@@ -42,6 +44,7 @@ export interface VerificarOtpDto {
 // Respuesta del paso 2: incluye el JWT
 export interface VerificarOtpResponse {
   access_token: string;
+  refresh_token?: string;
   usuario: Usuario;
 }
 

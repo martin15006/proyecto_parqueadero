@@ -91,6 +91,12 @@ export class Usuario {
   qr: string | null;
 
   /**
+   * Indica si el correo fue verificado vía OTP al momento del registro.
+   */
+  @Column({ name: 'correo_verificado', type: 'boolean', default: false })
+  correoVerificado: boolean;
+
+  /**
    * Token de notificaciones push (Firebase/Expo) para la aplicación móvil.
    */
   @Column({ name: 'push_token', type: 'varchar', length: 255, nullable: true })

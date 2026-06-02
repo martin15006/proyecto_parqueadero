@@ -4,6 +4,7 @@ import {
 import { VehiculosService } from './vehiculos.service';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
 import { ActualizarVehiculoDto } from './dto/actualizar-vehiculo.dto';
+import { CompartirVehiculoDto } from './dto/compartir-vehiculo.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -32,13 +33,24 @@ export class VehiculosController {
     return this.vehiculosService.listarTipos();
   }
 
+  /**
+   * Envía una solicitud de registro de vehículo al administrador.
+   * El vehículo NO queda registrado hasta que el admin apruebe.
+   */
   @UseGuards(JwtAuthGuard)
   @Post()
-  registrar(
+  solicitarRegistro(
     @CurrentUser() usuario: Omit<Usuario, 'contra'>,
     @Body() dto: CreateVehiculoDto,
   ) {
-    return this.vehiculosService.registrarVehiculo(usuario.documento, dto);
+    return this.vehiculosService.solicitarRegistroVehiculo(usuario.documento, dto);
+  }
+
+  /** Lista las solicitudes del usuario autenticado */
+  @UseGuards(JwtAuthGuard)
+  @Get('solicitudes')
+  misSolicitudes(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
+    return this.vehiculosService.listarMisSolicitudes(usuario.documento);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -79,5 +91,45 @@ export class VehiculosController {
     @Param('placa') placa: string,
   ) {
     return this.vehiculosService.eliminarRegistro(usuario.documento, placa);
+  }
+
+  // ─── COMPARTIR ────────────────────────────────────────────────────────────────
+
+  /** Lista los vehículos que otros compartieron conmigo */
+  @UseGuards(JwtAuthGuard)
+  @Get('compartidos-conmigo')
+  compartidosConmigo(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
+    return this.vehiculosService.listarVehiculosCompartidosConmigo(usuario.documento);
+  }
+
+  /** Info de con quién está compartido un vehículo mío */
+  @UseGuards(JwtAuthGuard)
+  @Get(':placa/compartir')
+  infoCompartido(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Param('placa') placa: string,
+  ) {
+    return this.vehiculosService.infoCompartidoMio(usuario.documento, placa);
+  }
+
+  /** Compartir mi vehículo con otro usuario por cédula */
+  @UseGuards(JwtAuthGuard)
+  @Post(':placa/compartir')
+  compartir(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Param('placa') placa: string,
+    @Body() dto: CompartirVehiculoDto,
+  ) {
+    return this.vehiculosService.compartirVehiculo(usuario.documento, placa, dto);
+  }
+
+  /** Quitar el compartido de mi vehículo */
+  @UseGuards(JwtAuthGuard)
+  @Delete(':placa/compartir')
+  quitarCompartido(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Param('placa') placa: string,
+  ) {
+    return this.vehiculosService.quitarCompartido(usuario.documento, placa);
   }
 }

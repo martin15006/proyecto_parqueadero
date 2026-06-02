@@ -6,6 +6,9 @@ import VehiculosScreen from '../screens/VehiculosScreen';
 import RegistrarVehiculoScreen from '../screens/RegistrarVehiculoScreen';
 import DetalleVehiculoScreen from '../screens/DetalleVehiculoScreen';
 import EditarVehiculoScreen from '../screens/EditarVehiculoScreen';
+import CompartirVehiculoScreen from '../screens/CompartirVehiculoScreen';
+import MisSolicitudesScreen from '../screens/MisSolicitudesScreen';
+import VehiculosCompartidosScreen from '../screens/VehiculosCompartidosScreen';
 import CambiarContrasenaScreen from '../screens/CambiarContrasenaScreen';
 import ConfiguracionScreen from '../screens/ConfiguracionScreen';
 import EditarPerfilScreen from '../screens/EditarPerfilScreen';
@@ -23,6 +26,8 @@ function VehiculosStackNavigator() {
       <VehiculosStack.Screen name="RegistrarVehiculo" component={RegistrarVehiculoScreen} />
       <VehiculosStack.Screen name="DetalleVehiculo" component={DetalleVehiculoScreen} />
       <VehiculosStack.Screen name="EditarVehiculo" component={EditarVehiculoScreen} />
+      <VehiculosStack.Screen name="CompartirVehiculo" component={CompartirVehiculoScreen} />
+      <VehiculosStack.Screen name="MisSolicitudes" component={MisSolicitudesScreen} />
     </VehiculosStack.Navigator>
   );
 }
@@ -50,6 +55,7 @@ export default function AppDrawer() {
     >
       <Drawer.Screen name="Home" component={HomeScreen} />
       <Drawer.Screen name="VehiculosStack" component={VehiculosStackNavigator} />
+      <Drawer.Screen name="VehiculosCompartidos" component={VehiculosCompartidosScreen} />
       <Drawer.Screen name="CambiarContrasena" component={CambiarContrasenaScreen} />
       <Drawer.Screen name="ConfiguracionStack" component={ConfiguracionStackNavigator} />
     </Drawer.Navigator>

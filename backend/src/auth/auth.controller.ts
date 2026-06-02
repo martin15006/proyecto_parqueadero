@@ -37,6 +37,16 @@ export class AuthController {
   }
 
   /**
+   * Verifica el OTP enviado al registrarse.
+   * Si es válido activa la cuenta y devuelve tokens (login automático).
+   */
+  @Post('verificar-registro')
+  @HttpCode(HttpStatus.OK)
+  verificarRegistro(@Body() dto: VerificarOtpDto) {
+    return this.authService.verificarRegistroOtp(dto);
+  }
+
+  /**
    * Reenvía un nuevo código OTP al correo del usuario.
    */
   @Post('reenviar-otp')

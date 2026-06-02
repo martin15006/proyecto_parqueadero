@@ -26,11 +26,13 @@ interface Props {
   correo: string;
   onCerrar: () => void;
   onExito: (token: string, usuario: any) => void;
+  /** 'login' (por defecto) o 'registro' — cambia el endpoint y el título */
+  modo?: 'login' | 'registro';
 }
 
 const TIEMPO_REENVIO = 60;
 
-export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) {
+export default function OtpModal({ visible, correo, onCerrar, onExito, modo = 'login' }: Props) {
   const { colores, esOscuro } = useTheme();
   const [, setCodigo] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -79,10 +81,8 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
     setError(false);
     setMensajeError('');
     try {
-      const respuesta = await authService.verificarOtp({
-        correo,
-        codigo: codigoCompleto,
-      });
+      const fn = modo === 'registro' ? authService.verificarRegistro : authService.verificarOtp;
+      const respuesta = await fn({ correo, codigo: codigoCompleto });
       onExito(respuesta.access_token, respuesta.usuario);
     } catch (err: any) {
       setError(true);
@@ -189,10 +189,12 @@ export default function OtpModal({ visible, correo, onCerrar, onExito }: Props) 
             </View>
 
             <Text style={[styles.titulo, { color: tituloColor }]}>
-              Verificación
+              {modo === 'registro' ? 'Verifica tu correo' : 'Verificación'}
             </Text>
             <Text style={[styles.subtitulo, { color: subtituloColor }]}>
-              Te enviamos un código de 6 dígitos a
+              {modo === 'registro'
+                ? 'Para activar tu cuenta, ingresa el código que enviamos a'
+                : 'Te enviamos un código de 6 dígitos a'}
             </Text>
             <Text style={[styles.correo, { color: colores.verde }]}>{correoCensurado}</Text>
 

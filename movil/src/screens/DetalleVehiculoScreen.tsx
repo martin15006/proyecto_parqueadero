@@ -192,6 +192,13 @@ export default function DetalleVehiculoScreen({ navigation, route }: any) {
               }
             />
             <AnimatedButton
+              texto="Compartir Vehículo"
+              variante="secundario"
+              onPress={() =>
+                navigation.navigate('CompartirVehiculo', { placa: vehiculo.placa })
+              }
+            />
+            <AnimatedButton
               texto="Eliminar Vehículo"
               variante="peligro"
               onPress={handleEliminar}

@@ -10,6 +10,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminLayout } from './layouts/AdminLayout';
 import { UsuariosPage } from './pages/admin/UsuariosPage';
 import { VehiculosPage } from './pages/admin/VehiculosPage';
+import { SolicitudesPage } from './pages/admin/SolicitudesPage';
 import { BahiasPage } from './pages/admin/BahiasPage';
 import { AuditoriaPage } from './pages/admin/AuditoriaPage';
 import { TelemetriaPage } from './pages/admin/TelemetriaPage';
@@ -158,6 +159,7 @@ function App() {
                 <Route path="operativos" element={<OperativosPage />} />
                 <Route path="visitantes" element={<VisitantesPage />} />
                 <Route path="vehiculos" element={<VehiculosPage />} />
+                <Route path="solicitudes" element={<SolicitudesPage />} />
                 <Route path="bahias" element={<BahiasPage />} />
                 <Route path="informes" element={<InformesPage />} />
                 <Route path="graficos" element={<GraficosPage />} />

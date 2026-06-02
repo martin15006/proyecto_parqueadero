@@ -83,7 +83,8 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Crear un usuario (Solo Admin)' })
   @ApiResponse({ status: 201, description: 'Usuario creado exitosamente' })
   createByAdmin(@Body() dto: CreateUsuarioAdminDto) {
-    return this.usuarioService.create(dto);
+    // El admin crea usuarios ya verificados (sin OTP de activación)
+    return this.usuarioService.createAdmin(dto);
   }
 
   @Post('login')

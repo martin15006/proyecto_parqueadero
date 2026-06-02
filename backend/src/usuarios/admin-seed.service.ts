@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { Usuario } from './entities/usuario.entity';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
+import { CatalogosSeedService } from './catalogos-seed.service';
 
 @Injectable()
 export class AdminSeedService implements OnModuleInit {
@@ -13,9 +14,14 @@ export class AdminSeedService implements OnModuleInit {
   constructor(
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
+    private readonly catalogosSeed: CatalogosSeedService,
   ) {}
 
   async onModuleInit() {
+    // CRÍTICO: garantizar que los catálogos (tipo_usuario, etc.) existan
+    // antes de intentar crear el admin, que depende de la FK id_tipo_usr.
+    await this.catalogosSeed.ensureSeeded();
+
     const correoAdmin = 'admin@sistema.com';
     const documentoAdmin = '123456789';
     const contraAdmin = 'Admin123*';
@@ -87,6 +93,7 @@ export class AdminSeedService implements OnModuleInit {
 
       usuario.idFormacion = null;
       usuario.pushToken = null;
+      usuario.correoVerificado = true; // El admin del seed siempre está verificado
 
       const actualizado = await this.usuarioRepository.save(usuario);
       this.logger.log(
@@ -109,6 +116,7 @@ export class AdminSeedService implements OnModuleInit {
       idFormacion: null,
       qr: randomUUID(),
       pushToken: null,
+      correoVerificado: true, // El admin del seed siempre está verificado
     });
 
     await this.usuarioRepository.save(admin);

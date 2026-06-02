@@ -21,10 +21,11 @@ interface ItemMenu {
 }
 
 const ITEMS: ItemMenu[] = [
-  { nombre: 'Mi Perfil', ruta: 'Home', icono: '' },
-  { nombre: 'Mis Vehículos', ruta: 'VehiculosStack', icono: '' },
-  { nombre: 'Cambiar Contraseña', ruta: 'CambiarContrasena', icono: '' },
-  { nombre: 'Configuración', ruta: 'ConfiguracionStack', icono: '' },
+  { nombre: 'Mi Perfil', ruta: 'Home', icono: '👤' },
+  { nombre: 'Mis Vehículos', ruta: 'VehiculosStack', icono: '🚗' },
+  { nombre: 'Compartidos Conmigo', ruta: 'VehiculosCompartidos', icono: '🤝' },
+  { nombre: 'Cambiar Contraseña', ruta: 'CambiarContrasena', icono: '🔒' },
+  { nombre: 'Configuración', ruta: 'ConfiguracionStack', icono: '⚙️' },
 ];
 
 export default function DrawerContent(props: any) {
