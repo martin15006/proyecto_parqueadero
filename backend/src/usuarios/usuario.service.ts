@@ -545,19 +545,20 @@ export class UsuarioService {
     const q = query.q?.trim();
     const nombre = query.nombre?.trim();
     const documento = query.documento?.trim();
-    const estado = query.estado ?? 'TODOS';
+    const rol = query.rol ?? 'TODOS';
 
     const qb = this.usuarioRepository
       .createQueryBuilder('u')
-      .withDeleted()
       .leftJoinAndSelect('u.registrosVehiculos', 'rv')
-      .leftJoinAndSelect('rv.vehiculo', 'vehiculo')
-      .where('u.id_tipo_usr != :adminRol', { adminRol: TipoUsuarioEnum.ADMIN });
+      .leftJoinAndSelect('rv.vehiculo', 'vehiculo');
 
-    if (estado === 'ACTIVO') {
-      qb.andWhere('u.deleted_at IS NULL');
-    } else if (estado === 'INACTIVO') {
-      qb.andWhere('u.deleted_at IS NOT NULL');
+    // Filtro por rol
+    if (rol === 'APRENDIZ') {
+      qb.andWhere('u.id_tipo_usr = :rolId', { rolId: TipoUsuarioEnum.APRENDIZ });
+    } else if (rol === 'ADMIN') {
+      qb.andWhere('u.id_tipo_usr = :rolId', { rolId: TipoUsuarioEnum.ADMIN });
+    } else if (rol === 'OPERATIVO') {
+      qb.andWhere('u.id_tipo_usr = :rolId', { rolId: TipoUsuarioEnum.OPERATIVO });
     }
 
     if (documento) {
@@ -576,15 +577,79 @@ export class UsuarioService {
 
     const usuarios = await qb.getMany();
 
+    const rolNombre = (id: number) => {
+      if (id === TipoUsuarioEnum.APRENDIZ) return 'APRENDIZ';
+      if (id === TipoUsuarioEnum.ADMIN) return 'ADMIN';
+      if (id === TipoUsuarioEnum.OPERATIVO) return 'OPERATIVO';
+      return 'DESCONOCIDO';
+    };
+
     return usuarios.map((u) => {
       const { contra: _contra, registrosVehiculos: _registros, ...rest } = u;
       return {
         ...rest,
-        estadoCuenta: u.deletedAt ? 'INACTIVO' : 'ACTIVO',
+        rol: rolNombre(u.idTipoUsr),
         vehiculos: (_registros || [])
           .map((r) => r.vehiculo)
           .filter(Boolean),
       };
     });
+  }
+
+  /**
+   * Admin → crea cualquier tipo de usuario.
+   * Si idTipoUsr == APRENDIZ → manda OTP al correo para verificar
+   * Si es ADMIN/OPERATIVO → ya queda verificado
+   */
+  async crearUsuarioPorAdmin(dto: CreateUsuarioAdminDto): Promise<{ mensaje: string; usuario?: Omit<Usuario, 'contra'> }> {
+    if (dto.idTipoUsr === TipoUsuarioEnum.APRENDIZ) {
+      // Crea con correoVerificado=false y envía OTP
+      const respuesta = await this.create(dto);
+      return { mensaje: respuesta.mensaje };
+    }
+    // Admin/Operativo → verificado
+    const usuario = await this.createAdmin(dto);
+    return { mensaje: 'Usuario creado exitosamente', usuario };
+  }
+
+  /**
+   * Admin → actualiza cualquier campo de un usuario (excepto contraseña, esa va por reset).
+   */
+  async actualizarUsuarioPorAdmin(
+    documento: string,
+    dto: Partial<Pick<Usuario, 'nombreCompleto' | 'correo' | 'numTelf' | 'contactoEmerg' | 'fotoPersona' | 'idTipoUsr' | 'idFormacion'>>,
+  ): Promise<Omit<Usuario, 'contra'>> {
+    const usuario = await this.usuarioRepository.findOne({ where: { documento } });
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+
+    if (dto.correo && dto.correo !== usuario.correo) {
+      const correoNormalizado = String(dto.correo).trim().toLowerCase();
+      const yaExiste = await this.usuarioRepository.findOne({ where: { correo: correoNormalizado } });
+      if (yaExiste && yaExiste.documento !== documento) {
+        throw new ConflictException('El correo ya está registrado por otro usuario');
+      }
+      usuario.correo = correoNormalizado;
+    }
+    if (dto.nombreCompleto !== undefined) usuario.nombreCompleto = dto.nombreCompleto;
+    if (dto.numTelf !== undefined) usuario.numTelf = dto.numTelf;
+    if (dto.contactoEmerg !== undefined) usuario.contactoEmerg = dto.contactoEmerg;
+    if (dto.fotoPersona !== undefined) usuario.fotoPersona = dto.fotoPersona;
+    if (dto.idTipoUsr !== undefined) usuario.idTipoUsr = dto.idTipoUsr;
+    if (dto.idFormacion !== undefined) usuario.idFormacion = dto.idFormacion;
+
+    const guardado = await this.usuarioRepository.save(usuario);
+    const { contra: _, ...rest } = guardado;
+    return rest;
+  }
+
+  /**
+   * Admin → elimina un usuario (hard delete) y revoca sus sesiones.
+   */
+  async eliminarUsuarioPorAdmin(documento: string): Promise<{ mensaje: string }> {
+    const usuario = await this.usuarioRepository.findOne({ where: { documento } });
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+
+    await this.usuarioRepository.remove(usuario);
+    return { mensaje: 'Usuario eliminado exitosamente' };
   }
 }

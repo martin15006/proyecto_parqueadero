@@ -144,7 +144,7 @@ export interface Vehiculo {
 }
 
 export interface AdminUsuarioItem extends User {
-  estadoCuenta: 'ACTIVO' | 'INACTIVO';
+  rol: 'APRENDIZ' | 'ADMIN' | 'OPERATIVO';
   vehiculos: Vehiculo[];
 }
 

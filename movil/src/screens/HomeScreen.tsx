@@ -1,21 +1,23 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'; // UI: React hooks para estado, efectos y memoización.
-import { // UI: importación de componentes nativos para una UI consistente y performante en iOS/Android.
-  ActivityIndicator, // UX: indicador de carga para llamadas a backend (RF16/RF25).
-  Animated, // UX: animaciones suaves de transiciones (RF8, experiencia premium).
-  Easing, // UX: curvas de animación para suavidad institucional.
-  LayoutAnimation, // UX: animación de expansión/colapso de la bandeja (RF25).
-  Platform, // UX: diferencias iOS/Android para sombras y LayoutAnimation.
-  ScrollView, // UX: permite scroll vertical manteniendo tarjetas estables (RF5).
-  StyleSheet, // UI: estilos nativos con rendimiento óptimo (directriz).
-  Text, // UI: render tipográfico.
-  TouchableOpacity, // UX: interacción táctil con feedback.
-  View, // UI: layout base.
-} from 'react-native'; // UI: runtime React Native.
-import Barcode from 'react-native-barcode-qr-generator'; // RF8: render de Code128/QR en Expo sin depender de hardware QR actual.
-import QRCode from 'react-native-qrcode-svg'; // RF8: render QR para compatibilidad futura (conmutación).
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Easing,
+  LayoutAnimation,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import Barcode from 'react-native-barcode-qr-generator';
+import QRCode from 'react-native-qrcode-svg';
 import AvatarIniciales from '../components/AvatarIniciales';
-import { useAuth } from '../context/AuthContext'; // RF7: fuente de sesión y perfil del aprendiz.
-import { apiRequest } from '../services/api'; // RF16/RF25: cliente HTTP tipado con auth y manejo de sesión inválida.
+import { useAuth } from '../context/AuthContext';
+import { apiRequest } from '../services/api';
+import { notificacionService } from '../services/notificacionService';
 
 type ModoVisualizacion = 'BARRAS' | 'QR'; // RF8: modos explícitos para conmutación dual.
 
@@ -67,6 +69,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
   }); // RF16: estado tipado.
   const [notificaciones, setNotificaciones] = useState<NotificacionUsuario[]>([]); // RF25: historial de eventos para bandeja del aprendiz.
   const [bandejaAbierta, setBandejaAbierta] = useState<boolean>(true); // RF25: colapsable por UX (menos ruido visual).
+  const [verTodasNotif, setVerTodasNotif] = useState<boolean>(false); // RF25: por defecto solo se muestran las 2 más recientes.
   const [cargando, setCargando] = useState<boolean>(true); // UX: loading global para sincronización de datos críticos.
 
   const animSwitch = useRef(new Animated.Value(1)).current; // UX: controla fade/scale al alternar BARRAS/QR (evita layout thrashing).
@@ -226,6 +229,24 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
     setModoVisualizacion((m) => (m === 'BARRAS' ? 'QR' : 'BARRAS')); // RF8: alterna de forma determinista.
   }; // RF8: fin toggleModo.
 
+  const eliminarNotificacion = (id: number) => {
+    Alert.alert('Eliminar notificación', '¿Eliminar esta notificación?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await notificacionService.eliminar(id);
+            setNotificaciones((prev) => prev.filter((n) => n.id !== id));
+          } catch (e: any) {
+            Alert.alert('Error', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
   const formatFecha = (iso: string) => { // RF25: formatea fecha legible para el aprendiz.
     const d = new Date(iso); // RF25: parse de ISO proveniente del backend.
     if (Number.isNaN(d.getTime())) return iso; // RF25: fallback si la fecha no es parseable.
@@ -236,6 +257,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
     const t = String(tipo ?? '').toUpperCase(); // RF25: normaliza para comparar.
     if (t.includes('SALIDA_EMERGENCIA')) return '⛔'; // RF25: icono semántico para emergencia.
     if (t.includes('DESHABILITADO')) return '🚫'; // RF25: icono semántico para bloqueo.
+    if (t.includes('SOLICITUD_VEHICULO_APROBADA')) return '✅';
+    if (t.includes('SOLICITUD_VEHICULO_RECHAZADA')) return '❌';
+    if (t.includes('SOLICITUD_VEHICULO')) return '📋';
+    if (t.includes('COMPARTIDO_VEHICULO_ELIMINADO')) return '🗑️';
+    if (t.includes('COMPARTIDO_REVOCADO')) return '🔒';
+    if (t.includes('COMPARTIDO_ACEPTADO')) return '🤝';
+    if (t.includes('COMPARTIDO_RECHAZADO')) return '✖️';
+    if (t.includes('COMPARTIDO')) return '🤝';
+    if (t.includes('VEHICULO_REGISTRADO_POR_ADMIN')) return '🚗';
+    if (t.includes('VEHICULO_EDITADO_POR_ADMIN')) return '✏️';
+    if (t.includes('VEHICULO_ELIMINADO_POR_ADMIN')) return '🗑️';
     return '🔔'; // RF25: icono general de notificación.
   }; // RF25: fin iconoNotificacion.
 
@@ -243,6 +275,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
     const t = String(tipo ?? '').toUpperCase(); // RF25: normaliza.
     if (t.includes('SALIDA_EMERGENCIA')) return COLORS.bloqueoEmergencia; // RF25: emergencia en rojo.
     if (t.includes('DESHABILITADO')) return COLORS.bloqueoEmergencia; // RF25: deshabilitado en rojo.
+    if (t.includes('RECHAZADA') || t.includes('RECHAZADO') || t.includes('ELIMINADO') || t.includes('REVOCADO')) return COLORS.bloqueoEmergencia;
+    if (t.includes('APROBADA') || t.includes('ACEPTADO')) return COLORS.verdeActivo;
     return COLORS.alertaOcupacion; // RF25: otras alertas en naranja.
   }; // RF25: fin colorNotificacion.
 
@@ -367,15 +401,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
                 <Text style={styles.bandejaEmpty}>No hay notificaciones institucionales registradas.</Text>
               ) : ( // RF25: lista de tarjetas.
                 <View style={styles.bandejaList}>
-                  {notificaciones.map((n) => ( // RF25: mapeo de notificaciones.
+                  {(verTodasNotif ? notificaciones : notificaciones.slice(0, 2)).map((n) => ( // RF25: por defecto solo 2; opcional ver todas.
                     <View key={n.id} style={[styles.notifCard, { borderLeftColor: colorNotificacion(n.tipo) }]}>
                       <View style={[styles.notifIcon, { backgroundColor: colorNotificacion(n.tipo) }]}>
                         <Text style={styles.notifIconText}>{iconoNotificacion(n.tipo)}</Text>
                       </View>
 
                       <View style={styles.notifContent}>
-                        <Text style={styles.notifTitle} numberOfLines={1}>{String(n?.titulo ?? '')}</Text>
-                        <Text style={styles.notifMessage} numberOfLines={3}>{String(n?.mensaje ?? '')}</Text>
+                        <Text style={styles.notifTitle} numberOfLines={2}>{String(n?.titulo ?? '')}</Text>
+                        <Text style={styles.notifMessage} numberOfLines={4}>{String(n?.mensaje ?? '')}</Text>
                         <View style={styles.notifMetaRow}>
                           <Text style={styles.notifMetaText}>{formatFecha(String(n?.createdAt ?? ''))}</Text>
                           <Text style={styles.notifMetaDot}>•</Text>
@@ -384,8 +418,36 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
                           </Text>
                         </View>
                       </View>
+
+                      <TouchableOpacity
+                        style={styles.notifEliminarBtn}
+                        onPress={() => eliminarNotificacion(n.id)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={styles.notifEliminarTxt}>×</Text>
+                      </TouchableOpacity>
                     </View>
                   ))}
+
+                  {notificaciones.length > 2 ? (
+                    <TouchableOpacity
+                      style={styles.verMasBtn}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        setVerTodasNotif((v) => !v);
+                      }}
+                    >
+                      <Text style={styles.verMasTexto}>
+                        {verTodasNotif
+                          ? `Mostrar solo las últimas 2`
+                          : `Ver todas (${notificaciones.length})`}
+                      </Text>
+                      <Text style={[styles.verMasFlecha, verTodasNotif && styles.verMasFlechaUp]}>
+                        ⌄
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               )}
             </View>
@@ -700,4 +762,47 @@ const styles = StyleSheet.create({ // UI: StyleSheet nativo para rendimiento y c
   footerSpace: { // UX: espacio final.
     height: 10, // UX: respiración.
   }, // UX: fin footerSpace.
+  notifEliminarBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(211,47,47,0.08)',
+  },
+  notifEliminarTxt: {
+    color: '#D32F2F',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  verMasBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    marginTop: 4,
+    gap: 6,
+  },
+  verMasTexto: {
+    color: COLORS.verdeOscuro,
+    fontWeight: '900',
+    fontSize: 12,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  verMasFlecha: {
+    color: COLORS.verdeOscuro,
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 22,
+    transform: [{ rotate: '0deg' }],
+  },
+  verMasFlechaUp: {
+    transform: [{ rotate: '180deg' }],
+  },
 }); // UI: fin StyleSheet.

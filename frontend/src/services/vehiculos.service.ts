@@ -83,6 +83,34 @@ export const vehiculosService = {
     return response.data;
   },
 
+  detalleVehiculoAdmin: async (placa: string): Promise<BackendEnvelope<any>> => {
+    const response = await api.get(`/admin/vehiculos/detalle/${placa}`);
+    return response.data;
+  },
+
+  crearVehiculoAdmin: async (datos: {
+    documentoPropietario: string;
+    placa: string;
+    fotoVehiculo: string;
+    fotoTarjetaP: string;
+    fotoPlaca?: string;
+    color: string;
+    idTipoVehiculo: number;
+  }): Promise<BackendEnvelope<{ mensaje: string; placa: string }>> => {
+    const response = await api.post('/admin/vehiculos', datos);
+    return response.data;
+  },
+
+  editarVehiculoAdmin: async (placa: string, datos: any): Promise<BackendEnvelope<{ mensaje: string }>> => {
+    const response = await api.patch(`/admin/vehiculos/${placa}`, datos);
+    return response.data;
+  },
+
+  eliminarVehiculoAdmin: async (placa: string): Promise<BackendEnvelope<{ mensaje: string }>> => {
+    const response = await api.delete(`/admin/vehiculos/${placa}`);
+    return response.data;
+  },
+
   salidaEmergenciaAdmin: async (payload: { placa?: string; idRegistroVehiculo?: number; motivo: string }): Promise<BackendEnvelope<any>> => {
     const response = await api.post('/admin/movimientos/salida-emergencia', payload);
     return response.data;

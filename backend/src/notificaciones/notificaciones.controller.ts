@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -23,6 +23,25 @@ export class NotificacionesController {
   @ApiOperation({ summary: 'Obtener mis notificaciones (RF25)' }) // RF25: trazabilidad explícita.
   async obtenerMisNotificaciones(@CurrentUser() usuario: IJwtPayload) {
     return await this.notificacionesService.obtenerMisNotificaciones(usuario.sub); // RNF2: usa sub del JWT (documento) sin loguearlo.
+  }
+
+  /** Elimina una notificación específica del usuario autenticado */
+  @Delete(':id')
+  @Roles(TipoUsuarioEnum.APRENDIZ)
+  @ApiOperation({ summary: 'Eliminar una notificación' })
+  async eliminarNotificacion(
+    @CurrentUser() usuario: IJwtPayload,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return await this.notificacionesService.eliminarNotificacion(usuario.sub, id);
+  }
+
+  /** Elimina TODAS las notificaciones del usuario autenticado */
+  @Delete()
+  @Roles(TipoUsuarioEnum.APRENDIZ)
+  @ApiOperation({ summary: 'Eliminar todas mis notificaciones' })
+  async eliminarTodas(@CurrentUser() usuario: IJwtPayload) {
+    return await this.notificacionesService.eliminarTodas(usuario.sub);
   }
 }
 

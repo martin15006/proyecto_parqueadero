@@ -1,35 +1,69 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { usuariosService } from '../../services/usuarios.service';
-import type { AdminUsuarioItem, CreateOperativoAdminDto } from '../../types';
-import { Plus, Search, User as UserIcon, Mail, Smartphone, Car, IdCard, Phone, Lock } from 'lucide-react';
+import type { AdminUsuarioItem } from '../../types';
+import { Plus, Search, User as UserIcon, Mail, Smartphone, Car, IdCard, Phone, Lock, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Table } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
+import { ImageUpload } from '../../components/ui/ImageUpload';
 import { useNotification } from '../../contexts/NotificationContext';
 
-/**
- * Gestión de Usuarios (Admin).
- * Permite listar, filtrar y administrar las cuentas institucionales.
- */
+type Rol = 'APRENDIZ' | 'ADMIN' | 'OPERATIVO' | 'TODOS';
+
+interface FormUsuario {
+  documento: string;
+  nombreCompleto: string;
+  correo: string;
+  numTelf: string;
+  contactoEmerg: string;
+  contra: string;
+  idTipoUsr: number; // 1 APRENDIZ, 2 ADMIN, 3 OPERATIVO
+  fotoPersona: string;
+  idFormacion: string;
+}
+
+const FORM_INICIAL: FormUsuario = {
+  documento: '',
+  nombreCompleto: '',
+  correo: '',
+  numTelf: '',
+  contactoEmerg: '',
+  contra: '',
+  idTipoUsr: 1,
+  fotoPersona: '',
+  idFormacion: '',
+};
+
+const rolIdToNombre: Record<number, string> = {
+  1: 'APRENDIZ',
+  2: 'ADMIN',
+  3: 'OPERATIVO',
+};
+
+const rolNombreToId: Record<string, number> = {
+  APRENDIZ: 1,
+  ADMIN: 2,
+  OPERATIVO: 3,
+};
+
 export const UsuariosPage: React.FC = () => {
   const { showNotification } = useNotification();
   const [usuarios, setUsuarios] = useState<AdminUsuarioItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [estado, setEstado] = useState<'ACTIVO' | 'INACTIVO' | 'TODOS'>('TODOS');
+  const [rol, setRol] = useState<Rol>('TODOS');
   const [q, setQ] = useState('');
 
-  const [isCreateOperativoOpen, setIsCreateOperativoOpen] = useState(false);
-  const [createOperativoLoading, setCreateOperativoLoading] = useState(false);
-  const [createOperativoData, setCreateOperativoData] = useState<CreateOperativoAdminDto>({
-    documento: '',
-    nombreCompleto: '',
-    correo: '',
-    numTelf: '',
-    contra: '',
-  });
-  const [createOperativoErrors, setCreateOperativoErrors] = useState<Partial<Record<keyof CreateOperativoAdminDto, string>>>({});
+  // Crear/Editar
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'crear' | 'editar'>('crear');
+  const [form, setForm] = useState<FormUsuario>(FORM_INICIAL);
+  const [errores, setErrores] = useState<Partial<Record<keyof FormUsuario, string>>>({});
+  const [saving, setSaving] = useState(false);
+
+  // Eliminar
+  const [confirmDeleteDoc, setConfirmDeleteDoc] = useState<string | null>(null);
 
   const getErrorMessage = (error: unknown, fallback: string) => {
     if (!error || typeof error !== 'object') return fallback;
@@ -43,10 +77,13 @@ export const UsuariosPage: React.FC = () => {
     return fallback;
   };
 
-  const fetchUsuarios = async (params: { q?: string; estado?: 'ACTIVO' | 'INACTIVO' | 'TODOS' }) => {
+  const fetchUsuarios = async () => {
     try {
       setLoading(true);
-      const res = await usuariosService.listarUsuariosAdmin(params);
+      const res = await usuariosService.listarUsuariosAdmin({
+        q: q.trim() || undefined,
+        rol,
+      });
       setUsuarios(res.data || []);
     } catch (error) {
       setUsuarios([]);
@@ -56,11 +93,117 @@ export const UsuariosPage: React.FC = () => {
   };
 
   useEffect(() => {
-    const t = window.setTimeout(() => {
-      fetchUsuarios({ q: q.trim() || undefined, estado });
-    }, 250);
+    const t = window.setTimeout(fetchUsuarios, 250);
     return () => window.clearTimeout(t);
-  }, [q, estado]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, rol]);
+
+  const abrirCrear = () => {
+    setModalMode('crear');
+    setForm({ ...FORM_INICIAL });
+    setErrores({});
+    setModalOpen(true);
+  };
+
+  const abrirEditar = (u: AdminUsuarioItem) => {
+    setModalMode('editar');
+    setForm({
+      documento: u.documento,
+      nombreCompleto: u.nombreCompleto,
+      correo: u.correo,
+      numTelf: u.numTelf || '',
+      contactoEmerg: u.contactoEmerg || '',
+      contra: '', // No se muestra
+      idTipoUsr: u.idTipoUsr,
+      fotoPersona: u.fotoPersona || '',
+      idFormacion: u.idFormacion || '',
+    });
+    setErrores({});
+    setModalOpen(true);
+  };
+
+  const cerrar = () => {
+    setModalOpen(false);
+    setSaving(false);
+  };
+
+  const validar = (): boolean => {
+    const e: Partial<Record<keyof FormUsuario, string>> = {};
+    if (!/^[0-9]{6,10}$/.test(form.documento.trim())) e.documento = 'Documento inválido (6–10 dígitos)';
+    if (form.nombreCompleto.trim().length < 3) e.nombreCompleto = 'Nombre obligatorio';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo.trim())) e.correo = 'Correo inválido';
+    if (!/^[0-9]{10}$/.test(form.numTelf.trim())) e.numTelf = 'Teléfono inválido (10 dígitos)';
+    if (modalMode === 'crear') {
+      if (!form.contra.trim()) e.contra = 'Contraseña obligatoria';
+    }
+    if (form.idTipoUsr === 1) {
+      if (!form.contactoEmerg || !/^[0-9]{10}$/.test(form.contactoEmerg.trim())) {
+        e.contactoEmerg = 'Contacto de emergencia obligatorio (10 dígitos)';
+      }
+      if (!form.idFormacion || !/^[0-9]{7}$/.test(form.idFormacion.trim())) {
+        e.idFormacion = 'Ficha obligatoria (7 dígitos)';
+      }
+    }
+    setErrores(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const guardar = async () => {
+    if (!validar()) return;
+    setSaving(true);
+    try {
+      if (modalMode === 'crear') {
+        const payload: any = {
+          documento: form.documento.trim(),
+          nombreCompleto: form.nombreCompleto.trim(),
+          correo: form.correo.trim(),
+          numTelf: form.numTelf.trim(),
+          contactoEmerg: form.contactoEmerg.trim() || form.numTelf.trim(),
+          contra: form.contra,
+          idTipoUsr: form.idTipoUsr,
+          fotoPersona: form.fotoPersona || '',
+        };
+        if (form.idTipoUsr === 1 && form.idFormacion) payload.idFormacion = form.idFormacion.trim();
+        const res = await usuariosService.crearUsuarioAdmin(payload);
+        const msg = res.data?.mensaje || 'Usuario creado';
+        if (form.idTipoUsr === 1) {
+          showNotification(`Usuario creado. Se envió un correo de verificación a ${form.correo}`, 'success');
+        } else {
+          showNotification(msg, 'success');
+        }
+      } else {
+        const payload: any = {
+          nombreCompleto: form.nombreCompleto.trim(),
+          correo: form.correo.trim(),
+          numTelf: form.numTelf.trim(),
+          contactoEmerg: form.contactoEmerg.trim() || form.numTelf.trim(),
+          idTipoUsr: form.idTipoUsr,
+          fotoPersona: form.fotoPersona || undefined,
+          idFormacion: form.idFormacion?.trim() || null,
+        };
+        await usuariosService.actualizarUsuarioAdmin(form.documento, payload);
+        showNotification('Usuario actualizado', 'success');
+      }
+      cerrar();
+      fetchUsuarios();
+    } catch (error) {
+      showNotification(getErrorMessage(error, 'No se pudo guardar'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const eliminar = async () => {
+    if (!confirmDeleteDoc) return;
+    try {
+      await usuariosService.eliminarUsuarioAdmin(confirmDeleteDoc);
+      showNotification('Usuario eliminado', 'success');
+      setConfirmDeleteDoc(null);
+      fetchUsuarios();
+    } catch (error) {
+      showNotification(getErrorMessage(error, 'No se pudo eliminar'), 'error');
+    }
+  };
 
   const columns = useMemo(() => ([
     {
@@ -75,6 +218,14 @@ export const UsuariosPage: React.FC = () => {
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-tighter">DOC: {u.documento}</p>
           </div>
         </div>
+      ),
+    },
+    {
+      header: 'Rol',
+      accessor: (u: AdminUsuarioItem) => (
+        <Badge variant={u.rol === 'ADMIN' ? 'info' : u.rol === 'OPERATIVO' ? 'warning' : 'success'}>
+          {u.rol}
+        </Badge>
       ),
     },
     {
@@ -104,208 +255,225 @@ export const UsuariosPage: React.FC = () => {
       },
     },
     {
-      header: 'Estado',
+      header: 'Acciones',
       accessor: (u: AdminUsuarioItem) => (
-        <Badge variant={u.estadoCuenta === 'ACTIVO' ? 'success' : 'error'}>
-          {u.estadoCuenta}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => abrirEditar(u)}
+            className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
+            title="Editar"
+          >
+            <Pencil size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmDeleteDoc(u.documento)}
+            className="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700"
+            title="Eliminar"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       ),
     },
   ]), []);
-
-  const openCreateOperativo = () => {
-    setCreateOperativoErrors({});
-    setCreateOperativoData({ documento: '', nombreCompleto: '', correo: '', numTelf: '', contra: '' });
-    setIsCreateOperativoOpen(true);
-  };
-
-  const closeCreateOperativo = () => {
-    setIsCreateOperativoOpen(false);
-    setCreateOperativoErrors({});
-    setCreateOperativoLoading(false);
-  };
-
-  const validateCreateOperativo = () => {
-    const next: Partial<Record<keyof CreateOperativoAdminDto, string>> = {};
-
-    const documento = createOperativoData.documento.trim();
-    const nombre = createOperativoData.nombreCompleto.trim();
-    const correo = createOperativoData.correo.trim();
-    const tel = createOperativoData.numTelf.trim();
-    const contra = createOperativoData.contra;
-
-    if (!/^[0-9]{6,10}$/.test(documento)) next.documento = 'Documento inválido (6–10 dígitos)';
-    if (nombre.length < 3) next.nombreCompleto = 'Nombre completo obligatorio';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) next.correo = 'Correo inválido';
-    if (!/^[0-9]{10}$/.test(tel)) next.numTelf = 'Teléfono inválido (10 dígitos)';
-    if (!contra.trim()) next.contra = 'Contraseña temporal obligatoria';
-
-    setCreateOperativoErrors(next);
-    return Object.keys(next).length === 0;
-  };
-
-  const handleCreateOperativo = async () => {
-    if (!validateCreateOperativo()) return;
-    setCreateOperativoLoading(true);
-    try {
-      const res = await usuariosService.crearOperativoAdmin({
-        documento: createOperativoData.documento.trim(),
-        nombreCompleto: createOperativoData.nombreCompleto.trim(),
-        correo: createOperativoData.correo.trim(),
-        numTelf: createOperativoData.numTelf.trim(),
-        contra: createOperativoData.contra,
-      });
-
-      if (res.data?.idTipoUsr !== 3) {
-        showNotification('No se pudo crear el operativo: rol inválido retornado por el servidor', 'error');
-        return;
-      }
-
-      showNotification('Operativo creado correctamente', 'success');
-      closeCreateOperativo();
-      fetchUsuarios({ q: q.trim() || undefined, estado });
-    } catch (error: unknown) {
-      showNotification(getErrorMessage(error, 'No se pudo crear el operativo'), 'error');
-    } finally {
-      setCreateOperativoLoading(false);
-    }
-  };
 
   return (
     <div className="space-y-8">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-[#232323] tracking-tight">Usuarios</h1>
-          <p className="text-slate-500 text-sm font-medium uppercase tracking-widest">RF19 • Administración de cuentas</p>
+          <p className="text-slate-500 text-sm font-medium uppercase tracking-widest">Administración de cuentas</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <Button
             type="button"
             variant="primary"
             size="sm"
-            onClick={openCreateOperativo}
+            onClick={abrirCrear}
             className="bg-[#39A900] hover:bg-[#2F8A00] shadow-sm"
           >
             <Plus size={16} className="mr-2" />
-            Registrar Vigilante
+            Crear Usuario
           </Button>
-          <Button variant={estado === 'TODOS' ? 'primary' : 'outline'} size="sm" onClick={() => setEstado('TODOS')}>Todos</Button>
-          <Button variant={estado === 'ACTIVO' ? 'primary' : 'outline'} size="sm" onClick={() => setEstado('ACTIVO')}>Activos</Button>
-          <Button variant={estado === 'INACTIVO' ? 'primary' : 'outline'} size="sm" onClick={() => setEstado('INACTIVO')}>Inactivos</Button>
         </div>
       </header>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <Input 
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+        <Input
           icon={<Search size={20} />}
           placeholder="Buscar por nombre, documento o correo..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 mr-2">Filtrar por rol:</span>
+          {(['TODOS', 'APRENDIZ', 'OPERATIVO', 'ADMIN'] as Rol[]).map((r) => (
+            <Button
+              key={r}
+              variant={rol === r ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setRol(r)}
+            >
+              {r === 'TODOS' ? 'Todos' : r.charAt(0) + r.slice(1).toLowerCase()}
+            </Button>
+          ))}
+        </div>
       </div>
 
-      <Table 
+      <Table
         columns={columns}
         data={usuarios}
         isLoading={loading}
         emptyMessage="No se encontraron usuarios"
       />
 
+      {/* Modal Crear/Editar */}
       <Modal
-        isOpen={isCreateOperativoOpen}
-        onClose={closeCreateOperativo}
-        title="Nuevo Operativo"
+        isOpen={modalOpen}
+        onClose={cerrar}
+        title={modalMode === 'crear' ? 'Crear Usuario' : `Editar ${form.nombreCompleto}`}
         footer={
           <>
-            <Button type="button" variant="outline" onClick={closeCreateOperativo}>
-              Cancelar
-            </Button>
+            <Button type="button" variant="outline" onClick={cerrar}>Cancelar</Button>
             <Button
               type="button"
               variant="primary"
-              isLoading={createOperativoLoading}
-              onClick={handleCreateOperativo}
+              isLoading={saving}
+              onClick={guardar}
               className="bg-[#39A900] hover:bg-[#2F8A00]"
             >
-              Crear
+              {modalMode === 'crear' ? 'Crear' : 'Guardar cambios'}
             </Button>
           </>
         }
       >
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-xl font-black text-[#232323] tracking-tight">Registrar Vigilante</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-600">
-              Se creará una cuenta con rol OPERATIVO. La autorización se valida por JWT del Administrador.
-            </p>
-          </div>
+        <div className="space-y-4">
+          {modalMode === 'crear' && form.idTipoUsr === 1 && (
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+              <p className="text-xs font-bold text-emerald-800">
+                ℹ Al crear un aprendiz, se le enviará un código de verificación al correo indicado.
+                Deberá ingresar el código en la app para activar su cuenta.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Rol</label>
+              <select
+                value={form.idTipoUsr}
+                onChange={(e) => setForm((p) => ({ ...p, idTipoUsr: Number(e.target.value) }))}
+                className="w-full mt-1 p-3 border border-slate-300 rounded-xl font-medium text-sm focus:border-[#39A900] focus:outline-none"
+              >
+                <option value={1}>Aprendiz</option>
+                <option value={3}>Operativo / Vigilante</option>
+                <option value={2}>Administrador</option>
+              </select>
+            </div>
+
             <Input
-              label="Documento (Cédula)"
+              label="Documento"
               icon={<IdCard size={18} />}
-              value={createOperativoData.documento}
-              onChange={(e) => setCreateOperativoData((p) => ({ ...p, documento: e.target.value }))}
-              error={createOperativoErrors.documento}
-              placeholder="Ej: 123456789"
-              className="focus:border-[#39A900]"
-              inputMode="numeric"
-              autoComplete="off"
+              value={form.documento}
+              onChange={(e) => setForm((p) => ({ ...p, documento: e.target.value }))}
+              error={errores.documento}
+              placeholder="Ej: 1234567890"
+              disabled={modalMode === 'editar'}
+            />
+
+            <div className="md:col-span-2">
+              <Input
+                label="Nombre completo"
+                icon={<UserIcon size={18} />}
+                value={form.nombreCompleto}
+                onChange={(e) => setForm((p) => ({ ...p, nombreCompleto: e.target.value }))}
+                error={errores.nombreCompleto}
+              />
+            </div>
+
+            <Input
+              label="Correo electrónico"
+              icon={<Mail size={18} />}
+              value={form.correo}
+              onChange={(e) => setForm((p) => ({ ...p, correo: e.target.value }))}
+              error={errores.correo}
+              placeholder="ejemplo@correo.com"
             />
 
             <Input
               label="Teléfono"
               icon={<Phone size={18} />}
-              value={createOperativoData.numTelf}
-              onChange={(e) => setCreateOperativoData((p) => ({ ...p, numTelf: e.target.value }))}
-              error={createOperativoErrors.numTelf}
+              value={form.numTelf}
+              onChange={(e) => setForm((p) => ({ ...p, numTelf: e.target.value }))}
+              error={errores.numTelf}
               placeholder="10 dígitos"
-              className="focus:border-[#39A900]"
-              inputMode="numeric"
-              autoComplete="off"
             />
 
+            {form.idTipoUsr === 1 && (
+              <>
+                <Input
+                  label="Contacto de emergencia"
+                  icon={<Phone size={18} />}
+                  value={form.contactoEmerg}
+                  onChange={(e) => setForm((p) => ({ ...p, contactoEmerg: e.target.value }))}
+                  error={errores.contactoEmerg}
+                  placeholder="10 dígitos"
+                />
+                <Input
+                  label="Ficha de formación"
+                  value={form.idFormacion}
+                  onChange={(e) => setForm((p) => ({ ...p, idFormacion: e.target.value }))}
+                  error={errores.idFormacion}
+                  placeholder="7 dígitos"
+                />
+              </>
+            )}
+
             <div className="md:col-span-2">
-              <Input
-                label="Nombre Completo"
-                icon={<UserIcon size={18} />}
-                value={createOperativoData.nombreCompleto}
-                onChange={(e) => setCreateOperativoData((p) => ({ ...p, nombreCompleto: e.target.value }))}
-                error={createOperativoErrors.nombreCompleto}
-                placeholder="Nombres y apellidos"
-                className="focus:border-[#39A900]"
-                autoComplete="name"
+              <ImageUpload
+                label="Foto de perfil"
+                value={form.fotoPersona}
+                onChange={(url) => setForm((p) => ({ ...p, fotoPersona: url }))}
+                placeholder="Subir foto de perfil"
+                previewHeight={180}
               />
             </div>
 
-            <div className="md:col-span-2">
-              <Input
-                label="Correo Electrónico"
-                icon={<Mail size={18} />}
-                value={createOperativoData.correo}
-                onChange={(e) => setCreateOperativoData((p) => ({ ...p, correo: e.target.value }))}
-                error={createOperativoErrors.correo}
-                placeholder="vigilante@sena.edu.co"
-                className="focus:border-[#39A900]"
-                autoComplete="email"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <Input
-                label="Contraseña Temporal"
-                icon={<Lock size={18} />}
-                value={createOperativoData.contra}
-                onChange={(e) => setCreateOperativoData((p) => ({ ...p, contra: e.target.value }))}
-                error={createOperativoErrors.contra}
-                placeholder="Asignar una contraseña segura"
-                className="focus:border-[#39A900]"
-                autoComplete="new-password"
-                type="password"
-              />
-            </div>
+            {modalMode === 'crear' && (
+              <div className="md:col-span-2">
+                <Input
+                  label="Contraseña"
+                  icon={<Lock size={18} />}
+                  type="password"
+                  value={form.contra}
+                  onChange={(e) => setForm((p) => ({ ...p, contra: e.target.value }))}
+                  error={errores.contra}
+                  placeholder="Asigna una contraseña segura"
+                />
+              </div>
+            )}
           </div>
         </div>
+      </Modal>
+
+      {/* Confirmar eliminación */}
+      <Modal
+        isOpen={!!confirmDeleteDoc}
+        onClose={() => setConfirmDeleteDoc(null)}
+        title="Eliminar usuario"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setConfirmDeleteDoc(null)}>Cancelar</Button>
+            <Button type="button" variant="danger" onClick={eliminar}>Eliminar definitivamente</Button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-700">
+          ¿Estás seguro de eliminar al usuario <b>{confirmDeleteDoc}</b>? Esta acción no se puede deshacer y
+          eliminará todos sus datos asociados.
+        </p>
       </Modal>
     </div>
   );

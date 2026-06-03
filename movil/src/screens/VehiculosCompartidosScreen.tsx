@@ -8,6 +8,7 @@ import {
   Alert,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
@@ -20,13 +21,18 @@ import { VehiculoCompartido } from '../types/vehiculo';
 export default function VehiculosCompartidosScreen({ navigation }: any) {
   const { colores, esOscuro } = useTheme();
   const [vehiculos, setVehiculos] = useState<VehiculoCompartido[]>([]);
+  const [pendientes, setPendientes] = useState<number>(0);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
 
   const cargar = async () => {
     try {
-      const datos = await vehiculoService.listarCompartidosConmigo();
+      const [datos, invs] = await Promise.all([
+        vehiculoService.listarCompartidosConmigo(),
+        vehiculoService.listarInvitacionesPendientes(),
+      ]);
       setVehiculos(datos);
+      setPendientes(invs.length);
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
@@ -105,11 +111,31 @@ export default function VehiculosCompartidosScreen({ navigation }: any) {
           />
         }
         ListHeaderComponent={
-          <View style={[styles.banner, { backgroundColor: esOscuro ? 'rgba(95,217,36,0.10)' : colores.verdeMuyClaro, borderColor: colores.verde }]}>
-            <Text style={[styles.bannerTexto, { color: colores.verde }]}>
-              🤝 Vehículos que otros usuarios han compartido contigo. Puedes usarlos
-              para ingresar al parqueadero. Máximo 2 vehículos compartidos.
-            </Text>
+          <View>
+            {pendientes > 0 && (
+              <TouchableOpacity
+                style={[styles.bannerPendiente, { backgroundColor: esOscuro ? 'rgba(255,193,7,0.10)' : '#FFF8E1', borderColor: '#FFC107' }]}
+                onPress={() => navigation.navigate('InvitacionesCompartido')}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 24, marginRight: 12 }}>📩</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.bannerPendienteTitulo, { color: esOscuro ? '#FFD54F' : '#856404' }]}>
+                    Tienes {pendientes} {pendientes === 1 ? 'invitación pendiente' : 'invitaciones pendientes'}
+                  </Text>
+                  <Text style={[styles.bannerPendienteSub, { color: colores.textoSecundario }]}>
+                    Toca para aceptarlas o rechazarlas
+                  </Text>
+                </View>
+                <Text style={[styles.bannerFlecha, { color: esOscuro ? '#FFD54F' : '#856404' }]}>›</Text>
+              </TouchableOpacity>
+            )}
+            <View style={[styles.banner, { backgroundColor: esOscuro ? 'rgba(95,217,36,0.10)' : colores.verdeMuyClaro, borderColor: colores.verde }]}>
+              <Text style={[styles.bannerTexto, { color: colores.verde }]}>
+                🤝 Vehículos que otros usuarios han compartido contigo y que ya aceptaste.
+                Puedes usarlos para ingresar al parqueadero. Máximo 2 vehículos.
+              </Text>
+            </View>
           </View>
         }
         ListEmptyComponent={
@@ -139,6 +165,17 @@ const styles = StyleSheet.create({
     marginBottom: espacios.normal,
   },
   bannerTexto: { fontSize: fonts.pequeno, lineHeight: 18, fontWeight: '500' },
+  bannerPendiente: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: espacios.normal,
+    borderWidth: 1,
+    marginBottom: espacios.normal,
+  },
+  bannerPendienteTitulo: { fontSize: fonts.normal, fontWeight: '700' },
+  bannerPendienteSub: { fontSize: fonts.pequeno, marginTop: 2 },
+  bannerFlecha: { fontSize: 28, fontWeight: '300' },
   card: {
     borderRadius: 16,
     flexDirection: 'row',

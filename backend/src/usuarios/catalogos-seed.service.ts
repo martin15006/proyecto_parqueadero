@@ -79,7 +79,7 @@ export class CatalogosSeedService {
   }
 
   private async seedTipoVehiculo() {
-    const tipos = ['Carro', 'Moto', 'Bicicleta'];
+    const tipos = ['Carro', 'Moto'];
     for (const tipoVehiculo of tipos) {
       const existe = await this.tipoVehiculoRepo.findOne({ where: { tipoVehiculo } });
       if (!existe) {

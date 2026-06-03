@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards, Param, Body, Patch, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Param, Body, Patch, Post, Delete, ParseIntPipe } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -23,6 +23,34 @@ export class AdminVehiculosController {
   @ApiResponse({ status: 200, description: 'Listado de vehículos' })
   async listar(@Query() query: AdminListVehiculosQueryDto) {
     return await this.vehiculosService.listarVehiculosAdmin(query);
+  }
+
+  /** Detalle COMPLETO de un vehículo incluyendo propietario */
+  @Get('detalle/:placa')
+  @ApiOperation({ summary: 'Detalle completo de vehículo + propietario (Admin)' })
+  detalle(@Param('placa') placa: string) {
+    return this.vehiculosService.detalleVehiculoAdmin(placa);
+  }
+
+  /** Crear vehículo y asignarlo a un usuario existente */
+  @Post()
+  @ApiOperation({ summary: 'Crear vehículo y asignarlo a un usuario (Admin)' })
+  crear(@Body() dto: any) {
+    return this.vehiculosService.crearVehiculoPorAdmin(dto);
+  }
+
+  /** Editar cualquier campo de un vehículo (sin cooldown) */
+  @Patch(':placa')
+  @ApiOperation({ summary: 'Editar vehículo (Admin)' })
+  editar(@Param('placa') placa: string, @Body() dto: any) {
+    return this.vehiculosService.actualizarVehiculoPorAdmin(placa, dto);
+  }
+
+  /** Eliminar un vehículo del sistema */
+  @Delete(':placa')
+  @ApiOperation({ summary: 'Eliminar vehículo (Admin)' })
+  eliminar(@Param('placa') placa: string) {
+    return this.vehiculosService.eliminarVehiculoPorAdmin(placa);
   }
 
   // ─── SOLICITUDES ─────────────────────────────────────────────────────────────

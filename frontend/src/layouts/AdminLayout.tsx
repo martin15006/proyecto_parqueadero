@@ -1,27 +1,20 @@
-import React, { useMemo, useState } from 'react';
-import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
+import React, { useMemo } from 'react';
+import { Link, useLocation, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Car,
   ShieldCheck, LogOut, ChevronRight,
-  Database, Menu, FileText, Inbox
+  Database, FileText, Inbox,
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 
 /**
  * Layout Principal para el Panel Administrativo.
- * Proporciona navegación lateral persistente y control de sesión.
+ * Sidebar fijo a la izquierda. Header simple sin menú desplegable.
  */
 export const AdminLayout: React.FC = () => {
   const { logout, user } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  /**
-   * Estado de UI del layout:
-   * - `isMenuOpen` controla el menú contextual superior para accesos rápidos en pantallas pequeñas.
-   * - La navegación principal (sidebar) permanece fija para mantener continuidad visual.
-   */
   const menuItems = [
     { path: '/appadmin', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { path: '/appadmin/usuarios', label: 'Usuarios', icon: <Users size={20} /> },
@@ -30,15 +23,6 @@ export const AdminLayout: React.FC = () => {
     { path: '/appadmin/auditoria', label: 'Auditoría', icon: <Database size={20} /> },
     { path: '/appadmin/informes', label: 'Reportes', icon: <FileText size={20} /> },
   ];
-
-  const dropdownItems = useMemo(() => ([
-    { label: 'Dashboard', path: '/appadmin' },
-    { label: 'Usuarios', path: '/appadmin/usuarios' },
-    { label: 'Vehículos', path: '/appadmin/vehiculos' },
-    { label: 'Solicitudes', path: '/appadmin/solicitudes' },
-    { label: 'Auditoría', path: '/appadmin/auditoria' },
-    { label: 'Reportes', path: '/appadmin/informes' },
-  ]), []);
 
   const pageMeta = useMemo(() => {
     const path = location.pathname;
@@ -83,8 +67,8 @@ export const AdminLayout: React.FC = () => {
                 key={item.path}
                 to={item.path}
                 className={`flex items-center justify-between p-4 rounded-xl transition-all duration-200 group ${
-                  location.pathname === item.path 
-                    ? 'bg-white/10 text-white shadow-sm ring-2 ring-[#39A900]/30' 
+                  location.pathname === item.path
+                    ? 'bg-white/10 text-white shadow-sm ring-2 ring-[#39A900]/30'
                     : 'text-white/85 hover:bg-white/10 hover:text-white'
                 }`}
               >
@@ -108,8 +92,8 @@ export const AdminLayout: React.FC = () => {
               <p className="text-[9px] font-bold text-white/60 uppercase truncate">{user?.usuario?.correo}</p>
             </div>
           </div>
-          
-          <button 
+
+          <button
             onClick={logout}
             className="w-full flex items-center gap-3 p-4 text-rose-200 font-black text-xs uppercase tracking-widest hover:bg-white/10 rounded-xl transition-all duration-200"
           >
@@ -121,7 +105,7 @@ export const AdminLayout: React.FC = () => {
       {/* Área de Contenido Principal */}
       <main className="flex-1 overflow-y-auto bg-slate-50">
         <div className="sticky top-0 z-40 bg-slate-50/90 backdrop-blur border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+          <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
                 <span className="text-slate-400">Admin</span>
@@ -132,51 +116,6 @@ export const AdminLayout: React.FC = () => {
                 <h1 className="text-xl font-black text-slate-900 tracking-tight truncate">{pageMeta.title}</h1>
                 <p className="text-xs font-semibold text-slate-500 truncate">{pageMeta.subtitle}</p>
               </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsMenuOpen((v) => !v)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl shadow-sm text-slate-900 font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all duration-200"
-              >
-                <Menu size={16} />
-                Menú
-              </button>
-
-              {isMenuOpen && (
-                <div className="relative">
-                  <div className="absolute left-0 top-3 w-72 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
-                    <div className="p-2">
-                      {dropdownItems.map((item) => (
-                        <button
-                          key={item.path}
-                          type="button"
-                          onClick={() => {
-                            setIsMenuOpen(false);
-                            navigate(item.path);
-                          }}
-                          className="w-full text-left px-4 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200"
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                      <div className="my-2 h-px bg-slate-200" />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          logout();
-                          navigate('/login', { replace: true });
-                        }}
-                        className="w-full text-left px-4 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest text-rose-700 hover:bg-rose-50 transition-all duration-200"
-                      >
-                        Cerrar sesión
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

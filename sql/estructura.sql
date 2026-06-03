@@ -63,6 +63,7 @@ CREATE TABLE vehiculo (
     foto_tarjeta_p VARCHAR(255) NOT NULL,
     color VARCHAR(50) NOT NULL,
     id_tipo_vehiculo SMALLINT NOT NULL,
+    ultima_edicion_at TIMESTAMPTZ,
 
     FOREIGN KEY (id_tipo_vehiculo)
         REFERENCES tipo_vehiculo(id_tipo_v)
@@ -112,10 +113,15 @@ CREATE TABLE registro_vehiculo (
         ON UPDATE CASCADE
 );
 
+CREATE TYPE compartir_estado_enum AS ENUM ('PENDIENTE', 'ACEPTADO', 'RECHAZADO');
+
 CREATE TABLE compartir (
     id_compartir SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     documento VARCHAR(10),
     id_registro_v INT,
+    estado compartir_estado_enum NOT NULL DEFAULT 'PENDIENTE',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    respondido_en TIMESTAMPTZ,
 
     FOREIGN KEY (documento)
         REFERENCES usuario(documento)
@@ -158,7 +164,6 @@ CREATE TABLE codigo_otp (
 
 CREATE INDEX idx_otp_documento ON codigo_otp(documento);
 
--- Solicitudes de registro de vehículo (pendiente aprobación del administrador)
 CREATE TYPE estado_solicitud AS ENUM (
     'PENDIENTE',
     'APROBADO',

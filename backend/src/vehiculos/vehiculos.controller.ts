@@ -84,6 +84,16 @@ export class VehiculosController {
     return this.vehiculosService.actualizarVehiculo(usuario.documento, placa, dto);
   }
 
+  /** Consulta si el vehículo se puede editar ahora (cooldown 15 días) */
+  @UseGuards(JwtAuthGuard)
+  @Get(':placa/puede-editar')
+  puedeEditar(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Param('placa') placa: string,
+  ) {
+    return this.vehiculosService.puedeEditarVehiculo(usuario.documento, placa);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Delete(':placa')
   eliminar(
@@ -95,11 +105,38 @@ export class VehiculosController {
 
   // ─── COMPARTIR ────────────────────────────────────────────────────────────────
 
-  /** Lista los vehículos que otros compartieron conmigo */
+  /** Lista los vehículos que otros compartieron conmigo (ya ACEPTADOS) */
   @UseGuards(JwtAuthGuard)
   @Get('compartidos-conmigo')
   compartidosConmigo(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
     return this.vehiculosService.listarVehiculosCompartidosConmigo(usuario.documento);
+  }
+
+  /** Invitaciones de compartido PENDIENTES dirigidas a mí */
+  @UseGuards(JwtAuthGuard)
+  @Get('compartidos-pendientes')
+  compartidosPendientes(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
+    return this.vehiculosService.listarInvitacionesPendientes(usuario.documento);
+  }
+
+  /** Acepta una invitación de compartido */
+  @UseGuards(JwtAuthGuard)
+  @Post('compartidos/:idCompartir/aceptar')
+  aceptarCompartido(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Param('idCompartir') idCompartir: string,
+  ) {
+    return this.vehiculosService.aceptarCompartido(usuario.documento, Number(idCompartir));
+  }
+
+  /** Rechaza una invitación de compartido */
+  @UseGuards(JwtAuthGuard)
+  @Post('compartidos/:idCompartir/rechazar')
+  rechazarCompartido(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Param('idCompartir') idCompartir: string,
+  ) {
+    return this.vehiculosService.rechazarCompartido(usuario.documento, Number(idCompartir));
   }
 
   /** Info de con quién está compartido un vehículo mío */

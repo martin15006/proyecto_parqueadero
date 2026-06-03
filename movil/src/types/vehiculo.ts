@@ -40,6 +40,8 @@ export interface SolicitudVehiculo {
   tipoVehiculo?: TipoVehiculo;
 }
 
+export type EstadoCompartido = 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO';
+
 export interface VehiculoCompartido {
   idCompartir: number;
   placa: string;
@@ -51,8 +53,20 @@ export interface VehiculoCompartido {
   compartidoDesde: string;
 }
 
+export interface InvitacionCompartido {
+  idCompartir: number;
+  placa: string;
+  fotoVehiculo: string;
+  color: string;
+  tipoVehiculo: string;
+  propietario: string;
+  documentoPropietario: string;
+  recibidaEn: string;
+}
+
 export interface InfoCompartido {
   compartido: boolean;
+  estado?: EstadoCompartido;
   receptor?: {
     documento: string;
     nombre: string;

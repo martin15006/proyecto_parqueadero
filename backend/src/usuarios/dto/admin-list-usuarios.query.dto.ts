@@ -20,5 +20,11 @@ export class AdminListUsuariosQueryDto {
   @IsOptional()
   @IsIn(['ACTIVO', 'INACTIVO', 'TODOS'])
   estado?: 'ACTIVO' | 'INACTIVO' | 'TODOS';
+
+  /** Filtro por rol del usuario */
+  @IsString()
+  @IsOptional()
+  @IsIn(['APRENDIZ', 'ADMIN', 'OPERATIVO', 'TODOS'])
+  rol?: 'APRENDIZ' | 'ADMIN' | 'OPERATIVO' | 'TODOS';
 }
 

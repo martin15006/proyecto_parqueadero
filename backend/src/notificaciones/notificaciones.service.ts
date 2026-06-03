@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NotificacionUsuario } from './entities/notificacion-usuario.entity';
@@ -30,6 +30,27 @@ export class NotificacionesService {
       order: { createdAt: 'DESC' },
       take: 50, // UX: límite razonable para evitar cargas grandes en móvil/web.
     });
+  }
+
+  /**
+   * Elimina una notificación específica (solo si pertenece al usuario).
+   */
+  async eliminarNotificacion(idUsuario: string, id: number) {
+    const notificacion = await this.notificacionRepository.findOne({ where: { id } });
+    if (!notificacion) throw new NotFoundException('Notificación no encontrada');
+    if (notificacion.idUsuario !== idUsuario) {
+      throw new ForbiddenException('No puedes eliminar una notificación que no es tuya');
+    }
+    await this.notificacionRepository.remove(notificacion);
+    return { mensaje: 'Notificación eliminada' };
+  }
+
+  /**
+   * Elimina TODAS las notificaciones del usuario.
+   */
+  async eliminarTodas(idUsuario: string) {
+    const result = await this.notificacionRepository.delete({ idUsuario });
+    return { mensaje: 'Notificaciones eliminadas', total: result.affected ?? 0 };
   }
 
   /**

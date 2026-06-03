@@ -55,7 +55,7 @@ export default function CompartirVehiculoScreen({ route, navigation }: any) {
     setError('');
     try {
       const res = await vehiculoService.compartirConUsuario(placa, documento.trim());
-      Alert.alert('Compartido', res.mensaje, [
+      Alert.alert('Invitación enviada', res.mensaje, [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
@@ -66,19 +66,22 @@ export default function CompartirVehiculoScreen({ route, navigation }: any) {
   };
 
   const handleQuitar = () => {
+    const esPendiente = info?.estado === 'PENDIENTE';
     Alert.alert(
-      'Quitar compartido',
-      '¿Estás seguro de dejar de compartir este vehículo?',
+      esPendiente ? 'Cancelar invitación' : 'Quitar acceso',
+      esPendiente
+        ? '¿Cancelar la invitación enviada?'
+        : '¿Quitarle el acceso a este vehículo al usuario?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Sí, quitar',
+          text: esPendiente ? 'Sí, cancelar' : 'Sí, quitar acceso',
           style: 'destructive',
           onPress: async () => {
             setProcesando(true);
             try {
               await vehiculoService.quitarCompartido(placa);
-              Alert.alert('Listo', 'Compartido eliminado', [
+              Alert.alert('Listo', esPendiente ? 'Invitación cancelada' : 'Acceso removido', [
                 { text: 'OK', onPress: () => navigation.goBack() },
               ]);
             } catch (e: any) {
@@ -115,28 +118,51 @@ export default function CompartirVehiculoScreen({ route, navigation }: any) {
           </View>
 
           {info?.compartido && info.receptor ? (
-            // ─── Vehículo YA compartido ──────────────────────────────
+            // ─── Vehículo YA compartido (PENDIENTE o ACEPTADO) ──────────
             <FadeInView delay={150}>
-              <View style={[styles.estadoBox, { backgroundColor: esOscuro ? 'rgba(95,217,36,0.10)' : colores.verdeMuyClaro, borderColor: colores.verde }]}>
-                <Text style={[styles.estadoTitulo, { color: colores.verde }]}>✓ Este vehículo está compartido</Text>
-                <View style={styles.fila}>
-                  <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Compartido con:</Text>
-                  <Text style={[styles.valor, { color: colores.textoPrimario }]}>{info.receptor.nombre}</Text>
-                </View>
-                <View style={styles.fila}>
-                  <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Documento:</Text>
-                  <Text style={[styles.valor, { color: colores.textoPrimario }]}>{info.receptor.documento}</Text>
-                </View>
-                <View style={styles.fila}>
-                  <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Desde:</Text>
-                  <Text style={[styles.valor, { color: colores.textoPrimario }]}>
-                    {new Date(info.receptor.compartidoDesde).toLocaleDateString()}
+              {info.estado === 'PENDIENTE' ? (
+                <View style={[styles.estadoBox, { backgroundColor: esOscuro ? 'rgba(255,193,7,0.10)' : '#FFF8E1', borderColor: '#FFC107' }]}>
+                  <Text style={[styles.estadoTitulo, { color: esOscuro ? '#FFD54F' : '#856404' }]}>⏳ Invitación pendiente de respuesta</Text>
+                  <View style={styles.fila}>
+                    <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Enviada a:</Text>
+                    <Text style={[styles.valor, { color: colores.textoPrimario }]}>{info.receptor.nombre}</Text>
+                  </View>
+                  <View style={styles.fila}>
+                    <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Documento:</Text>
+                    <Text style={[styles.valor, { color: colores.textoPrimario }]}>{info.receptor.documento}</Text>
+                  </View>
+                  <View style={styles.fila}>
+                    <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Enviada el:</Text>
+                    <Text style={[styles.valor, { color: colores.textoPrimario }]}>
+                      {new Date(info.receptor.compartidoDesde).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <Text style={{ color: colores.textoSecundario, fontSize: fonts.pequeno, marginTop: 8, fontStyle: 'italic' }}>
+                    El usuario aún no ha aceptado la invitación. Puedes cancelarla mientras esté pendiente.
                   </Text>
                 </View>
-              </View>
+              ) : (
+                <View style={[styles.estadoBox, { backgroundColor: esOscuro ? 'rgba(95,217,36,0.10)' : colores.verdeMuyClaro, borderColor: colores.verde }]}>
+                  <Text style={[styles.estadoTitulo, { color: colores.verde }]}>✓ Vehículo compartido y aceptado</Text>
+                  <View style={styles.fila}>
+                    <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Compartido con:</Text>
+                    <Text style={[styles.valor, { color: colores.textoPrimario }]}>{info.receptor.nombre}</Text>
+                  </View>
+                  <View style={styles.fila}>
+                    <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Documento:</Text>
+                    <Text style={[styles.valor, { color: colores.textoPrimario }]}>{info.receptor.documento}</Text>
+                  </View>
+                  <View style={styles.fila}>
+                    <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Desde:</Text>
+                    <Text style={[styles.valor, { color: colores.textoPrimario }]}>
+                      {new Date(info.receptor.compartidoDesde).toLocaleDateString()}
+                    </Text>
+                  </View>
+                </View>
+              )}
 
               <AnimatedButton
-                texto="Dejar de compartir"
+                texto={info.estado === 'PENDIENTE' ? 'Cancelar invitación' : 'Quitar acceso al vehículo'}
                 variante="peligro"
                 onPress={handleQuitar}
                 cargando={procesando}
@@ -147,12 +173,13 @@ export default function CompartirVehiculoScreen({ route, navigation }: any) {
             <FadeInView delay={150}>
               <View style={[styles.aviso, { backgroundColor: esOscuro ? 'rgba(33,150,243,0.10)' : '#E3F2FD', borderColor: '#2196F3' }]}>
                 <Text style={[styles.avisoTexto, { color: esOscuro ? '#90CAF9' : '#0D47A1' }]}>
-                  ℹ Ingresa el documento de la persona con quien quieres compartir
-                  este vehículo. Una vez compartido, esa persona podrá ingresar al
-                  parqueadero con este vehículo.{'\n\n'}
+                  ℹ Ingresa el documento del usuario al que quieres invitar a usar
+                  este vehículo. La invitación quedará PENDIENTE hasta que la otra
+                  persona la acepte.{'\n\n'}
                   Reglas:{'\n'}
-                  • Solo puedes compartir cada vehículo una vez.{'\n'}
-                  • Un usuario puede recibir máximo 2 vehículos compartidos.
+                  • Solo puedes invitar a 1 persona por vehículo.{'\n'}
+                  • Un usuario puede tener máximo 2 vehículos compartidos aceptados.{'\n'}
+                  • Podrás cancelar la invitación o quitar el acceso en cualquier momento.
                 </Text>
               </View>
 

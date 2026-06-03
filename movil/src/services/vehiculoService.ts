@@ -5,15 +5,20 @@ import {
   VehiculoUsuario,
   SolicitudVehiculo,
   VehiculoCompartido,
+  InvitacionCompartido,
   InfoCompartido,
 } from '../types/vehiculo';
 
 export interface ActualizarVehiculoDto {
   fotoVehiculo?: string;
-  fotoTarjetaP?: string;
-  fotoPlaca?: string;
   color?: string;
-  idTipoVehiculo?: number;
+}
+
+export interface EstadoEdicionVehiculo {
+  puedeEditar: boolean;
+  ultimaEdicionAt: string | null;
+  proximaEdicionDisponible: string | null;
+  diasRestantes: number;
 }
 
 export const vehiculoService = {
@@ -47,10 +52,17 @@ export const vehiculoService = {
     });
   },
 
-  async actualizar(placa: string, datos: ActualizarVehiculoDto): Promise<{ mensaje: string }> {
-    return apiRequest<{ mensaje: string }>(`/vehiculos/${placa}`, {
+  async actualizar(placa: string, datos: ActualizarVehiculoDto): Promise<{ mensaje: string; proximaEdicionDisponible: string }> {
+    return apiRequest<{ mensaje: string; proximaEdicionDisponible: string }>(`/vehiculos/${placa}`, {
       method: 'PATCH',
       body: JSON.stringify(datos),
+      conAuth: true,
+    });
+  },
+
+  async puedeEditar(placa: string): Promise<EstadoEdicionVehiculo> {
+    return apiRequest<EstadoEdicionVehiculo>(`/vehiculos/${placa}/puede-editar`, {
+      method: 'GET',
       conAuth: true,
     });
   },
@@ -98,6 +110,28 @@ export const vehiculoService = {
   async quitarCompartido(placa: string): Promise<{ mensaje: string }> {
     return apiRequest<{ mensaje: string }>(`/vehiculos/${placa}/compartir`, {
       method: 'DELETE',
+      conAuth: true,
+    });
+  },
+
+  /** Invitaciones de compartido pendientes de aceptación/rechazo */
+  async listarInvitacionesPendientes(): Promise<InvitacionCompartido[]> {
+    return apiRequest<InvitacionCompartido[]>('/vehiculos/compartidos-pendientes', {
+      method: 'GET',
+      conAuth: true,
+    });
+  },
+
+  async aceptarInvitacion(idCompartir: number): Promise<{ mensaje: string }> {
+    return apiRequest<{ mensaje: string }>(`/vehiculos/compartidos/${idCompartir}/aceptar`, {
+      method: 'POST',
+      conAuth: true,
+    });
+  },
+
+  async rechazarInvitacion(idCompartir: number): Promise<{ mensaje: string }> {
+    return apiRequest<{ mensaje: string }>(`/vehiculos/compartidos/${idCompartir}/rechazar`, {
+      method: 'POST',
       conAuth: true,
     });
   },

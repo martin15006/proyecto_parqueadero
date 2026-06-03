@@ -23,7 +23,7 @@ interface ItemMenu {
 const ITEMS: ItemMenu[] = [
   { nombre: 'Mi Perfil', ruta: 'Home', icono: '👤' },
   { nombre: 'Mis Vehículos', ruta: 'VehiculosStack', icono: '🚗' },
-  { nombre: 'Compartidos Conmigo', ruta: 'VehiculosCompartidos', icono: '🤝' },
+  { nombre: 'Compartidos Conmigo', ruta: 'CompartidosStack', icono: '🤝' },
   { nombre: 'Cambiar Contraseña', ruta: 'CambiarContrasena', icono: '🔒' },
   { nombre: 'Configuración', ruta: 'ConfiguracionStack', icono: '⚙️' },
 ];

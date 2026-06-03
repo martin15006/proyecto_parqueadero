@@ -11,21 +11,23 @@ import AnimatedInput from '../components/AnimatedInput';
 import AnimatedButton from '../components/AnimatedButton';
 import FadeInView from '../components/FadeInView';
 import SuccessCheck from '../components/SuccessCheck';
-import { vehiculoService } from '../services/vehiculoService';
+import { vehiculoService, EstadoEdicionVehiculo } from '../services/vehiculoService';
 import { subirImagen } from '../services/uploadService';
-import { TipoVehiculo, VehiculoUsuario } from '../types/vehiculo';
+import { VehiculoUsuario } from '../types/vehiculo';
 
+/**
+ * Edición restringida:
+ *  - Solo se permite cambiar la FOTO del vehículo y el COLOR.
+ *  - Hay un cooldown de 15 días entre ediciones.
+ */
 export default function EditarVehiculoScreen({ navigation, route }: any) {
   const { colores, esOscuro } = useTheme();
   const { placa } = route.params;
 
   const [vehiculo, setVehiculo] = useState<VehiculoUsuario | null>(null);
-  const [tipos, setTipos] = useState<TipoVehiculo[]>([]);
+  const [estadoEdicion, setEstadoEdicion] = useState<EstadoEdicionVehiculo | null>(null);
   const [color, setColor] = useState('');
-  const [tipoSeleccionado, setTipoSeleccionado] = useState<number | null>(null);
   const [fotoVehiculoLocal, setFotoVehiculoLocal] = useState<string | null>(null);
-  const [fotoTarjetaLocal, setFotoTarjetaLocal] = useState<string | null>(null);
-  const [fotoPlacaLocal, setFotoPlacaLocal] = useState<string | null>(null);
   const [errores, setErrores] = useState<any>({});
   const [cargandoInicial, setCargandoInicial] = useState(true);
   const [cargando, setCargando] = useState(false);
@@ -38,14 +40,13 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
 
   const cargarDatos = async () => {
     try {
-      const [detalle, listaTipos] = await Promise.all([
+      const [detalle, edicion] = await Promise.all([
         vehiculoService.obtenerDetalle(placa),
-        vehiculoService.listarTipos(),
+        vehiculoService.puedeEditar(placa).catch(() => null),
       ]);
       setVehiculo(detalle);
-      setTipos(listaTipos);
       setColor(detalle.color);
-      setTipoSeleccionado(detalle.idTipoVehiculo);
+      if (edicion) setEstadoEdicion(edicion);
     } catch (error: any) {
       Alert.alert('Error', error.message);
       navigation.goBack();
@@ -54,15 +55,22 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
     }
   };
 
-  const seleccionarFoto = (cual: 'vehiculo' | 'tarjeta' | 'placa') => {
-    Alert.alert('Foto', '¿De dónde tomar la foto?', [
+  const seleccionarFoto = () => {
+    if (estadoEdicion && !estadoEdicion.puedeEditar) {
+      Alert.alert(
+        'Edición bloqueada',
+        `Solo puedes editar este vehículo cada 15 días. Te faltan ${estadoEdicion.diasRestantes} día(s).`,
+      );
+      return;
+    }
+    Alert.alert('Foto del vehículo', '¿De dónde tomar la foto?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Cámara', onPress: () => abrir(cual, 'camara') },
-      { text: 'Galería', onPress: () => abrir(cual, 'galeria') },
+      { text: 'Cámara', onPress: () => abrir('camara') },
+      { text: 'Galería', onPress: () => abrir('galeria') },
     ]);
   };
 
-  const abrir = async (cual: 'vehiculo' | 'tarjeta' | 'placa', origen: 'camara' | 'galeria') => {
+  const abrir = async (origen: 'camara' | 'galeria') => {
     const permiso =
       origen === 'camara'
         ? await ImagePicker.requestCameraPermissionsAsync()
@@ -73,54 +81,52 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
     }
     const result =
       origen === 'camara'
-        ? await ImagePicker.launchCameraAsync({
-          mediaTypes: ['images'], allowsEditing: false, quality: 0.7,
-        })
-        : await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'], allowsEditing: false, quality: 0.7,
-        });
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.7 })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.7 });
     if (!result.canceled && result.assets.length > 0) {
-      if (cual === 'vehiculo') setFotoVehiculoLocal(result.assets[0].uri);
-      else if (cual === 'tarjeta') setFotoTarjetaLocal(result.assets[0].uri);
-      else setFotoPlacaLocal(result.assets[0].uri);
+      setFotoVehiculoLocal(result.assets[0].uri);
     }
   };
 
   const validar = (): boolean => {
     const e: any = {};
     if (!color.trim()) e.color = 'El color es obligatorio';
-    if (!tipoSeleccionado) e.tipo = 'Selecciona un tipo';
     setErrores(e);
     return Object.keys(e).length === 0;
   };
 
   const handleGuardar = async () => {
     if (!validar() || !vehiculo) return;
-    setCargando(true);
-    try {
-      const datos: any = {};
+    if (estadoEdicion && !estadoEdicion.puedeEditar) {
+      Alert.alert(
+        'Edición bloqueada',
+        `Solo puedes editar este vehículo cada 15 días. Te faltan ${estadoEdicion.diasRestantes} día(s).`,
+      );
+      return;
+    }
 
-      if (fotoVehiculoLocal) {
+    const datos: any = {};
+    if (fotoVehiculoLocal) {
+      try {
+        setCargando(true);
         setMensajeCargando('Subiendo foto del vehículo...');
         datos.fotoVehiculo = await subirImagen(fotoVehiculoLocal);
-      }
-      if (fotoTarjetaLocal) {
-        setMensajeCargando('Subiendo foto de tarjeta...');
-        datos.fotoTarjetaP = await subirImagen(fotoTarjetaLocal);
-      }
-      if (fotoPlacaLocal) {
-        setMensajeCargando('Subiendo foto de placa...');
-        datos.fotoPlaca = await subirImagen(fotoPlacaLocal);
-      }
-      if (color !== vehiculo.color) datos.color = color.trim();
-      if (tipoSeleccionado !== vehiculo.idTipoVehiculo) datos.idTipoVehiculo = tipoSeleccionado;
-
-      if (Object.keys(datos).length === 0) {
-        Alert.alert('Sin cambios', 'No hay cambios para guardar');
+      } catch (error: any) {
         setCargando(false);
+        Alert.alert('Error subiendo foto', error.message);
         return;
       }
+    }
+    if (color.trim() !== vehiculo.color) datos.color = color.trim();
 
+    if (Object.keys(datos).length === 0) {
+      setCargando(false);
+      Alert.alert('Sin cambios', 'No hay cambios para guardar');
+      return;
+    }
+
+    try {
+      setCargando(true);
       setMensajeCargando('Guardando cambios...');
       await vehiculoService.actualizar(vehiculo.placa, datos);
 
@@ -140,11 +146,7 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
   if (cargandoInicial) {
     return (
       <View style={[styles.container, { backgroundColor: colores.fondo }]}>
-        <SenaHeader
-          titulo="Editar Vehículo"
-          mostrarVolver
-          onBackPress={() => navigation.goBack()}
-        />
+        <SenaHeader titulo="Editar Vehículo" mostrarVolver onBackPress={() => navigation.goBack()} />
         <View style={styles.centrado}>
           <ActivityIndicator size="large" color={colores.verde} />
         </View>
@@ -154,20 +156,14 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
 
   if (!vehiculo) return null;
 
+  const bloqueado = !!estadoEdicion && !estadoEdicion.puedeEditar;
+
   return (
     <View style={[styles.container, { backgroundColor: colores.fondo }]}>
-      <SenaHeader
-        titulo="Editar Vehículo"
-        mostrarVolver
-        onBackPress={() => navigation.goBack()}
-      />
+      <SenaHeader titulo="Editar Vehículo" mostrarVolver onBackPress={() => navigation.goBack()} />
       {esOscuro && <View style={styles.aurora} />}
 
-      <KeyboardAwareScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        enableOnAndroid
-      >
+      <KeyboardAwareScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" enableOnAndroid>
         <FadeInView>
           {/* Placa solo informativa */}
           <View
@@ -180,64 +176,59 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
             ]}
           >
             <Text style={[styles.placaLabel, { color: colores.textoTenue }]}>PLACA</Text>
-            <Text style={[styles.placaValor, { color: colores.textoPrimario }]}>
-              {vehiculo.placa}
-            </Text>
+            <Text style={[styles.placaValor, { color: colores.textoPrimario }]}>{vehiculo.placa}</Text>
             <Text style={[styles.placaHelp, { color: colores.textoTenue }]}>
-              La placa no se puede cambiar
+              La placa, tipo y tarjeta de propiedad no se pueden modificar
             </Text>
           </View>
 
+          {/* Aviso de cooldown */}
+          {bloqueado ? (
+            <View style={[styles.aviso, { backgroundColor: esOscuro ? 'rgba(229,57,53,0.10)' : '#FFEBEE', borderColor: '#E53935' }]}>
+              <Text style={[styles.avisoTitulo, { color: '#E53935' }]}>⛔ Edición bloqueada</Text>
+              <Text style={[styles.avisoTexto, { color: colores.textoPrimario }]}>
+                Solo puedes editar este vehículo cada 15 días.{'\n'}
+                Faltan <Text style={{ fontWeight: '900' }}>{estadoEdicion!.diasRestantes} día(s)</Text> para tu próxima edición.
+              </Text>
+              {estadoEdicion?.proximaEdicionDisponible && (
+                <Text style={[styles.avisoTexto, { color: colores.textoSecundario, marginTop: 4 }]}>
+                  Disponible el {new Date(estadoEdicion.proximaEdicionDisponible).toLocaleDateString('es-CO')}
+                </Text>
+              )}
+            </View>
+          ) : (
+            <View style={[styles.aviso, { backgroundColor: esOscuro ? 'rgba(255,193,7,0.10)' : '#FFF8E1', borderColor: '#FFC107' }]}>
+              <Text style={[styles.avisoTitulo, { color: esOscuro ? '#FFD54F' : '#856404' }]}>ℹ Edición restringida</Text>
+              <Text style={[styles.avisoTexto, { color: esOscuro ? '#FFD54F' : '#856404' }]}>
+                Solo puedes editar la foto y el color del vehículo.{'\n'}
+                Después de guardar, deberás esperar 15 días para poder editar de nuevo.
+              </Text>
+            </View>
+          )}
+
+          {/* Foto del vehículo (editable) */}
           <Text style={[styles.label, { color: colores.verde }]}>Foto del Vehículo</Text>
           <TouchableOpacity
-            style={[styles.fotoBox, { backgroundColor: esOscuro ? colores.glassFondo : '#f4f6f4', borderColor: esOscuro ? colores.borde : colores.gris }]}
-            onPress={() => seleccionarFoto('vehiculo')}
+            style={[
+              styles.fotoBox,
+              {
+                backgroundColor: esOscuro ? colores.glassFondo : '#f4f6f4',
+                borderColor: esOscuro ? colores.borde : colores.gris,
+                opacity: bloqueado ? 0.6 : 1,
+              },
+            ]}
+            onPress={seleccionarFoto}
+            disabled={bloqueado}
           >
-            <Image
-              source={{ uri: fotoVehiculoLocal || vehiculo.fotoVehiculo }}
-              style={styles.fotoImg}
-            />
-            <View style={[styles.cambiarOverlay, { backgroundColor: colores.verde }]}>
-              <Text style={styles.cambiarTexto}>📷 Cambiar</Text>
-            </View>
-          </TouchableOpacity>
-
-          <Text style={[styles.label, { color: colores.verde }]}>Tarjeta de Propiedad</Text>
-          <TouchableOpacity
-            style={[styles.fotoBox, { backgroundColor: esOscuro ? colores.glassFondo : '#f4f6f4', borderColor: esOscuro ? colores.borde : colores.gris }]}
-            onPress={() => seleccionarFoto('tarjeta')}
-          >
-            <Image
-              source={{ uri: fotoTarjetaLocal || vehiculo.fotoTarjetaP }}
-              style={styles.fotoImg}
-            />
-            <View style={[styles.cambiarOverlay, { backgroundColor: colores.verde }]}>
-              <Text style={styles.cambiarTexto}>📷 Cambiar</Text>
-            </View>
-          </TouchableOpacity>
-
-          <Text style={[styles.label, { color: colores.verde }]}>Foto de la Placa</Text>
-          <TouchableOpacity
-            style={[styles.fotoBox, { backgroundColor: esOscuro ? colores.glassFondo : '#f4f6f4', borderColor: esOscuro ? colores.borde : colores.gris }]}
-            onPress={() => seleccionarFoto('placa')}
-          >
-            {(fotoPlacaLocal || (vehiculo.fotoPlaca && vehiculo.fotoPlaca.trim() !== '')) ? (
-              <Image
-                source={{ uri: fotoPlacaLocal || vehiculo.fotoPlaca }}
-                style={styles.fotoImg}
-              />
-            ) : (
-              <Text style={{ color: colores.textoTenue, fontSize: fonts.pequeno }}>
-                📷 Toca para agregar foto de placa
-              </Text>
+            <Image source={{ uri: fotoVehiculoLocal || vehiculo.fotoVehiculo }} style={styles.fotoImg} />
+            {!bloqueado && (
+              <View style={[styles.cambiarOverlay, { backgroundColor: colores.verde }]}>
+                <Text style={styles.cambiarTexto}>📷 Cambiar foto</Text>
+              </View>
             )}
-            <View style={[styles.cambiarOverlay, { backgroundColor: colores.verde }]}>
-              <Text style={styles.cambiarTexto}>
-                📷 { (fotoPlacaLocal || (vehiculo.fotoPlaca && vehiculo.fotoPlaca.trim() !== '')) ? 'Cambiar' : 'Agregar' }
-              </Text>
-            </View>
           </TouchableOpacity>
 
+          {/* Color (editable) */}
           <AnimatedInput
             label="Color"
             placeholder="Rojo, Negro, Blanco..."
@@ -247,50 +238,37 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
               setColor(v);
               if (errores.color) setErrores({ ...errores, color: undefined });
             }}
+            editable={!bloqueado}
           />
 
-          <Text style={[styles.label, { color: colores.verde }]}>Tipo de Vehículo</Text>
-          <View style={styles.tiposContainer}>
-            {tipos.map((tipo) => (
-              <TouchableOpacity
-                key={tipo.idTipoV}
-                style={[
-                  styles.tipoChip,
-                  {
-                    backgroundColor:
-                      tipoSeleccionado === tipo.idTipoV
-                        ? esOscuro ? 'rgba(95,217,36,0.20)' : colores.verdeMuyClaro
-                        : esOscuro ? colores.glassFondo : '#f4f6f4',
-                    borderColor: tipoSeleccionado === tipo.idTipoV ? colores.verde : colores.borde,
-                  },
-                ]}
-                onPress={() => {
-                  setTipoSeleccionado(tipo.idTipoV);
-                  if (errores.tipo) setErrores({ ...errores, tipo: undefined });
-                }}
-              >
-                <Text
-                  style={[
-                    styles.tipoChipTexto,
-                    {
-                      color: tipoSeleccionado === tipo.idTipoV ? colores.verde : colores.textoSecundario,
-                      fontWeight: tipoSeleccionado === tipo.idTipoV ? 'bold' : '500',
-                    },
-                  ]}
-                >
-                  {tipo.tipoVehiculo}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          {/* Bloque de campos NO editables (solo informativo) */}
+          <View style={[styles.bloqueadoBox, { backgroundColor: esOscuro ? 'rgba(255,255,255,0.04)' : '#F5F5F5', borderColor: colores.borde }]}>
+            <Text style={[styles.bloqueadoTitulo, { color: colores.textoSecundario }]}>🔒 Datos no editables</Text>
+            <View style={styles.bloqueadoFila}>
+              <Text style={[styles.bloqueadoEtiqueta, { color: colores.textoTenue }]}>Tipo:</Text>
+              <Text style={[styles.bloqueadoValor, { color: colores.textoPrimario }]}>{vehiculo.tipoVehiculo}</Text>
+            </View>
+            <View style={styles.bloqueadoFila}>
+              <Text style={[styles.bloqueadoEtiqueta, { color: colores.textoTenue }]}>Tarjeta:</Text>
+              <Text style={[styles.bloqueadoValor, { color: colores.textoTenue, fontSize: fonts.pequeno }]}>
+                Disponible en detalle
+              </Text>
+            </View>
+            <View style={styles.bloqueadoFila}>
+              <Text style={[styles.bloqueadoEtiqueta, { color: colores.textoTenue }]}>Foto placa:</Text>
+              <Text style={[styles.bloqueadoValor, { color: colores.textoTenue, fontSize: fonts.pequeno }]}>
+                Disponible en detalle
+              </Text>
+            </View>
           </View>
-          {errores.tipo && <Text style={[styles.error, { color: colores.error }]}>{errores.tipo}</Text>}
 
           <View style={{ marginTop: espacios.medio }}>
             <AnimatedButton
-              texto="Guardar Cambios"
+              texto={bloqueado ? `Disponible en ${estadoEdicion!.diasRestantes} día(s)` : 'Guardar Cambios'}
               onPress={handleGuardar}
               cargando={cargando}
               mensajeCargando={mensajeCargando}
+              deshabilitado={bloqueado}
             />
           </View>
         </FadeInView>
@@ -315,13 +293,21 @@ const styles = StyleSheet.create({
   },
   placaLabel: { fontSize: fonts.pequeno, fontWeight: '700', letterSpacing: 1.2 },
   placaValor: { fontSize: 32, fontWeight: '900', letterSpacing: 3, marginVertical: 4 },
-  placaHelp: { fontSize: fonts.pequeno, fontStyle: 'italic' },
+  placaHelp: { fontSize: fonts.pequeno, fontStyle: 'italic', textAlign: 'center' },
+  aviso: {
+    borderRadius: 12,
+    padding: espacios.normal,
+    borderWidth: 1,
+    marginBottom: espacios.normal,
+  },
+  avisoTitulo: { fontWeight: '800', fontSize: fonts.normal, marginBottom: 4 },
+  avisoTexto: { fontSize: fonts.pequeno, lineHeight: 18 },
   label: {
     fontSize: fonts.normal, fontWeight: 'bold',
     marginBottom: espacios.pequeno, marginTop: espacios.normal,
   },
   fotoBox: {
-    borderRadius: 12, height: 180, justifyContent: 'center', alignItems: 'center',
+    borderRadius: 12, height: 200, justifyContent: 'center', alignItems: 'center',
     borderWidth: 2, overflow: 'hidden', position: 'relative',
   },
   fotoImg: { width: '100%', height: '100%' },
@@ -330,11 +316,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8, alignItems: 'center',
   },
   cambiarTexto: { color: '#ffffff', fontSize: fonts.pequeno, fontWeight: '700' },
-  error: { fontSize: fonts.pequeno, marginTop: 4 },
-  tiposContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  tipoChip: {
-    paddingHorizontal: espacios.normal, paddingVertical: 10,
-    borderRadius: 20, borderWidth: 2,
+  bloqueadoBox: {
+    borderRadius: 12,
+    padding: espacios.normal,
+    borderWidth: 1,
+    marginTop: espacios.medio,
   },
-  tipoChipTexto: { fontSize: fonts.normal },
+  bloqueadoTitulo: {
+    fontSize: fonts.pequeno,
+    fontWeight: '700',
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  bloqueadoFila: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  bloqueadoEtiqueta: { fontSize: fonts.pequeno },
+  bloqueadoValor: { fontSize: fonts.normal, fontWeight: '600' },
 });
