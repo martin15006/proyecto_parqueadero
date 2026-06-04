@@ -135,4 +135,15 @@ export const vehiculoService = {
       conAuth: true,
     });
   },
+
+  /**
+   * El receptor renuncia/elimina un vehículo compartido que ya había aceptado.
+   * El propietario recibe una notificación.
+   */
+  async eliminarVehiculoCompartido(idCompartir: number): Promise<{ mensaje: string }> {
+    return apiRequest<{ mensaje: string }>(`/vehiculos/compartidos/${idCompartir}`, {
+      method: 'DELETE',
+      conAuth: true,
+    });
+  },
 };

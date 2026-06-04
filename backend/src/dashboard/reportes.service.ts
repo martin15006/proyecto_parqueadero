@@ -71,7 +71,6 @@ export class ReportesService {
       .innerJoin('rv.usuario', 'u') // RF21: propietario (aprendiz) del vehículo.
       .innerJoin('rv.vehiculo', 'v') // RF21: vehículo asociado a la placa.
       .leftJoin('v.tipoVehiculo', 'tv') // RF21: tipo de vehículo (relación ya existente).
-      .leftJoin('mv.bahia', 'b') // RF21: bahía asignada al movimiento.
       .leftJoin(
         Auditoria,
         'ae',
@@ -218,16 +217,15 @@ export class ReportesService {
         'u.nombre_completo AS "propietario"',
         'mv.hora_ingreso AS "horaIngreso"',
         'mv.hora_salida AS "horaSalida"',
-        'COALESCE(b.nombre_bahia, CAST(mv.id_bahia AS text)) AS "bahiaAsignada"',
         'COALESCE(op.nombre_completo, \'\') AS "operadorResponsable"',
         `CASE
           WHEN mv.hora_salida IS NULL THEN NULL
           ELSE ROUND(EXTRACT(EPOCH FROM (mv.hora_salida - mv.hora_ingreso)) / 60.0)::int
         END AS "estanciaMinutos"`,
-      ]) // RF21/RF23: columnas mínimas del histórico + operador responsable + duración.
-      .orderBy('mv.hora_ingreso', 'DESC') // RF21: orden de bitácora por ingreso más reciente.
-      .offset(offset) // RF21: paginación.
-      .limit(limit) // RF21: paginación.
+      ])
+      .orderBy('mv.hora_ingreso', 'DESC')
+      .offset(offset)
+      .limit(limit)
       .getRawMany();
 
     const avgRaw = await this.buildHistoricoBaseQuery(from, to, query)
@@ -287,7 +285,6 @@ export class ReportesService {
       'Propietario',
       'Hora Ingreso',
       'Hora Salida',
-      'Bahía Asignada',
       'Operador Responsable',
     ];
 
@@ -306,7 +303,6 @@ export class ReportesService {
           'u.nombre_completo AS "propietario"',
           'mv.hora_ingreso AS "horaIngreso"',
           'mv.hora_salida AS "horaSalida"',
-          'COALESCE(b.nombre_bahia, CAST(mv.id_bahia AS text)) AS "bahiaAsignada"',
           'COALESCE(op.nombre_completo, \'\') AS "operadorResponsable"',
         ])
         .orderBy('mv.hora_ingreso', 'DESC')
@@ -323,7 +319,6 @@ export class ReportesService {
           r.propietario,
           r.horaIngreso ? new Date(r.horaIngreso).toISOString() : '',
           r.horaSalida ? new Date(r.horaSalida).toISOString() : '',
-          r.bahiaAsignada,
           r.operadorResponsable,
         ]
           .map(escapeCsv)
@@ -360,7 +355,6 @@ export class ReportesService {
         { header: 'Placa', key: 'placa', width: 12 },
         { header: 'Usuario', key: 'usuario', width: 28 },
         { header: 'Documento', key: 'documento', width: 12 },
-        { header: 'Bahía', key: 'bahia', width: 14 },
         { header: 'Ingreso', key: 'ingreso', width: 20 },
         { header: 'Salida', key: 'salida', width: 20 },
         { header: 'Estado', key: 'estado', width: 12 },
@@ -371,7 +365,7 @@ export class ReportesService {
         where: {
           horaIngreso: Between(from, to),
         } as any,
-        relations: ['bahia', 'registroVehiculo', 'registroVehiculo.usuario', 'registroVehiculo.vehiculo'],
+        relations: ['registroVehiculo', 'registroVehiculo.usuario', 'registroVehiculo.vehiculo'],
         order: { horaIngreso: 'DESC' },
         take: 5000,
       });
@@ -382,7 +376,6 @@ export class ReportesService {
           placa: m.registroVehiculo?.idVehiculo ?? '',
           usuario: m.registroVehiculo?.usuario?.nombreCompleto ?? '',
           documento: m.registroVehiculo?.usuario?.documento ?? '',
-          bahia: m.bahia?.nombreBahia ?? String(m.idBahia),
           ingreso: m.horaIngreso ? new Date(m.horaIngreso).toISOString() : '',
           salida: m.horaSalida ? new Date(m.horaSalida).toISOString() : '',
           estado: m.estado,

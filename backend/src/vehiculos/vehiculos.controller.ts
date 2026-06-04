@@ -139,6 +139,19 @@ export class VehiculosController {
     return this.vehiculosService.rechazarCompartido(usuario.documento, Number(idCompartir));
   }
 
+  /**
+   * El receptor renuncia / elimina un vehículo compartido que ya aceptó.
+   * Borra el vínculo y notifica al propietario.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Delete('compartidos/:idCompartir')
+  eliminarCompartidoReceptor(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Param('idCompartir') idCompartir: string,
+  ) {
+    return this.vehiculosService.eliminarCompartidoComoReceptor(usuario.documento, Number(idCompartir));
+  }
+
   /** Info de con quién está compartido un vehículo mío */
   @UseGuards(JwtAuthGuard)
   @Get(':placa/compartir')

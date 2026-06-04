@@ -77,40 +77,28 @@ export const useOperativo = () => {
     try {
       setLoading(true);
 
-      const [sensorizadas, resumen] = await Promise.all([
+      // Conteo global → fuente única de verdad para total/ocupados/disponibles.
+      // Estos valores vienen del backend basados en QRs ACTIVOS (movimientos),
+      // no en sensores. Cada QR de entrada sube +1, cada QR de salida baja -1.
+      const [sensorizadas, ocupacion] = await Promise.all([
         bahiasService.getSensorizadas() as Promise<BahiaSensorizada[]>,
-        operativoService.resumenTurno(),
+        bahiasService.getOcupacion(),
       ]);
 
       setBahias(sensorizadas);
       setVehiculos(mapActivosFromSensorizadas(sensorizadas));
 
-      // Métricas derivadas del array sensorizado.
-      // Regla de negocio:
-      //   OCUPADO / DISCREPANCIA → presencia física confirmada → cuenta como ocupado.
-      //   LIBRE / SALIDA_PENDIENTE → bahía físicamente disponible → cuenta como libre.
-      //   OFFLINE / DESHABILITADO → no cuentan en ninguno de los dos lados.
-      // SALIDA_PENDIENTE NO es "ocupado": el sensor ya confirmó que el vehículo se fue;
-      // la bahía puede recibir otro vehículo. Solo falta la confirmación de portería.
-      const total = sensorizadas.length;
-      const ocupados = sensorizadas.filter(
-        (b) => b.estadoPanel === 'OCUPADO' || b.estadoPanel === 'DISCREPANCIA',
-      ).length;
-      const libres = sensorizadas.filter(
-        (b) => b.estadoPanel === 'LIBRE' || b.estadoPanel === 'SALIDA_PENDIENTE',
-      ).length;
+      const total = Number(ocupacion?.total ?? 0);
+      const ocupados = Number(ocupacion?.ocupados ?? 0);
+      const disponibles = Math.max(total - ocupados, 0);
+
       setStats({
         total,
         ocupados,
-        disponibles: libres,
-        // vehiculosActivos incluye SALIDA_PENDIENTE: el operario aún debe confirmar la salida.
-        vehiculosActivos: sensorizadas.filter(
-          (b) => b.estadoPanel === 'OCUPADO' || b.estadoPanel === 'SALIDA_PENDIENTE',
-        ).length,
+        disponibles,
+        vehiculosActivos: ocupados,
         enTransitoIngreso: 0,
       });
-      // resumen se conserva para estadoParqueadero y alertas técnicas (sin uso directo en stats).
-      void resumen;
     } catch {
       showToast('Error de conexión: no se pudieron cargar los datos de infraestructura', 'error');
     } finally {

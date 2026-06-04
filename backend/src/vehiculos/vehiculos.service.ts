@@ -13,7 +13,6 @@ import { RegistroVehiculo } from './entities/registro-vehiculo.entity';
 import { MovimientoVehiculo, EstadoMovimiento } from './entities/movimiento-vehiculo.entity';
 import { Compartir, EstadoCompartido } from './entities/compartir.entity';
 import { SolicitudVehiculo, EstadoSolicitud } from './entities/solicitud-vehiculo.entity';
-import { Bahia } from '../bahias/entities/bahia.entity';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
 import { ActualizarVehiculoDto } from './dto/actualizar-vehiculo.dto';
 import { AdminListVehiculosQueryDto } from './dto/admin-list-vehiculos.query.dto';
@@ -441,6 +440,64 @@ export class VehiculosService {
   }
 
   /**
+   * El receptor RENUNCIA a un vehículo compartido que previamente aceptó.
+   * Elimina el vínculo y notifica al propietario.
+   *
+   * Reglas:
+   *  - Solo el receptor del compartido puede ejecutar esta acción.
+   *  - Solo se permite si el compartido está ACEPTADO.
+   *  - Si el receptor tiene un movimiento activo con este vehículo, no se permite
+   *    renunciar hasta que registre la salida (regla de seguridad operativa).
+   */
+  async eliminarCompartidoComoReceptor(documentoReceptor: string, idCompartir: number): Promise<{ mensaje: string }> {
+    const compartido = await this.compartirRepository.findOne({
+      where: { idCompartir },
+      relations: ['registroVehiculo', 'registroVehiculo.vehiculo', 'registroVehiculo.usuario'],
+    });
+    if (!compartido) throw new NotFoundException('Compartido no encontrado');
+    if (compartido.documento !== documentoReceptor) {
+      throw new ForbiddenException('Este compartido no es tuyo');
+    }
+    if (compartido.estado !== EstadoCompartido.ACEPTADO) {
+      throw new BadRequestException('Solo se puede eliminar un compartido que ya fue aceptado.');
+    }
+
+    // Validar que el receptor no tenga un movimiento activo con este vehículo
+    const movimientoActivo = await this.movimientoRepository.findOne({
+      where: {
+        idRegistroVehiculo: compartido.idRegistroV,
+        documentoIngreso: documentoReceptor,
+        estado: In([EstadoMovimiento.ADENTRO, EstadoMovimiento.TRANSITO]),
+      },
+    });
+    if (movimientoActivo) {
+      throw new BadRequestException(
+        'No puedes eliminar este vehículo compartido mientras tengas un ingreso activo. Registra la salida primero.',
+      );
+    }
+
+    const placa = compartido.registroVehiculo.vehiculo.placa;
+    const propietarioDoc = compartido.registroVehiculo.usuario.documento;
+    const receptor = await this.compartirRepository.manager
+      .getRepository('usuario')
+      .findOne({ where: { documento: documentoReceptor } }) as any;
+
+    await this.compartirRepository.remove(compartido);
+
+    // Notificar al propietario que el receptor renunció
+    await this.notificacionesService.notificarUsuario({
+      idUsuario: propietarioDoc,
+      tipo: 'COMPARTIDO_RENUNCIADO',
+      titulo: 'Vehículo compartido eliminado',
+      mensaje: `${receptor?.nombreCompleto ?? documentoReceptor} eliminó el vehículo compartido con placa ${placa} de su cuenta.`,
+      actorNombre: receptor?.nombreCompleto ?? documentoReceptor,
+      metadata: { placa, receptor: documentoReceptor },
+    });
+
+    return { mensaje: `Eliminaste el acceso al vehículo ${placa}` };
+  }
+
+  /**
    * Lista los vehículos compartidos ACEPTADOS por el usuario.
    */
   async listarVehiculosCompartidosConmigo(documento: string) {
@@ -814,14 +871,44 @@ export class VehiculosService {
   }
 
   /**
-   * Requerido por UsuarioService.
+   * Vehículos asociados al usuario:
+   *  - los registrados a su nombre (propios)
+   *  - los que otros le han COMPARTIDO y él ya ACEPTÓ
+   *
+   * Ambos pueden ser usados por el usuario para ingresar al parqueadero.
    */
   async findByUsuario(documento: string): Promise<Vehiculo[]> {
-    const registros = await this.registroRepository.find({
+    // 1. Vehículos propios
+    const propios = await this.registroRepository.find({
       where: { idUsuario: documento },
       relations: ['vehiculo', 'vehiculo.tipoVehiculo'],
     });
-    return registros.map(r => r.vehiculo);
+
+    // 2. Vehículos compartidos ACEPTADOS por este usuario
+    const compartidos = await this.compartirRepository.find({
+      where: { documento, estado: EstadoCompartido.ACEPTADO },
+      relations: [
+        'registroVehiculo',
+        'registroVehiculo.vehiculo',
+        'registroVehiculo.vehiculo.tipoVehiculo',
+      ],
+    });
+
+    const vehiculosCompartidos = compartidos
+      .map((c) => c.registroVehiculo?.vehiculo)
+      .filter((v): v is Vehiculo => !!v);
+
+    // Combinamos y deduplicamos por placa
+    const todos = [...propios.map((r) => r.vehiculo), ...vehiculosCompartidos];
+    const seen = new Set<string>();
+    const unicos: Vehiculo[] = [];
+    for (const v of todos) {
+      if (v && !seen.has(v.placa)) {
+        seen.add(v.placa);
+        unicos.push(v);
+      }
+    }
+    return unicos;
   }
 
   /**
@@ -836,21 +923,19 @@ export class VehiculosService {
    */
   async listarHistorialUsuario(documento: string) {
     const movimientos = await this.movimientoRepository
-      .createQueryBuilder('mv') // PERFORMANCE: consulta agregada con joins controlados.
-      .innerJoin(RegistroVehiculo, 'rv', 'rv.id_registro_v = mv.id_registro_vehiculo') // RF32: enlaza movimiento con registro usuario-vehículo.
-      .innerJoin(Vehiculo, 'v', 'v.placa = rv.id_vehiculo') // RF32: permite devolver la placa en el historial.
-      .leftJoin(Bahia, 'b', 'b.id_bahia = mv.id_bahia') // RF32: permite devolver nombre de bahía si existe.
-      .where('rv.id_usuario = :documento', { documento }) // RNF2: limita estrictamente al usuario autenticado.
-      .orderBy('mv.hora_ingreso', 'DESC') // RF32: orden cronológico descendente.
-      .limit(50) // UX: limita historial para evitar cargas grandes en móvil.
+      .createQueryBuilder('mv')
+      .innerJoin(RegistroVehiculo, 'rv', 'rv.id_registro_v = mv.id_registro_vehiculo')
+      .innerJoin(Vehiculo, 'v', 'v.placa = rv.id_vehiculo')
+      .where('rv.id_usuario = :documento', { documento })
+      .orderBy('mv.hora_ingreso', 'DESC')
+      .limit(50)
       .select([
         'mv.id_movimiento AS "idMovimiento"',
         'v.placa AS "placa"',
         'mv.hora_ingreso AS "horaIngreso"',
         'mv.hora_salida AS "horaSalida"',
         'mv.estado AS "estado"',
-        'b.nombre_bahia AS "bahia"',
-      ]) // RF32: payload mínimo para UI.
+      ])
       .getRawMany();
 
     return movimientos;

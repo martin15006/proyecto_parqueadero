@@ -66,6 +66,28 @@ type EscaneoCodigoSeleccionResponse = {
 
 type EscaneoCodigoResponse = EscaneoCodigoAutoResponse | EscaneoCodigoSeleccionResponse;
 
+type InfoPlacaResponse = {
+  vehiculo: {
+    placa: string;
+    color: string;
+    tipoVehiculo: string;
+    fotoVehiculo: string;
+    fotoTarjetaP: string;
+    fotoPlaca: string | null;
+  };
+  usuariosAutorizados: Array<{
+    documento: string;
+    nombreCompleto: string;
+    fotoPersona: string;
+    rol: 'PROPIETARIO' | 'COMPARTIDO';
+  }>;
+  movimientoActivo: {
+    idMovimiento: number;
+    documentoIngreso: string | null;
+    nombreIngreso: string | null;
+  } | null;
+};
+
 /**
  * FEATURE: MovementForm - Control de ingresos/salidas con escaneo híbrido y contingencia (RF33, RF34)
  * REFACTOR: Eliminación de placeholders y conexión real a backend con feedback visual profesional.
@@ -83,10 +105,14 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
   const [turnoIngresos, setTurnoIngresos] = useState<TurnoIngresoRow[]>([]);
   const [turnoLoading, setTurnoLoading] = useState<boolean>(true);
 
+  // Estado para el modal de selección de usuario (cuando el vehículo está compartido)
+  const [infoPlaca, setInfoPlaca] = useState<InfoPlacaResponse | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null); // RF33: foco permanente en el input (lector emula teclado).
   const motivoRef = useRef<HTMLInputElement>(null); // RF34: referencia para el input de motivo (contingencia).
   const scannerBufferRef = useRef<string>(''); // RF33: buffer local para capturar ráfagas del lector (keyboard wedge) cuando el foco se pierde.
   const lastScanKeyAtRef = useRef<number>(0); // RF33: timestamp del último carácter recibido; permite detectar ráfagas y reconstruir el código completo.
+  const lastInputChangeAtRef = useRef<number>(0); // RF33: timestamp del último onChange del input para detectar nueva ráfaga del lector.
 
   async function loadTurnoIngresos() {
     try {
@@ -144,13 +170,14 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
         setMultiVehiculos(null); // RF31: si estaba en selección, se cancela para evitar confirmación accidental.
         setCodigoPendiente(''); // RF31: limpia token pendiente.
         setAprendizPendiente(''); // RF31: limpia nombre visible.
+        setInfoPlaca(null); // Cierra el modal de selección de usuario manual
         setTimeout(() => focusScanInput(), 0); // RF33: re-enfoca inmediatamente tras limpiar.
         scannerBufferRef.current = '';
         lastScanKeyAtRef.current = 0;
         return;
       } // RF33: fin ESC.
 
-      if (showContingencia || multiVehiculos || feedback.type === 'loading') {
+      if (showContingencia || multiVehiculos || infoPlaca || feedback.type === 'loading') {
         scannerBufferRef.current = '';
         lastScanKeyAtRef.current = 0;
         return;
@@ -197,26 +224,18 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
       }
     }; // RF33: fin handler de teclado global.
 
-    window.addEventListener('keydown', handleGlobalKeys); // RF33: registra listener global de teclado.
+    window.addEventListener('keydown', handleGlobalKeys);
 
-    let timeout: ReturnType<typeof setTimeout> | undefined; // UX: temporizador para cerrar overlays automáticamente.
-    if (feedback.type === 'success' && !lastResponse?.aprendiz) { // RF33: éxito simple se oculta automático.
-      timeout = setTimeout(() => { // UX: auto-cierre para operación continua.
-        closeFeedback();
-      }, 4000); 
-    } else if (feedback.type === 'success' && lastResponse?.aprendiz) {
-      // Para el modal profesional, damos más tiempo (10 segundos) o hasta que cierren manualmente.
-      timeout = setTimeout(() => {
-        closeFeedback();
-      }, 10000);
-    }
+    // Los overlays YA NO se cierran solos por tiempo. Solo se cierran cuando:
+    //  - El operativo presiona "Autorizar y cerrar" / "Cerrar Aviso"
+    //  - El operativo presiona ESC
+    //  - Se inicia una nueva acción (handleAction) que limpia el estado al comenzar
 
-    return () => { // UX: limpieza de listeners al desmontar.
-      window.removeEventListener('focus', handleWindowFocus); // UX: cleanup.
-      window.removeEventListener('keydown', handleGlobalKeys); // UX: cleanup.
-      if (timeout) clearTimeout(timeout); // UX: cleanup del temporizador.
-    }; // UX: fin cleanup.
-  }, [feedback.type, lastResponse, showContingencia, multiVehiculos, handleAction]); // RF33/RF34: depende del estado actual del form.
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('keydown', handleGlobalKeys);
+    };
+  }, [feedback.type, lastResponse, showContingencia, multiVehiculos, infoPlaca, handleAction]);
 
   const clearState = () => {
     setInputValue(''); // RF33: prepara el input para el siguiente escaneo.
@@ -229,9 +248,15 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
   };
 
   const closeFeedback = () => {
-    setFeedback({ type: null, message: '' }); // RF33: limpia feedback.
-    setFeedbackOverlayOpen(false); // RF33: cierra overlay masivo.
-    setLastResponse(null); // Limpia la respuesta para ocultar el modal.
+    setFeedback({ type: null, message: '' });
+    setFeedbackOverlayOpen(false);
+    setLastResponse(null);
+    // Prepara el input para el siguiente escaneo
+    setInputValue('');
+    scannerBufferRef.current = '';
+    lastScanKeyAtRef.current = 0;
+    lastInputChangeAtRef.current = 0;
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   /**
@@ -248,26 +273,38 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
       return; // RF33: aborta.
     } // RF33: fin validación.
 
-    setFeedback({ type: 'loading', message: 'COMUNICANDO CON EL SERVIDOR...' }); // RF33: feedback de procesamiento.
+    // Cierra cualquier modal/feedback anterior antes de empezar la nueva operación.
+    setLastResponse(null);
+    setFeedbackOverlayOpen(false);
+    setFeedback({ type: 'loading', message: 'COMUNICANDO CON EL SERVIDOR...' });
     
     try {
       const upper = targetValue.toUpperCase(); // RF33: normalización para evaluar formatos.
 
       switch (action) {
-        case 'entrada':
-          const resEntrada: OperativoResponse = await operativoService.registrarEntrada(upper); // RF10: registra entrada por placa (normalizada).
-          setFeedback({ 
-            type: 'success', 
-            message: resEntrada.mensaje 
-          });
+        case 'entrada': {
+          // Si la placa tiene varios usuarios autorizados (compartidos), preguntar quién entra.
+          const info: InfoPlacaResponse = await operativoService.obtenerInfoPlaca(upper);
+
+          if (info.usuariosAutorizados.length > 1 && !info.movimientoActivo) {
+            // Múltiples usuarios autorizados → mostrar modal para elegir
+            setInfoPlaca(info);
+            setFeedback({ type: null, message: '' });
+            return;
+          }
+
+          // Un solo usuario o ya hay movimiento activo → ingreso directo (sin documentoIngreso → backend asume propietario)
+          const resEntrada: OperativoResponse = await operativoService.registrarEntrada(upper);
+          setFeedback({ type: 'success', message: resEntrada.mensaje });
           setLastResponse(resEntrada);
-          setFeedbackOverlayOpen(true); // RF33: muestra overlay verde para confirmación a distancia.
-          onSuccess(`Ingreso: ${targetValue} -> ${resEntrada.bahia}`);
+          setFeedbackOverlayOpen(true);
+          onSuccess(`Ingreso: ${targetValue}`);
           loadTurnoIngresos();
           setInputValue('');
           setMotivo('');
           setShowContingencia(false);
           break;
+        }
 
         case 'salida':
           const resSalida: OperativoResponse = await operativoService.registrarSalida(upper); // RF11: registra salida por placa (normalizada).
@@ -332,6 +369,12 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
       setFeedbackOverlayOpen(true); // RF33: overlay rojo.
       setLastResponse(null);
       onError(msg);
+      // Limpia el input para que el siguiente escaneo no se acumule sobre el anterior
+      setInputValue('');
+      scannerBufferRef.current = '';
+      lastScanKeyAtRef.current = 0;
+      lastInputChangeAtRef.current = 0;
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
   }
 
@@ -344,13 +387,65 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
   /**
    * Procesa la confirmación manual de un vehículo (Aprendiz multi-vehículo).
    */
+  // Flag para evitar dobles confirmaciones por clicks rápidos
+  const procesandoMultiRef = useRef<boolean>(false);
+
+  /**
+   * Confirma el ingreso manual de placa eligiendo qué usuario (propietario o
+   * receptor compartido) está entrando con el vehículo.
+   */
+  async function handleConfirmarUsuarioManual(documento: string) {
+    if (!infoPlaca) return;
+    if (procesandoMultiRef.current) return;
+    procesandoMultiRef.current = true;
+
+    const placa = infoPlaca.vehiculo.placa;
+    setInfoPlaca(null); // cierra el modal inmediatamente
+
+    setFeedback({ type: 'loading', message: 'REGISTRANDO INGRESO...' });
+    try {
+      const resEntrada: OperativoResponse = await operativoService.registrarEntrada(placa, documento);
+      setFeedback({ type: 'success', message: resEntrada.mensaje });
+      setLastResponse(resEntrada);
+      setFeedbackOverlayOpen(true);
+      onSuccess(`Ingreso: ${placa}`);
+      loadTurnoIngresos();
+      setInputValue('');
+      setMotivo('');
+      setShowContingencia(false);
+    } catch (error: any) {
+      const msg = error.message || error.response?.data?.message || 'ERROR EN INGRESO';
+      setFeedback({ type: 'error', message: msg.toUpperCase() });
+      setFeedbackOverlayOpen(true);
+      setLastResponse(null);
+      onError(msg);
+      setInputValue('');
+      scannerBufferRef.current = '';
+      lastScanKeyAtRef.current = 0;
+      lastInputChangeAtRef.current = 0;
+      setTimeout(() => inputRef.current?.focus(), 50);
+    } finally {
+      procesandoMultiRef.current = false;
+    }
+  }
+
   async function handleConfirmarMultivehiculo(placa: string) {
+    // Protección contra doble click / doble confirmación
+    if (procesandoMultiRef.current) return;
+    procesandoMultiRef.current = true;
+
+    // Cerramos el modal de selección INMEDIATAMENTE para que no se pueda
+    // seleccionar otro vehículo mientras se procesa el primero.
+    setMultiVehiculos(null);
+    setCodigoPendiente('');
+    setAprendizPendiente('');
+
     setFeedback({ type: 'loading', message: 'CONFIRMANDO SELECCIÓN...' });
     try {
-      const res: OperativoResponse = await operativoService.confirmarIngresoMultivehiculo(codigoPendiente, placa); // RF31: confirma vehículo específico.
-      setFeedback({ 
-        type: 'success', 
-        message: res.mensaje 
+      const res: OperativoResponse = await operativoService.confirmarIngresoMultivehiculo(codigoPendiente, placa);
+      setFeedback({
+        type: 'success',
+        message: res.mensaje,
       });
       setLastResponse(res);
       setFeedbackOverlayOpen(true);
@@ -365,6 +460,13 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
       setFeedbackOverlayOpen(true);
       setLastResponse(null);
       onError(msg);
+      setInputValue('');
+      scannerBufferRef.current = '';
+      lastScanKeyAtRef.current = 0;
+      lastInputChangeAtRef.current = 0;
+      setTimeout(() => inputRef.current?.focus(), 50);
+    } finally {
+      procesandoMultiRef.current = false;
     }
   }
 
@@ -485,7 +587,30 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
                   id="scan-input"
                   ref={inputRef}
                   value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value.toUpperCase())} // RF33: normaliza entrada a mayúsculas.
+                  onChange={(e) => {
+                    // Distinguir entre escritura humana y ráfaga del lector físico:
+                    //  - Lector físico: dispara MUCHOS caracteres muy rápido (>= 4 chars
+                    //    de diferencia en un único onChange).
+                    //  - Humano: escribe 1 char por tecla.
+                    //
+                    // Solo cuando el lector envía una ráfaga grande mientras ya había contenido
+                    // (sobre-escribir un resultado previo), reemplazamos en vez de concatenar.
+                    const now = Date.now();
+                    const gap = now - lastInputChangeAtRef.current;
+                    const valorAnterior = inputValue;
+                    const valorNuevo = e.target.value.toUpperCase();
+                    const diff = valorNuevo.length - valorAnterior.length;
+
+                    const esRafagaLector = gap > 250 && valorAnterior.length > 0 && diff >= 4;
+
+                    if (esRafagaLector) {
+                      const nuevosCaracteres = valorNuevo.slice(valorAnterior.length);
+                      setInputValue(nuevosCaracteres);
+                    } else {
+                      setInputValue(valorNuevo);
+                    }
+                    lastInputChangeAtRef.current = now;
+                  }}
                   onKeyDown={handleKeyDown} // RF33: Enter dispara el flujo unificado de escaneo.
                   disabled={feedback.type === 'loading'} // UX: evita doble envío.
                   placeholder="ESCANEAR CÓDIGO (BARRAS/QR) O DIGITAR PLACA"
@@ -633,6 +758,69 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
           )}
         </div>
       </div>
+
+      {/* Overlay: Selección de USUARIO en registro manual de placa */}
+      {infoPlaca && (
+        <div className="fixed inset-0 z-[110] bg-[#003939]/95 backdrop-blur-sm p-6 flex flex-col items-center justify-center overflow-y-auto animate-in fade-in zoom-in duration-300">
+          <div className="max-w-5xl w-full">
+            <p className="text-[#39A900] text-center text-sm font-black uppercase tracking-[0.4em] mb-3">Registro manual</p>
+            <h2 className="text-white text-center text-4xl sm:text-5xl font-black uppercase tracking-tighter mb-2">
+              {infoPlaca.vehiculo.placa}
+            </h2>
+            <p className="text-white/60 text-center text-xs font-bold uppercase tracking-widest mb-8">
+              {infoPlaca.vehiculo.tipoVehiculo} • {infoPlaca.vehiculo.color}
+            </p>
+
+            {/* Galería de fotos del vehículo */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+              <FotoCard label="Vehículo" url={infoPlaca.vehiculo.fotoVehiculo} />
+              <FotoCard label="Tarjeta de Propiedad" url={infoPlaca.vehiculo.fotoTarjetaP} />
+              <FotoCard label="Foto de la Placa" url={infoPlaca.vehiculo.fotoPlaca} />
+            </div>
+
+            <p className="text-white/80 text-center text-[11px] font-black uppercase tracking-widest mb-6">
+              Selecciona el usuario que está ingresando
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {infoPlaca.usuariosAutorizados.map((u) => (
+                <button
+                  key={u.documento}
+                  type="button"
+                  onClick={() => handleConfirmarUsuarioManual(u.documento)}
+                  disabled={feedback.type === 'loading'}
+                  className="group rounded-2xl bg-[#003939] text-white p-5 text-left shadow-sm hover:brightness-110 focus:outline-none focus:ring-4 focus:ring-[#39A900]/25 disabled:opacity-60 flex items-center gap-4"
+                >
+                  <div className="w-16 h-16 rounded-xl bg-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                    {u.fotoPersona ? (
+                      <img src={u.fotoPersona} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-2xl font-black">{u.nombreCompleto?.charAt(0) || '?'}</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xl font-black uppercase tracking-tight truncate">{u.nombreCompleto}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">CC {u.documento}</p>
+                    <span className={`mt-2 inline-block px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${
+                      u.rol === 'PROPIETARIO' ? 'bg-[#39A900]/20 text-[#39A900]' : 'bg-amber-500/20 text-amber-300'
+                    }`}>
+                      {u.rol === 'PROPIETARIO' ? 'Propietario' : 'Compartido'}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => { setInfoPlaca(null); setFeedback({ type: null, message: '' }); }}
+              className="mt-10 w-full text-white/40 hover:text-white text-[10px] font-black uppercase tracking-[0.3em] transition-colors"
+            >
+              [ ESC ] Cancelar operación
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Overlay de Selección de Vehículo (RF31) */}
       {multiVehiculos && (
@@ -857,3 +1045,19 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
     </div>
   );
 };
+
+/** Tarjeta pequeña de foto del vehículo para el modal de registro manual */
+const FotoCard: React.FC<{ label: string; url: string | null }> = ({ label, url }) => (
+  <div className="rounded-2xl overflow-hidden border-2 border-white/10 bg-white/5">
+    <div className="bg-black/40 px-3 py-2">
+      <p className="text-white/80 text-[10px] font-black uppercase tracking-widest">{label}</p>
+    </div>
+    <div className="h-40 bg-slate-100 flex items-center justify-center">
+      {url ? (
+        <img src={url} className="w-full h-full object-cover" alt={label} />
+      ) : (
+        <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">Sin foto</span>
+      )}
+    </div>
+  </div>
+);

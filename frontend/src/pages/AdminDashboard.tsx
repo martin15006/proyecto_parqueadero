@@ -58,6 +58,38 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </header>
 
+      {/* Banner crítico — parqueadero lleno */}
+      {resumen?.estadoParqueadero === 'LLENO' && (
+        <div className="rounded-2xl border-2 border-rose-300 bg-rose-50 p-5 flex items-start gap-4 animate-pulse">
+          <div className="w-12 h-12 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0">
+            <AlertTriangle size={24} />
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] font-black uppercase tracking-widest text-rose-700">Alerta crítica</p>
+            <h2 className="text-xl font-black text-rose-900 mt-1">Capacidad máxima alcanzada</h2>
+            <p className="text-sm font-semibold text-rose-800 mt-1">
+              El parqueadero está LLENO ({resumen.ocupacion?.ocupados}/{resumen.ocupacion?.total} ocupados).
+              No se permiten más ingresos hasta que ocurra una salida.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {resumen?.estadoParqueadero === 'DESHABILITADO' && (
+        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-5 flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0">
+            <AlertTriangle size={24} />
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Estado administrativo</p>
+            <h2 className="text-xl font-black text-amber-900 mt-1">Parqueadero deshabilitado</h2>
+            <p className="text-sm font-semibold text-amber-800 mt-1">
+              El parqueadero está fuera de servicio por decisión administrativa.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* KPIs principales */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard

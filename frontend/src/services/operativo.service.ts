@@ -17,8 +17,17 @@ export const operativoService = {
     return response.data.data || response.data;
   },
 
-  registrarEntrada: async (placa: string) => {
-    const response = await api.post('/operativo/registrar-entrada', { placa });
+  registrarEntrada: async (placa: string, documentoIngreso?: string) => {
+    const response = await api.post('/operativo/registrar-entrada', { placa, documentoIngreso });
+    return response.data.data || response.data;
+  },
+
+  /**
+   * Info de placa para registro manual: vehículo + usuarios autorizados a ingresarlo
+   * + estado de movimiento activo si lo hay.
+   */
+  obtenerInfoPlaca: async (placa: string) => {
+    const response = await api.get(`/operativo/info-placa/${encodeURIComponent(placa)}`);
     return response.data.data || response.data;
   },
 

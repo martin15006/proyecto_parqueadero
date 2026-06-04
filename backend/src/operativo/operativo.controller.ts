@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Param,
   UseGuards,
   Request,
   Req,
@@ -79,6 +80,18 @@ export class OperativoController {
     );
   }
 
+  /**
+   * Información de una placa para registro manual: datos del vehículo + fotos +
+   * lista de usuarios autorizados a ingresarlo (dueño + receptores con compartido ACEPTADO).
+   * También indica si tiene un movimiento activo y quién lo ingresó.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
+  @Get('info-placa/:placa')
+  infoPlaca(@Param('placa') placa: string) {
+    return this.operativoService.obtenerInfoPlacaParaRegistroManual(placa);
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
   @Post('registrar-entrada')
@@ -89,6 +102,7 @@ export class OperativoController {
     return this.operativoService.registrarEntrada(
       dto.placa,
       { ...req.user, ip: req.ip },
+      dto.documentoIngreso,
     );
   }
 

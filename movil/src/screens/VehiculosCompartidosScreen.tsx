@@ -43,6 +43,28 @@ export default function VehiculosCompartidosScreen({ navigation }: any) {
 
   useFocusEffect(useCallback(() => { cargar(); }, []));
 
+  const handleEliminar = (item: VehiculoCompartido) => {
+    Alert.alert(
+      'Eliminar vehículo compartido',
+      `¿Eliminar el vehículo ${item.placa} de tu lista de compartidos?\n\nYa no podrás usarlo en el parqueadero.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sí, eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await vehiculoService.eliminarVehiculoCompartido(item.idCompartir);
+              setVehiculos((prev) => prev.filter((v) => v.idCompartir !== item.idCompartir));
+            } catch (e: any) {
+              Alert.alert('Error', e.message);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const renderItem = ({ item, index }: { item: VehiculoCompartido; index: number }) => (
     <FadeInView delay={index * 100}>
       <View
@@ -56,7 +78,16 @@ export default function VehiculosCompartidosScreen({ navigation }: any) {
       >
         <Image source={{ uri: item.fotoVehiculo }} style={styles.imagen} />
         <View style={styles.contenido}>
-          <Text style={[styles.placa, { color: colores.textoPrimario }]}>{item.placa}</Text>
+          <View style={styles.cabeceraFila}>
+            <Text style={[styles.placa, { color: colores.textoPrimario }]}>{item.placa}</Text>
+            <TouchableOpacity
+              style={styles.btnEliminar}
+              onPress={() => handleEliminar(item)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={[styles.btnEliminarTexto, { color: colores.error }]}>×</Text>
+            </TouchableOpacity>
+          </View>
           <View
             style={[
               styles.chip,
@@ -78,6 +109,16 @@ export default function VehiculosCompartidosScreen({ navigation }: any) {
           <Text style={[styles.fecha, { color: colores.textoTenue }]}>
             Compartido el {new Date(item.compartidoDesde).toLocaleDateString()}
           </Text>
+
+          <TouchableOpacity
+            style={[styles.btnEliminarFull, { borderColor: colores.error }]}
+            onPress={() => handleEliminar(item)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.btnEliminarFullTexto, { color: colores.error }]}>
+              🗑 Eliminar acceso
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </FadeInView>
@@ -186,7 +227,25 @@ const styles = StyleSheet.create({
   },
   imagen: { width: 130, height: 160 },
   contenido: { flex: 1, padding: espacios.normal, justifyContent: 'space-between' },
+  cabeceraFila: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   placa: { fontSize: fonts.grande, fontWeight: '800', letterSpacing: 1.5 },
+  btnEliminar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(211,47,47,0.08)',
+  },
+  btnEliminarTexto: { fontSize: 24, fontWeight: '700', lineHeight: 26 },
+  btnEliminarFull: {
+    marginTop: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  btnEliminarFullTexto: { fontWeight: '700', fontSize: fonts.pequeno },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

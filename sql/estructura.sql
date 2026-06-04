@@ -140,10 +140,16 @@ CREATE TABLE movimiento_vehiculo (
     hora_salida TIMESTAMP,
     estado estado_mov NOT NULL,
     id_compartir SMALLINT,
+    documento_ingreso VARCHAR(10),
 
     FOREIGN KEY (id_compartir)
         REFERENCES compartir(id_compartir)
         ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+    FOREIGN KEY (documento_ingreso)
+        REFERENCES usuario(documento)
+        ON DELETE SET NULL
         ON UPDATE CASCADE
 );
 

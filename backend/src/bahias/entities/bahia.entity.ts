@@ -1,7 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, Index } from 'typeorm';
 import { TipoBahia } from './tipo-bahia.entity';
 import { TipoControl } from './tipo-control.entity';
-import { MovimientoVehiculo } from '../../vehiculos/entities/movimiento-vehiculo.entity';
 import { IotStatusEnum } from '../../common/enums/iot-status.enum';
 import { BahiaReconciliacionEstadoEnum } from '../../common/enums/bahia-reconciliacion-estado.enum';
 
@@ -64,7 +63,4 @@ export class Bahia {
   @ManyToOne(() => TipoControl, (tipo) => tipo.bahias)
   @JoinColumn({ name: 'id_tipo_control' })
   tipoControl: TipoControl;
-
-  @OneToMany(() => MovimientoVehiculo, (movimiento) => movimiento.bahia)
-  movimientos: MovimientoVehiculo[];
 }

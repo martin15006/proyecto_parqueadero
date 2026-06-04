@@ -19,7 +19,6 @@ import { NotificacionesService } from '../notificaciones/notificaciones.service'
 import { Vehiculo } from '../vehiculos/entities/vehiculo.entity';
 import { RegistroVehiculo } from '../vehiculos/entities/registro-vehiculo.entity';
 import { MovimientoVehiculo, EstadoMovimiento } from '../vehiculos/entities/movimiento-vehiculo.entity';
-import { Bahia } from '../bahias/entities/bahia.entity';
 import { Contingencia } from '../contingencia/entities/contingencia.entity';
 import { AlertaSistema } from '../telemetria/entities/alerta-sistema.entity';
 import { ConfirmarIngresoMultivehiculoDto } from './dto/confirmar-ingreso-multivehiculo.dto';
@@ -94,14 +93,55 @@ export class OperativoService {
       vehiculos = vehiculos.filter(v => v.placa === resultado.placaDetectada);
     }
 
-    if (vehiculos.length === 1) {
-      if (!operador) {
-        throw new BadRequestException({
-          message: 'Operación no permitida sin contexto de operador.',
-          errorCode: 'OPERADOR_REQUERIDO',
-        });
-      }
+    if (!operador) {
+      throw new BadRequestException({
+        message: 'Operación no permitida sin contexto de operador.',
+        errorCode: 'OPERADOR_REQUERIDO',
+      });
+    }
 
+    // 🔍 Si el usuario YA tiene un movimiento activo (con cualquiera de sus vehículos),
+    // la acción es siempre SALIDA de ese vehículo — no mostramos modal de selección.
+    const placas = vehiculos.map((v) => v.placa);
+    const movimientoActivoMio = await this.movimientoRepository
+      .createQueryBuilder('mv')
+      .innerJoin(RegistroVehiculo, 'rv', 'rv.id_registro_v = mv.id_registro_vehiculo')
+      .where('rv.id_vehiculo IN (:...placas)', { placas })
+      .andWhere('mv.documento_ingreso = :doc', { doc: usuario.documento })
+      .andWhere('mv.estado IN (:...estados)', {
+        estados: [EstadoMovimiento.ADENTRO, EstadoMovimiento.TRANSITO],
+      })
+      .orderBy('mv.hora_ingreso', 'DESC')
+      .getOne();
+
+    if (movimientoActivoMio) {
+      const registro = await this.movimientoRepository.manager.findOne(RegistroVehiculo, {
+        where: { idRegistroV: movimientoActivoMio.idRegistroVehiculo },
+        relations: ['vehiculo', 'vehiculo.tipoVehiculo'],
+      });
+      const placa = registro?.idVehiculo ?? '';
+      const resultadoOp = await this.resolverAccionPorEstado(placa, usuario.documento, operador, usuario);
+      return {
+        ...resultadoOp,
+        modo: 'AUTO',
+        aprendiz: {
+          nombreCompleto: usuario.nombreCompleto,
+          documento: usuario.documento,
+          fotoPersona: usuario.fotoPersona,
+        },
+        vehiculo: {
+          placa,
+          tipoVehiculo: registro?.vehiculo?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
+          color: registro?.vehiculo?.color,
+          fotoVehiculo: registro?.vehiculo?.fotoVehiculo,
+          fotoTarjetaP: registro?.vehiculo?.fotoTarjetaP,
+          fotoPlaca: registro?.vehiculo?.fotoPlaca,
+        },
+      };
+    }
+
+    // Si solo tiene un vehículo, va directo a ingresarlo
+    if (vehiculos.length === 1) {
       const placa = vehiculos[0].placa;
       const resultadoOp = await this.resolverAccionPorEstado(placa, usuario.documento, operador, usuario);
 
@@ -124,6 +164,7 @@ export class OperativoService {
       };
     }
 
+    // Tiene varios vehículos y NINGUNO está adentro → debe elegir con cuál ingresar
     return {
       ok: true,
       modo: 'SELECCION',
@@ -164,15 +205,16 @@ export class OperativoService {
     operador: IJwtPayload & { ip: string },
     usuarioInfo?: any,
   ) {
+    // Buscamos el registro del vehículo (sin filtrar por usuario, ya que puede ser compartido).
     const registro = await this.movimientoRepository.manager.findOne(RegistroVehiculo, {
-      where: { idVehiculo: placa, idUsuario: documentoUsuario },
+      where: { idVehiculo: placa },
     });
 
     if (!registro) {
-      return await this.iniciarTransitoIngreso(placa, operador, usuarioInfo);
+      return await this.iniciarTransitoIngreso(placa, documentoUsuario, operador, usuarioInfo);
     }
 
-    // Si tiene movimiento activo (ADENTRO o TRANSITO legacy) → salida.
+    // ¿Tiene movimiento activo? → entonces tocaría salida
     const movimientoActivo = await this.movimientoRepository.findOne({
       where: [
         { idRegistroVehiculo: registro.idRegistroV, estado: EstadoMovimiento.ADENTRO },
@@ -181,10 +223,19 @@ export class OperativoService {
     });
 
     if (movimientoActivo) {
+      // Solo quien hizo el ingreso puede registrar la salida.
+      // Si `documentoIngreso` está vacío (movimientos antiguos), permitimos al propietario.
+      const quienIngresó = movimientoActivo.documentoIngreso ?? registro.idUsuario;
+      if (quienIngresó !== documentoUsuario) {
+        throw new BadRequestException({
+          message: 'Solo el usuario que realizó el ingreso puede registrar la salida de este vehículo.',
+          errorCode: 'SALIDA_NO_AUTORIZADA',
+        });
+      }
       return await this.registrarSalida(placa, operador);
     }
 
-    return await this.iniciarTransitoIngreso(placa, operador, usuarioInfo);
+    return await this.iniciarTransitoIngreso(placa, documentoUsuario, operador, usuarioInfo);
   }
 
   /**
@@ -246,13 +297,11 @@ export class OperativoService {
    * - Alertas técnicas recientes (sensores/hardware) desde la tabla de alertas del sistema.
    */
   async obtenerResumenTurno(operador: IJwtPayload & { ip: string }) {
-    // RF35: obtiene estado administrativo (deshabilitado/estadoParqueadero) y métricas físicas por separado.
-    // IMPORTANTE: `obtenerOcupacion` cuenta TODAS las bahías de BD; solo `obtenerMetricasSensorizadas`
-    // filtra por sensor.activo = true, devolviendo el total real de infraestructura sensorizada (3).
-    const [estadoGlobal, metricasSensorizadas] = await Promise.all([
-      this.bahiasService.obtenerOcupacion(),
-      this.bahiasService.obtenerMetricasSensorizadas(),
-    ]);
+    // obtenerOcupacion ahora devuelve:
+    //   total     = bahías con sensor activo (físicas reales)
+    //   ocupados  = QRs escaneados activos (movimientos ADENTRO/TRANSITO)
+    //   disponibles = total - ocupados
+    const estadoGlobal = await this.bahiasService.obtenerOcupacion();
 
     const inicioDia = new Date(); // RF35: para "ingresos del día" sin inventar el concepto de turnos no modelado.
     inicioDia.setHours(0, 0, 0, 0); // RF35: fija inicio del día local del servidor.
@@ -317,13 +366,16 @@ export class OperativoService {
       take: 10,
     }); // RF35: entrega últimas alertas del sistema (incluye sensores/hardware si existen).
 
+    const porcentajeOcupacion = estadoGlobal.total > 0
+      ? parseFloat(((estadoGlobal.ocupados / estadoGlobal.total) * 100).toFixed(1))
+      : 0;
+
     return {
-      // RF35: solo los conteos de infraestructura sensorizada real (sensor.activo=true).
       ocupacion: {
-        total: metricasSensorizadas.totalBahias,
-        ocupados: metricasSensorizadas.bahiasOcupadas,
-        disponibles: metricasSensorizadas.bahiasDisponibles,
-        porcentajeOcupacion: metricasSensorizadas.porcentajeOcupacion,
+        total: estadoGlobal.total,
+        ocupados: estadoGlobal.ocupados,
+        disponibles: estadoGlobal.disponibles,
+        porcentajeOcupacion,
         parqueaderoDeshabilitado: estadoGlobal.parqueaderoDeshabilitado,
         estadoParqueadero: estadoGlobal.estadoParqueadero,
       },
@@ -381,24 +433,63 @@ export class OperativoService {
    * Sin asignación de bahía: el sensor gestiona el estado visual de forma independiente.
    * Mismo modelo que `iniciarTransitoIngreso` (flujo QR).
    */
-  async registrarEntrada(placa: string, operador: IJwtPayload & { ip: string }) {
+  async registrarEntrada(
+    placa: string,
+    operador: IJwtPayload & { ip: string },
+    documentoIngresoExplicito?: string,
+  ) {
     await this.bahiasService.validarIngresoPermitido();
     return await this.movimientoRepository.manager.transaction(async (manager) => {
-      const { registro } = await this.validarVehiculoYRegistro(placa, manager);
+      const { vehiculo, registro } = await this.validarVehiculoYRegistro(placa, manager);
       await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
+
+      // Cargamos el vehículo CON su tipo (para devolver datos completos al frontend).
+      const vehiculoCompleto = await manager.findOne(Vehiculo, {
+        where: { placa: vehiculo.placa },
+        relations: ['tipoVehiculo'],
+      });
+
+      // Si se especificó un documentoIngreso, validar que sea autorizado:
+      // - el propietario del registro, o
+      // - un usuario con compartido ACEPTADO sobre este vehículo
+      let documentoIngreso = registro.idUsuario;
+      if (documentoIngresoExplicito && documentoIngresoExplicito.trim()) {
+        const doc = documentoIngresoExplicito.trim();
+        if (doc === registro.idUsuario) {
+          documentoIngreso = doc;
+        } else {
+          const compartido = await manager
+            .createQueryBuilder('compartir', 'c')
+            .where('c.id_registro_v = :idReg', { idReg: registro.idRegistroV })
+            .andWhere('c.documento = :doc', { doc })
+            .andWhere(`c.estado = 'ACEPTADO'`)
+            .getRawOne();
+          if (!compartido) {
+            throw new BadRequestException({
+              message: 'El usuario indicado no está autorizado a ingresar este vehículo.',
+              errorCode: 'USUARIO_NO_AUTORIZADO',
+            });
+          }
+          documentoIngreso = doc;
+        }
+      }
+
+      // Un usuario solo puede tener UN vehículo adentro a la vez
+      await this.verificarUsuarioSinIngresoActivo(documentoIngreso, manager);
 
       const nuevoMovimiento = manager.create(MovimientoVehiculo, {
         horaIngreso: new Date(),
         idRegistroVehiculo: registro.idRegistroV,
-        idBahia: null,   // Sin asignación — el vehículo elige libremente la bahía.
         estado: EstadoMovimiento.ADENTRO,
+        documentoIngreso,
       });
 
       const guardado = await manager.save(nuevoMovimiento);
 
       await this.ejecutarPostIngreso(guardado, placa, 'LIBRE', operador);
 
-      const usuario = await this.usuarioService.findOneByDocumento(registro.idUsuario);
+      // Usuario que efectivamente ingresó (puede ser propietario o receptor compartido)
+      const usuarioIngreso = await this.usuarioService.findOneByDocumento(documentoIngreso);
 
       return {
         ok: true,
@@ -409,17 +500,17 @@ export class OperativoService {
           estado: guardado.estado,
         },
         aprendiz: {
-          nombreCompleto: usuario?.nombreCompleto || 'USUARIO DESCONOCIDO',
-          documento: usuario?.documento || registro.idUsuario,
-          fotoPersona: usuario?.fotoPersona,
+          nombreCompleto: usuarioIngreso?.nombreCompleto || 'USUARIO DESCONOCIDO',
+          documento: usuarioIngreso?.documento || documentoIngreso,
+          fotoPersona: usuarioIngreso?.fotoPersona,
         },
         vehiculo: {
-          placa,
-          tipoVehiculo: registro.vehiculo?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
-          color: registro.vehiculo?.color,
-          fotoVehiculo: registro.vehiculo?.fotoVehiculo,
-          fotoTarjetaP: registro.vehiculo?.fotoTarjetaP,
-          fotoPlaca: registro.vehiculo?.fotoPlaca,
+          placa: vehiculoCompleto?.placa ?? placa,
+          tipoVehiculo: vehiculoCompleto?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
+          color: vehiculoCompleto?.color,
+          fotoVehiculo: vehiculoCompleto?.fotoVehiculo,
+          fotoTarjetaP: vehiculoCompleto?.fotoTarjetaP,
+          fotoPlaca: vehiculoCompleto?.fotoPlaca,
         },
       };
     });
@@ -468,38 +559,39 @@ export class OperativoService {
       }
 
       // 1. Validaciones de existencia (placa normalizada)
-      const { registro } = await this.validarVehiculoYRegistro(placaARegistrar, manager);
+      const { vehiculo, registro } = await this.validarVehiculoYRegistro(placaARegistrar, manager);
       await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
 
-      // 2. Asignación de infraestructura con Pessimistic Lock (Garantiza exclusión mutua)
-      const bahia = await this.asignarBahiaDisponible(manager);
+      // Un usuario solo puede tener UN vehículo adentro a la vez
+      await this.verificarUsuarioSinIngresoActivo(registro.idUsuario, manager);
 
-      // 3. Registro formal del movimiento marcado como manual
+      const vehiculoCompleto = await manager.findOne(Vehiculo, {
+        where: { placa: vehiculo.placa },
+        relations: ['tipoVehiculo'],
+      });
+
       const nuevoMovimiento = manager.create(MovimientoVehiculo, {
         horaIngreso: new Date(),
         idRegistroVehiculo: registro.idRegistroV,
-        idBahia: bahia.idBahia,
         estado: EstadoMovimiento.ADENTRO,
-        esManual: true, // Flag de contingencia
+        esManual: true,
+        documentoIngreso: registro.idUsuario,
       });
 
       const movimientoGuardado = await manager.save(nuevoMovimiento);
 
-      // 4. Registro formal de la contingencia para auditoría RF34
       const contingencia = manager.create(Contingencia, {
         tipoOperacion: 'INGRESO',
         placa: placaARegistrar,
         motivo: dto.motivo,
-        idOperativo: operador.sub, // Documento del operario
+        idOperativo: operador.sub,
         idMovimiento: movimientoGuardado.idMovimiento,
       });
 
       await manager.save(contingencia);
 
-      // 5. Ejecutar procesos post-ingreso (Auditoría, Sockets, etc.)
-      await this.ejecutarPostIngreso(movimientoGuardado, placaARegistrar, bahia.nombreBahia, operador);
+      await this.ejecutarPostIngreso(movimientoGuardado, placaARegistrar, 'LIBRE', operador);
 
-      // Cargamos datos para el modal profesional del frontend
       const usuario = await this.usuarioService.findOneByDocumento(registro.idUsuario);
 
       return {
@@ -510,19 +602,18 @@ export class OperativoService {
           horaIngreso: movimientoGuardado.horaIngreso,
           estado: movimientoGuardado.estado,
         },
-        bahia: bahia.nombreBahia,
         aprendiz: {
           nombreCompleto: usuario?.nombreCompleto || 'USUARIO DESCONOCIDO',
           documento: usuario?.documento || registro.idUsuario,
-          fotoPersona: usuario?.fotoPersona
+          fotoPersona: usuario?.fotoPersona,
         },
         vehiculo: {
-          placa: placaARegistrar,
-          tipoVehiculo: registro.vehiculo?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
-          color: registro.vehiculo?.color,
-          fotoVehiculo: registro.vehiculo?.fotoVehiculo,
-          fotoTarjetaP: registro.vehiculo?.fotoTarjetaP,
-          fotoPlaca: registro.vehiculo?.fotoPlaca,
+          placa: vehiculoCompleto?.placa ?? placaARegistrar,
+          tipoVehiculo: vehiculoCompleto?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
+          color: vehiculoCompleto?.color,
+          fotoVehiculo: vehiculoCompleto?.fotoVehiculo,
+          fotoTarjetaP: vehiculoCompleto?.fotoTarjetaP,
+          fotoPlaca: vehiculoCompleto?.fotoPlaca,
         },
       };
     });
@@ -543,28 +634,22 @@ export class OperativoService {
    */
   async registrarSalida(placa: string, operador: IJwtPayload & { ip: string }) {
     return await this.movimientoRepository.manager.transaction(async (manager) => {
-      const { registro } = await this.validarVehiculoYRegistro(placa, manager);
+      const { vehiculo, registro } = await this.validarVehiculoYRegistro(placa, manager);
 
-      // CRÍTICO (PostgreSQL): el lock FOR UPDATE falla con LEFT JOIN.
-      // Primero buscamos TRANSITO de salida (con bahía), luego ADENTRO como fallback.
-      const movimientoTransitoSalida = await manager
+      // Cargamos el vehículo CON su tipo (para devolver datos completos al frontend).
+      const vehiculoCompleto = await manager.findOne(Vehiculo, {
+        where: { placa: vehiculo.placa },
+        relations: ['tipoVehiculo'],
+      });
+
+      const movimientoActivo = await manager
         .createQueryBuilder(MovimientoVehiculo, 'mov')
         .setLock('pessimistic_write')
         .where('mov.id_registro_vehiculo = :id', { id: registro.idRegistroV })
-        .andWhere('mov.estado = :estado', { estado: EstadoMovimiento.TRANSITO })
-        .andWhere('mov.id_bahia IS NOT NULL')
+        .andWhere('mov.estado IN (:...estados)', {
+          estados: [EstadoMovimiento.ADENTRO, EstadoMovimiento.TRANSITO],
+        })
         .getOne();
-
-      const movimientoAdentro = movimientoTransitoSalida
-        ? null
-        : await manager
-            .createQueryBuilder(MovimientoVehiculo, 'mov')
-            .setLock('pessimistic_write')
-            .where('mov.id_registro_vehiculo = :id', { id: registro.idRegistroV })
-            .andWhere('mov.estado = :estado', { estado: EstadoMovimiento.ADENTRO })
-            .getOne();
-
-      const movimientoActivo = movimientoTransitoSalida ?? movimientoAdentro;
 
       if (!movimientoActivo) {
         throw new BadRequestException('El vehículo no tiene un ingreso activo registrado');
@@ -574,18 +659,11 @@ export class OperativoService {
       movimientoActivo.estado = EstadoMovimiento.SALIDA;
       await manager.save(movimientoActivo);
 
-      const bahia = movimientoActivo.idBahia != null
-        ? await manager.findOne(Bahia, { where: { idBahia: movimientoActivo.idBahia } })
-        : null;
-      if (bahia) {
-        (movimientoActivo as any).bahia = bahia;
-      }
-
-      // 4. Auditoría, Sockets y Sincronización
       await this.ejecutarPostSalida(movimientoActivo, placa, operador);
 
-      // Cargamos datos para el modal profesional del frontend
-      const usuario = await this.usuarioService.findOneByDocumento(registro.idUsuario);
+      // Usuario que efectivamente ingresó el vehículo (puede ser propietario o receptor compartido)
+      const docQuienIngreso = movimientoActivo.documentoIngreso ?? registro.idUsuario;
+      const usuarioIngreso = await this.usuarioService.findOneByDocumento(docQuienIngreso);
 
       return {
         ok: true,
@@ -596,19 +674,18 @@ export class OperativoService {
           horaSalida: movimientoActivo.horaSalida,
           estado: movimientoActivo.estado,
         },
-        bahia: bahia?.nombreBahia,
         aprendiz: {
-          nombreCompleto: usuario?.nombreCompleto || 'USUARIO DESCONOCIDO',
-          documento: usuario?.documento || registro.idUsuario,
-          fotoPersona: usuario?.fotoPersona
+          nombreCompleto: usuarioIngreso?.nombreCompleto || 'USUARIO DESCONOCIDO',
+          documento: usuarioIngreso?.documento || docQuienIngreso,
+          fotoPersona: usuarioIngreso?.fotoPersona,
         },
         vehiculo: {
-          placa: placa,
-          tipoVehiculo: registro.vehiculo?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
-          color: registro.vehiculo?.color,
-          fotoVehiculo: registro.vehiculo?.fotoVehiculo,
-          fotoTarjetaP: registro.vehiculo?.fotoTarjetaP,
-          fotoPlaca: registro.vehiculo?.fotoPlaca,
+          placa: vehiculoCompleto?.placa ?? placa,
+          tipoVehiculo: vehiculoCompleto?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
+          color: vehiculoCompleto?.color,
+          fotoVehiculo: vehiculoCompleto?.fotoVehiculo,
+          fotoTarjetaP: vehiculoCompleto?.fotoTarjetaP,
+          fotoPlaca: vehiculoCompleto?.fotoPlaca,
         },
       };
     });
@@ -708,7 +785,6 @@ export class OperativoService {
         datosNuevos: {
           placa: registro.idVehiculo,
           motivo: dto.motivo,
-          idBahia: movimientoActivo.idBahia,
           horaSalida: ahora,
         },
         ip: actor.ip,
@@ -744,7 +820,6 @@ export class OperativoService {
         mensaje: 'Salida de emergencia registrada',
         idMovimiento: movimientoActivo.idMovimiento,
         placa: registro.idVehiculo,
-        idBahia: movimientoActivo.idBahia,
       };
     });
   }
@@ -783,11 +858,47 @@ export class OperativoService {
       });
     }
 
+    // 🔍 Si el usuario YA tiene un movimiento activo con cualquiera de sus vehículos,
+    // la acción es siempre SALIDA — no se le consulta cuál usar.
+    const placas = vehiculos.map((v) => v.placa);
+    const movimientoActivoMio = await this.movimientoRepository
+      .createQueryBuilder('mv')
+      .innerJoin(RegistroVehiculo, 'rv', 'rv.id_registro_v = mv.id_registro_vehiculo')
+      .where('rv.id_vehiculo IN (:...placas)', { placas })
+      .andWhere('mv.documento_ingreso = :doc', { doc: usuario.documento })
+      .andWhere('mv.estado IN (:...estados)', {
+        estados: [EstadoMovimiento.ADENTRO, EstadoMovimiento.TRANSITO],
+      })
+      .orderBy('mv.hora_ingreso', 'DESC')
+      .getOne();
+
+    if (movimientoActivoMio) {
+      const registro = await this.movimientoRepository.manager.findOne(RegistroVehiculo, {
+        where: { idRegistroV: movimientoActivoMio.idRegistroVehiculo },
+        relations: ['vehiculo', 'vehiculo.tipoVehiculo'],
+      });
+      const placa = registro?.idVehiculo ?? '';
+      const resultadoOp = await this.resolverAccionPorEstado(placa, usuario.documento, operador, usuario);
+      return {
+        ...resultadoOp,
+        modo: 'AUTO',
+        aprendiz: {
+          nombreCompleto: usuario.nombreCompleto,
+          documento: usuario.documento,
+          fotoPersona: usuario.fotoPersona,
+        },
+        vehiculo: {
+          placa,
+          tipoVehiculo: registro?.vehiculo?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
+          color: registro?.vehiculo?.color,
+          fotoVehiculo: registro?.vehiculo?.fotoVehiculo,
+          fotoTarjetaP: registro?.vehiculo?.fotoTarjetaP,
+          fotoPlaca: registro?.vehiculo?.fotoPlaca,
+        },
+      };
+    }
+
     if (vehiculos.length === 1) {
-      // Misma máquina de estados que escanearCodigo:
-      // – sin movimiento activo  → iniciarTransitoIngreso (ingreso)
-      // – TRANSITO sin bahía     → error (ya autorizado, esperar sensor)
-      // – ADENTRO / TRANSITO con bahía → registrarSalida (confirma salida en portería)
       const resultadoOp = await this.resolverAccionPorEstado(
         vehiculos[0].placa,
         usuario.documento,
@@ -853,21 +964,31 @@ export class OperativoService {
    */
   private async iniciarTransitoIngreso(
     placa: string,
+    documentoUsuario: string,
     operador: IJwtPayload & { ip: string },
     usuarioInfo?: { nombreCompleto?: string; documento?: string; fotoPersona?: string },
   ) {
     await this.bahiasService.validarIngresoPermitido();
 
     return await this.movimientoRepository.manager.transaction(async (manager) => {
-      const { registro } = await this.validarVehiculoYRegistro(placa, manager);
+      const { vehiculo, registro } = await this.validarVehiculoYRegistro(placa, manager);
       await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
+
+      // Un usuario solo puede tener UN vehículo adentro a la vez
+      await this.verificarUsuarioSinIngresoActivo(documentoUsuario, manager);
+
+      // Cargamos el vehículo CON su tipo para devolver datos completos al frontend.
+      const vehiculoCompleto = await manager.findOne(Vehiculo, {
+        where: { placa: vehiculo.placa },
+        relations: ['tipoVehiculo'],
+      });
 
       const nuevoMovimiento = manager.create(MovimientoVehiculo, {
         horaIngreso: new Date(),
         idRegistroVehiculo: registro.idRegistroV,
-        idBahia: null,           // Sin asignación de bahía — el vehículo elige libremente.
         estado: EstadoMovimiento.ADENTRO,
         esManual: false,
+        documentoIngreso: documentoUsuario, // Quien escaneó el QR para ingresar
       });
 
       const guardado = await manager.save(nuevoMovimiento);
@@ -877,7 +998,7 @@ export class OperativoService {
         entidad: 'MOVIMIENTO_VEHICULO',
         idEntidad: guardado.idMovimiento,
         idUsuario: operador?.sub || 'SISTEMA',
-        datosNuevos: { placa },
+        datosNuevos: { placa, documentoIngreso: documentoUsuario },
         ip: operador?.ip || '127.0.0.1',
         userAgent: 'Operativo App',
       });
@@ -889,8 +1010,9 @@ export class OperativoService {
       });
       await this.sincronizarEstadoGlobal();
 
+      // Usuario que efectivamente ingresó (puede ser receptor de un compartido).
       const usuario = usuarioInfo
-        ?? await this.usuarioService.findOneByDocumento(registro.idUsuario);
+        ?? await this.usuarioService.findOneByDocumento(documentoUsuario);
 
       return {
         ok: true,
@@ -903,16 +1025,16 @@ export class OperativoService {
         },
         aprendiz: {
           nombreCompleto: (usuario as any)?.nombreCompleto || 'USUARIO DESCONOCIDO',
-          documento: (usuario as any)?.documento || registro.idUsuario,
+          documento: (usuario as any)?.documento || documentoUsuario,
           fotoPersona: (usuario as any)?.fotoPersona,
         },
         vehiculo: {
-          placa,
-          tipoVehiculo: registro.vehiculo?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
-          color: registro.vehiculo?.color,
-          fotoVehiculo: registro.vehiculo?.fotoVehiculo,
-          fotoTarjetaP: registro.vehiculo?.fotoTarjetaP,
-          fotoPlaca: registro.vehiculo?.fotoPlaca,
+          placa: vehiculoCompleto?.placa ?? placa,
+          tipoVehiculo: vehiculoCompleto?.tipoVehiculo?.tipoVehiculo ?? 'N/D',
+          color: vehiculoCompleto?.color,
+          fotoVehiculo: vehiculoCompleto?.fotoVehiculo,
+          fotoTarjetaP: vehiculoCompleto?.fotoTarjetaP,
+          fotoPlaca: vehiculoCompleto?.fotoPlaca,
         },
       };
     });
@@ -957,47 +1079,37 @@ export class OperativoService {
   }
 
   /**
-   * Asigna la primera bahía disponible con bloqueo pesimista de escritura.
+   * Garantiza que el usuario que va a ingresar NO tenga otro vehículo
+   * (propio o compartido) ya adentro del parqueadero.
    *
-   * Criterios de exclusión (AND lógico):
-   * 1. Bahías con movimiento activo (`ADENTRO` o `TRANSITO`) en `movimiento_vehiculo`.
-   * 2. Bahías cuyo `estado_reconciliado` refleja ocupación física o fallo de sensor
-   *    (`OCUPADO`, `TRANSITO`, `DISCREPANCIA`, `OFFLINE`, `DESHABILITADO`).
+   * Un usuario solo puede tener UN movimiento activo a la vez.
    *
-   * @throws {BadRequestException} Si no hay ninguna bahía que cumpla ambos criterios.
+   * NOTA técnica: PostgreSQL no permite `FOR UPDATE` con LEFT JOIN, por eso
+   * primero bloqueamos solo la tabla movimiento_vehiculo y luego, si hay
+   * registro activo, hacemos un fetch separado para obtener la placa.
    */
-  private async asignarBahiaDisponible(manager: EntityManager): Promise<Bahia> {
-    const estadosExcluidosReconciliacion = [
-      'OCUPADO', 'TRANSITO', 'DISCREPANCIA', 'OFFLINE', 'DESHABILITADO',
-    ];
-
-    const disponible = await manager.createQueryBuilder(Bahia, 'bahia')
+  private async verificarUsuarioSinIngresoActivo(documentoUsuario: string, manager: EntityManager) {
+    const activo = await manager
+      .createQueryBuilder(MovimientoVehiculo, 'mv')
+      .where('mv.documento_ingreso = :doc', { doc: documentoUsuario })
+      .andWhere('mv.estado IN (:...estados)', {
+        estados: [EstadoMovimiento.ADENTRO, EstadoMovimiento.TRANSITO],
+      })
       .setLock('pessimistic_write')
-      .where((qb) => {
-        // Exclusión por movimiento activo en BD
-        const subQuery = qb
-          .subQuery()
-          .select('mov.id_bahia')
-          .from(MovimientoVehiculo, 'mov')
-          .where('mov.estado IN (:...estadosMov)', {
-            estadosMov: [EstadoMovimiento.ADENTRO, EstadoMovimiento.TRANSITO],
-          })
-          .getQuery();
-        return 'bahia.id_bahia NOT IN ' + subQuery;
-      })
-      // Exclusión por estado físico del sensor (telemetría en tiempo real)
-      .andWhere('bahia.estado_reconciliado NOT IN (:...estadosExcluidos)', {
-        estadosExcluidos: estadosExcluidosReconciliacion,
-      })
       .getOne();
 
-    if (!disponible) {
-      throw new BadRequestException(
-        'Capacidad máxima alcanzada: No hay bahías disponibles',
-      );
-    }
+    if (activo) {
+      // Cargamos por separado la placa (sin lock) para incluirla en el mensaje
+      const registro = await manager.findOne(RegistroVehiculo, {
+        where: { idRegistroV: activo.idRegistroVehiculo },
+      });
+      const placa = registro?.idVehiculo ?? '';
 
-    return disponible;
+      throw new BadRequestException({
+        message: `Este usuario ya tiene un vehículo dentro del parqueadero${placa ? ` (placa ${placa})` : ''}. Debe registrar la salida antes de ingresar otro.`,
+        errorCode: 'USUARIO_CON_INGRESO_ACTIVO',
+      });
+    }
   }
 
   private async ejecutarPostIngreso(mov: MovimientoVehiculo, placa: string, bahia: string, operador: IJwtPayload & { ip: string }) {
@@ -1031,24 +1143,116 @@ export class OperativoService {
   }
 
   private async sincronizarEstadoGlobal() {
-    // El socket `conteo_global_disponibles` debe reflejar solo las bahías con sensor activo
-    // para que el panel operativo y la app móvil muestren "TOTAL 3" y no el total de BD.
-    const [metricas, conteo] = await Promise.all([
-      this.bahiasService.obtenerMetricasSensorizadas(),
-      this.bahiasService.obtenerConteoGlobal(), // solo para parqueaderoDeshabilitado y estadoParqueadero
-    ]);
-    const estadoParqueadero: 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO' = conteo.parqueaderoDeshabilitado
-      ? 'DESHABILITADO'
-      : metricas.bahiasDisponibles <= 0 && metricas.totalBahias > 0
-        ? 'LLENO'
-        : 'DISPONIBLE';
+    // Conteo unificado:
+    //  - total     = bahías sensorizadas (físicas)
+    //  - ocupados  = QRs escaneados activos (movimientos ADENTRO/TRANSITO)
+    //  - disponibles = total - ocupados
+    const conteo = await this.bahiasService.obtenerConteoGlobal();
+
     this.eventosGateway.emitirConteoGlobalDisponibles({
-      total: metricas.totalBahias,
-      ocupados: metricas.bahiasOcupadas,
-      disponibles: metricas.bahiasDisponibles,
-      estadoParqueadero,
+      total: conteo.total,
+      ocupados: conteo.ocupados,
+      disponibles: conteo.disponibles,
+      estadoParqueadero: conteo.estadoParqueadero,
       actualizadoEn: new Date(),
     });
-    await this.bahiasService.evaluarAlertasOcupacion(); // RF13/RF39: dispara alertas 80/100 tras cada cambio de ocupación.
+    await this.bahiasService.evaluarAlertasOcupacion();
+  }
+
+  /**
+   * Información de una placa para registro manual:
+   *  - Datos y fotos del vehículo
+   *  - Lista de usuarios que pueden ingresarlo (propietario + receptores con compartido ACEPTADO)
+   *  - Si tiene un movimiento activo, indica quién lo ingresó
+   */
+  async obtenerInfoPlacaParaRegistroManual(placa: string) {
+    const placaNormalizada = this.normalizarPlaca(placa);
+
+    // 1) Vehículo + tipo
+    const vehiculo = await this.movimientoRepository.manager.findOne(Vehiculo, {
+      where: { placa: placaNormalizada },
+      relations: ['tipoVehiculo'],
+    });
+    if (!vehiculo) {
+      throw new NotFoundException({
+        message: 'Placa no reconocida en el sistema',
+        errorCode: 'PLACA_NO_ENCONTRADA',
+      });
+    }
+
+    // 2) Registro vehículo-propietario
+    const registro = await this.movimientoRepository.manager.findOne(RegistroVehiculo, {
+      where: { idVehiculo: placaNormalizada },
+      relations: ['usuario'],
+    });
+
+    const usuariosAutorizados: Array<{
+      documento: string;
+      nombreCompleto: string;
+      fotoPersona: string;
+      rol: 'PROPIETARIO' | 'COMPARTIDO';
+    }> = [];
+
+    if (registro?.usuario) {
+      usuariosAutorizados.push({
+        documento: registro.usuario.documento,
+        nombreCompleto: registro.usuario.nombreCompleto,
+        fotoPersona: registro.usuario.fotoPersona,
+        rol: 'PROPIETARIO',
+      });
+
+      // 3) Receptores con compartido ACEPTADO
+      const compartidosRaw = await this.movimientoRepository.manager
+        .createQueryBuilder()
+        .select('u.documento', 'documento')
+        .addSelect('u.nombre_completo', 'nombreCompleto')
+        .addSelect('u.foto_persona', 'fotoPersona')
+        .from('compartir', 'c')
+        .innerJoin('usuario', 'u', 'u.documento = c.documento')
+        .where('c.id_registro_v = :idReg', { idReg: registro.idRegistroV })
+        .andWhere(`c.estado = 'ACEPTADO'`)
+        .getRawMany();
+
+      for (const c of compartidosRaw) {
+        usuariosAutorizados.push({
+          documento: c.documento,
+          nombreCompleto: c.nombreCompleto,
+          fotoPersona: c.fotoPersona,
+          rol: 'COMPARTIDO',
+        });
+      }
+    }
+
+    // 4) Movimiento activo (si existe)
+    let movimientoActivoInfo: { idMovimiento: number; documentoIngreso: string | null; nombreIngreso: string | null } | null = null;
+    if (registro) {
+      const activo = await this.movimientoRepository.findOne({
+        where: [
+          { idRegistroVehiculo: registro.idRegistroV, estado: EstadoMovimiento.ADENTRO },
+          { idRegistroVehiculo: registro.idRegistroV, estado: EstadoMovimiento.TRANSITO },
+        ],
+        relations: ['usuarioIngreso'],
+      });
+      if (activo) {
+        movimientoActivoInfo = {
+          idMovimiento: activo.idMovimiento,
+          documentoIngreso: activo.documentoIngreso,
+          nombreIngreso: activo.usuarioIngreso?.nombreCompleto ?? null,
+        };
+      }
+    }
+
+    return {
+      vehiculo: {
+        placa: vehiculo.placa,
+        color: vehiculo.color,
+        tipoVehiculo: vehiculo.tipoVehiculo?.tipoVehiculo ?? 'N/D',
+        fotoVehiculo: vehiculo.fotoVehiculo,
+        fotoTarjetaP: vehiculo.fotoTarjetaP,
+        fotoPlaca: vehiculo.fotoPlaca,
+      },
+      usuariosAutorizados,
+      movimientoActivo: movimientoActivoInfo,
+    };
   }
 }

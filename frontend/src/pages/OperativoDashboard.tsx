@@ -30,14 +30,16 @@ export const OperativoDashboard: React.FC = () => {
     return Math.round((stats.ocupados / stats.total) * 100); // RF15: cálculo simple y estable para UI.
   }, [stats.ocupados, stats.total]); // RF15: depende de stats.
 
-  const estadoGlobal = useMemo(() => { // RF14/RF15/RF18: deduce estado global a partir de eventos reales sin inventar fuentes.
-    const tipos = alerts.map(a => String(a.tipo || '').toUpperCase()); // RF15: normaliza tipos de alertas recibidas por WebSocket.
-    if (tipos.some(t => t.includes('PARQUEADERO_DESHABILITADO'))) return 'DESHABILITADO'; // RF14: bloqueo administrativo (fase 3).
-    if (tipos.some(t => t.includes('PARQUEADERO_LLENO'))) return 'LLENO'; // RF15: capacidad 100% (fase 3/39).
-    if (tipos.some(t => t.includes('UMBRAL_80'))) return 'ALERTA_80'; // RF15: alerta operativa 80%.
-    if (stats.total > 0 && stats.disponibles === 0) return 'LLENO'; // RF15: fallback si no llegó alerta pero el cálculo indica 100%.
-    return 'DISPONIBLE'; // RF15: estado por defecto si no hay señales de bloqueo/lleno.
-  }, [alerts, stats.disponibles, stats.total]); // RF15: recalcula con datos en vivo.
+  const estadoGlobal = useMemo(() => {
+    const tipos = alerts.map((a) => String(a.tipo || '').toUpperCase());
+    if (tipos.some((t) => t.includes('PARQUEADERO_DESHABILITADO'))) return 'DESHABILITADO';
+    // Fuente principal: conteo de QRs activos. Si ocupados >= total → LLENO.
+    if (stats.total > 0 && stats.ocupados >= stats.total) return 'LLENO';
+    if (tipos.some((t) => t.includes('PARQUEADERO_LLENO'))) return 'LLENO';
+    if (tipos.some((t) => t.includes('UMBRAL_80'))) return 'ALERTA_80';
+    if (stats.total > 0 && (stats.ocupados / stats.total) >= 0.8) return 'ALERTA_80';
+    return 'DISPONIBLE';
+  }, [alerts, stats.ocupados, stats.total]);
 
   const estadoStyle = useMemo(() => { // UI: paleta institucional de alto contraste (hex exigidos).
     if (estadoGlobal === 'DESHABILITADO') return { bg: 'bg-[#D32F2F]', label: 'DESHABILITADO', sub: 'Bloqueo total de ingresos (RF14)', ring: 'ring-[#D32F2F]/25' }; // RF14.
@@ -101,8 +103,40 @@ export const OperativoDashboard: React.FC = () => {
         </div> {/* UI: fin container navbar. */}
       </header> {/* UI: fin header. */}
 
-      <main className="max-w-[1800px] mx-auto px-4 md:px-6 py-6 space-y-6"> {/* UI: contenedor principal. */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6"> {/* Layout: grid robusto para 3 secciones. */}
+      <main className="max-w-[1800px] mx-auto px-4 md:px-6 py-6 space-y-6">
+        {/* Banner crítico — parqueadero lleno */}
+        {estadoGlobal === 'LLENO' && (
+          <div className="rounded-3xl border-2 border-[#D32F2F] bg-[#D32F2F]/5 p-5 flex items-start gap-4 animate-pulse">
+            <div className="w-14 h-14 rounded-2xl bg-[#D32F2F] text-white flex items-center justify-center shrink-0">
+              <ShieldAlert size={28} />
+            </div>
+            <div className="flex-1">
+              <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#D32F2F]">Alerta crítica</p>
+              <h2 className="text-2xl font-black text-[#D32F2F] mt-1">Capacidad máxima alcanzada</h2>
+              <p className="text-sm font-semibold text-slate-700 mt-1">
+                El parqueadero está LLENO ({stats.ocupados}/{stats.total}). No se permiten más ingresos
+                hasta que ocurra una salida.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {estadoGlobal === 'DESHABILITADO' && (
+          <div className="rounded-3xl border-2 border-[#FF6B00] bg-[#FF6B00]/5 p-5 flex items-start gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-[#FF6B00] text-white flex items-center justify-center shrink-0">
+              <ShieldAlert size={28} />
+            </div>
+            <div className="flex-1">
+              <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#FF6B00]">Estado administrativo</p>
+              <h2 className="text-2xl font-black text-[#FF6B00] mt-1">Parqueadero deshabilitado</h2>
+              <p className="text-sm font-semibold text-slate-700 mt-1">
+                El parqueadero está fuera de servicio por decisión administrativa.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-12"> {/* Sección A: barra superior de estado (a lo ancho). */}
             <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.08)]"> {/* UI: card premium. */}
               <div className="absolute inset-0 pointer-events-none"> {/* UI: capa de pulso perimetral. */}

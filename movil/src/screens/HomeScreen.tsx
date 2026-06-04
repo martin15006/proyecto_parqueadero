@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -6,16 +6,19 @@ import {
   Easing,
   LayoutAnimation,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Barcode from 'react-native-barcode-qr-generator';
 import QRCode from 'react-native-qrcode-svg';
 import AvatarIniciales from '../components/AvatarIniciales';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiRequest } from '../services/api';
 import { notificacionService } from '../services/notificacionService';
 
@@ -55,10 +58,24 @@ const COLORS = { // UI: paleta oficial SENA exigida por requerimiento.
   sombra: 'rgba(15, 23, 42, 0.14)', // UI: sombra suave para iOS.
 }; // UI: constantes centralizadas para consistencia visual.
 
-export default function HomeScreen({ navigation }: { navigation: any }) { // UX: navegación del Drawer sin romper integración existente.
-  const { usuario } = useAuth(); // RF7: obtiene perfil autenticado del aprendiz desde contexto de sesión.
+export default function HomeScreen({ navigation }: { navigation: any }) {
+  const { usuario } = useAuth();
+  const { esOscuro } = useTheme();
 
   const esAprendiz = Number(usuario?.idTipoUsr ?? 0) === 1;
+
+  // Paleta dinámica según tema
+  const T = useMemo(() => ({
+    fondo: esOscuro ? '#0B1410' : COLORS.fondoBase,
+    superficie: esOscuro ? '#16221C' : COLORS.blanco,
+    superficieAlt: esOscuro ? '#1F2D26' : '#F8FAFC',
+    textoPrimario: esOscuro ? '#F0F4F1' : COLORS.texto,
+    textoSecundario: esOscuro ? 'rgba(240,244,241,0.72)' : COLORS.textoSuave,
+    textoTenue: esOscuro ? 'rgba(240,244,241,0.55)' : '#64748B',
+    borde: esOscuro ? 'rgba(255,255,255,0.08)' : COLORS.borde,
+    headerBg: esOscuro ? '#0F1F1A' : COLORS.verdeOscuro,
+    badgeBg: esOscuro ? 'rgba(95,217,36,0.16)' : 'rgba(255,255,255,0.14)',
+  }), [esOscuro]);
 
   const [modoVisualizacion, setModoVisualizacion] = useState<ModoVisualizacion>('BARRAS'); // RF8: inicia en BARRAS por hardware actual de portería.
   const [codigoAcceso, setCodigoAcceso] = useState<string>(''); // RF8/RNF2: token opaco (alfanumérico) para render Code128.
@@ -119,97 +136,107 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
     ).start(); // UX: inicia al montar.
   }, [animPulse]); // UX: depende de la referencia animada.
 
-  useEffect(() => { // RF8/RF16/RF25: carga inicial de datos críticos para Home.
-    let activo = true; // UX: evita setState si el usuario navega fuera antes de completar promesas.
+  // Refresco unificado: estado del parqueadero + notificaciones
+  // (sin mover el QR, que se carga solo una vez para no romper el preview).
+  const cargarLiveData = useCallback(async (mostrarSpinner = false) => {
+    if (!usuario) return;
+    if (mostrarSpinner) setCargando(true);
 
-    const normalizeTokenRaw = (value: string) =>
-      String(value ?? '').trim();
+    const estadoPromise = esAprendiz
+      ? apiRequest<{ indicadorGlobal: string; espaciosDisponibles: number }>('/bahias/estado-aprendiz', { conAuth: true })
+      : apiRequest<{ estadoParqueadero: string; disponibles: number }>('/bahias/ocupacion', { conAuth: true });
 
+    const bandejaPromise = esAprendiz
+      ? apiRequest<NotificacionUsuario[]>('/notificaciones/mias', { conAuth: true })
+      : Promise.resolve<NotificacionUsuario[]>([]);
+
+    const [estadoResult, bandejaResult] = await Promise.allSettled([estadoPromise, bandejaPromise]);
+
+    if (estadoResult.status === 'fulfilled') {
+      const indicador = String(
+        esAprendiz
+          ? (estadoResult.value as any)?.indicadorGlobal
+          : (estadoResult.value as any)?.estadoParqueadero,
+      ).toUpperCase().trim() || 'SIN_DATOS';
+      const indicadorGlobal: IndicadorGlobal =
+        indicador === 'DISPONIBLE' ? 'DISPONIBLE'
+          : indicador === 'LLENO' ? 'LLENO'
+          : indicador === 'DESHABILITADO' ? 'DESHABILITADO'
+          : 'SIN_DATOS';
+
+      setEstado({
+        indicadorGlobal,
+        espaciosDisponibles: Number(
+          esAprendiz
+            ? (estadoResult.value as any)?.espaciosDisponibles
+            : (estadoResult.value as any)?.disponibles,
+        ) || 0,
+      });
+    }
+
+    if (bandejaResult.status === 'fulfilled') {
+      setNotificaciones(Array.isArray(bandejaResult.value) ? bandejaResult.value : []);
+    }
+
+    if (mostrarSpinner) setCargando(false);
+  }, [usuario, esAprendiz]);
+
+  // Carga inicial: QR (1 vez) + datos en vivo
+  useEffect(() => {
+    let activo = true;
+    const normalizeTokenRaw = (value: string) => String(value ?? '').trim();
     const toBarcodeToken = (value: string) =>
-      String(value ?? '')
-        .trim()
-        .replace(/[^0-9a-zA-Z]/g, '')
-        .toUpperCase();
+      String(value ?? '').trim().replace(/[^0-9a-zA-Z]/g, '').toUpperCase();
 
-    (async () => { // UX: IIFE async para poder usar await.
-      try { // UX: bloque de carga con finally para apagar spinner.
-        if (!usuario) return; // UX: si no hay sesión, no hacemos llamadas con auth.
-
-        setCargando(true); // UX: activa skeleton/spinner para evitar UI inconsistente.
-
+    (async () => {
+      if (!usuario) return;
+      setCargando(true);
+      try {
         if (esAprendiz) {
           let codigo: CodigoAccesoResponse | null = null;
           try {
             codigo = await apiRequest<CodigoAccesoResponse>('/usuarios/codigo-acceso', { conAuth: true });
-          } catch {
-            codigo = null;
-          }
-
+          } catch { codigo = null; }
           if (!activo) return;
-
           const tokenRaw = codigo?.tokenAccesoVehicular
             ? normalizeTokenRaw(codigo.tokenAccesoVehicular)
             : normalizeTokenRaw(usuario.qr ?? '');
-
           setCodigoAccesoQr(tokenRaw);
           setCodigoAcceso(toBarcodeToken(tokenRaw));
         } else {
           setCodigoAccesoQr('');
           setCodigoAcceso('');
         }
+        await cargarLiveData(false);
+      } finally {
+        if (activo) setCargando(false);
+      }
+    })();
 
-        const estadoPromise = esAprendiz
-          ? apiRequest<{ indicadorGlobal: string; espaciosDisponibles: number }>('/bahias/estado-aprendiz', { conAuth: true })
-          : apiRequest<{ estadoParqueadero: string; disponibles: number }>('/bahias/ocupacion', { conAuth: true });
+    return () => { activo = false; };
+  }, [usuario, esAprendiz, cargarLiveData]);
 
-        const bandejaPromise = esAprendiz
-          ? apiRequest<NotificacionUsuario[]>('/notificaciones/mias', { conAuth: true })
-          : Promise.resolve<NotificacionUsuario[]>([]);
+  // 🔴 Refresco en TIEMPO REAL mientras la pantalla está visible.
+  // Polling cada 10s + refresco al recibir foco.
+  useFocusEffect(
+    useCallback(() => {
+      // Refresco inmediato al entrar a Mi Perfil
+      cargarLiveData(false);
 
-        const [estadoResult, bandejaResult] = await Promise.allSettled([
-          estadoPromise,
-          bandejaPromise,
-        ]);
+      const intervalId = setInterval(() => {
+        cargarLiveData(false);
+      }, 10000); // cada 10 segundos
 
-        if (!activo) return;
+      return () => clearInterval(intervalId);
+    }, [cargarLiveData]),
+  );
 
-        if (estadoResult.status === 'fulfilled') {
-          const indicador = String(
-            esAprendiz
-              ? (estadoResult.value as any)?.indicadorGlobal
-              : (estadoResult.value as any)?.estadoParqueadero,
-          )
-            .toUpperCase()
-            .trim() || 'SIN_DATOS';
-          const indicadorGlobal: IndicadorGlobal =
-            indicador === 'DISPONIBLE'
-              ? 'DISPONIBLE'
-              : indicador === 'LLENO'
-                ? 'LLENO'
-                : indicador === 'DESHABILITADO'
-                  ? 'DESHABILITADO'
-                  : 'SIN_DATOS';
-
-          setEstado({
-            indicadorGlobal,
-            espaciosDisponibles: Number(
-              esAprendiz
-                ? (estadoResult.value as any)?.espaciosDisponibles
-                : (estadoResult.value as any)?.disponibles,
-            ) || 0,
-          });
-        }
-
-        if (bandejaResult.status === 'fulfilled') {
-          setNotificaciones(Array.isArray(bandejaResult.value) ? bandejaResult.value : []);
-        }
-      } finally { // UX: garantiza apagar loading incluso si falla algún request.
-        if (activo) setCargando(false); // UX: desactiva spinner solo si sigue montado.
-      } // UX: fin finally.
-    })(); // UX: ejecuta IIFE.
-
-    return () => { activo = false; }; // UX: cleanup para evitar setState tardío.
-  }, [usuario]); // RF7: recarga si cambia la sesión/usuario.
+  const [refrescando, setRefrescando] = useState(false);
+  const onPullToRefresh = useCallback(async () => {
+    setRefrescando(true);
+    await cargarLiveData(false);
+    setRefrescando(false);
+  }, [cargarLiveData]);
 
   useEffect(() => { // RF8: animación suave al alternar entre BARRAS y QR.
     Animated.sequence([ // UX: fade-out + fade-in para transición sin saltos.
@@ -262,12 +289,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
     if (t.includes('SOLICITUD_VEHICULO')) return '📋';
     if (t.includes('COMPARTIDO_VEHICULO_ELIMINADO')) return '🗑️';
     if (t.includes('COMPARTIDO_REVOCADO')) return '🔒';
+    if (t.includes('COMPARTIDO_RENUNCIADO')) return '👋';
     if (t.includes('COMPARTIDO_ACEPTADO')) return '🤝';
     if (t.includes('COMPARTIDO_RECHAZADO')) return '✖️';
     if (t.includes('COMPARTIDO')) return '🤝';
     if (t.includes('VEHICULO_REGISTRADO_POR_ADMIN')) return '🚗';
     if (t.includes('VEHICULO_EDITADO_POR_ADMIN')) return '✏️';
     if (t.includes('VEHICULO_ELIMINADO_POR_ADMIN')) return '🗑️';
+    if (t.includes('PARQUEADERO_LLENO')) return '🚫';
+    if (t.includes('PARQUEADERO_UMBRAL_80')) return '⚠️';
     return '🔔'; // RF25: icono general de notificación.
   }; // RF25: fin iconoNotificacion.
 
@@ -287,9 +317,20 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
   const pulseOpacity = animPulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }); // UX: opacidad pulsante sutil.
 
   return (
-    <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+    <View style={[styles.screen, { backgroundColor: T.fondo }]}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refrescando}
+            onRefresh={onPullToRefresh}
+            colors={[COLORS.verdeActivo]}
+            tintColor={COLORS.verdeActivo}
+          />
+        }
+      >
+        <View style={[styles.header, { backgroundColor: T.headerBg }]}>
           <TouchableOpacity style={styles.menuButton} onPress={() => navigation?.openDrawer?.()}>
             <Text style={styles.menuButtonText}>≡</Text>
           </TouchableOpacity>
@@ -320,7 +361,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
           </View>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: T.superficie, borderColor: T.borde }]}>
           <View style={[styles.capacidadBanner, { backgroundColor: colorEstado }]}>
             <Text style={styles.capacidadTitulo}>ESTADO PARQUEADERO SENA</Text>
             <View style={styles.capacidadRow}>
@@ -334,17 +375,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
           {cargando ? (
             <View style={styles.loadingRow}>
               <ActivityIndicator color={COLORS.verdeActivo} />
-              <Text style={styles.loadingText}>Sincronizando datos institucionales...</Text>
+              <Text style={[styles.loadingText, { color: T.textoSecundario }]}>Sincronizando datos institucionales...</Text>
             </View>
           ) : null}
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: T.superficie, borderColor: T.borde }]}>
           <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>CREDENCIAL VEHICULAR</Text>
+            <Text style={[styles.cardTitle, { color: esOscuro ? '#7FE34F' : COLORS.verdeOscuro }]}>CREDENCIAL VEHICULAR</Text>
             <View style={styles.syncRow}>
               <View style={[styles.syncDot, { backgroundColor: sincronizado ? COLORS.verdeActivo : COLORS.alertaOcupacion }]} />
-              <Text style={styles.syncText}>{sincronizado ? 'Lector de Portería Sincronizado' : 'Sincronizando...'}</Text>
+              <Text style={[styles.syncText, { color: T.textoSecundario }]}>{sincronizado ? 'Lector de Portería Sincronizado' : 'Sincronizando...'}</Text>
             </View>
           </View>
 
@@ -354,7 +395,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
                 {cargando ? (
                   <ActivityIndicator color={COLORS.verdeActivo} />
                 ) : !esAprendiz ? (
-                  <Text style={styles.codeUnavailable}>Disponible solo para Aprendiz</Text>
+                  <Text style={[styles.codeUnavailable, { color: T.textoSecundario }]}>Disponible solo para Aprendiz</Text>
                 ) : tieneCodigoAcceso ? (
                   modoVisualizacion === 'BARRAS' ? ( // RF8: modo actual (hardware real).
                     <Barcode
@@ -374,12 +415,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
                     />
                   )
                 ) : (
-                  <Text style={styles.codeUnavailable}>Código no disponible</Text>
+                  <Text style={[styles.codeUnavailable, { color: T.textoSecundario }]}>Código no disponible</Text>
                 )}
               </Animated.View>
             </View>
 
-            <Text style={styles.credencialHint}>Presenta este código en la portería vehicular</Text>
+            <Text style={[styles.credencialHint, { color: T.textoSecundario }]}>Presenta este código en la portería vehicular</Text>
 
             <TouchableOpacity style={styles.toggleButton} onPress={toggleModo} disabled={!tieneCodigoAcceso}>
               <Text style={styles.toggleButtonText}>
@@ -389,31 +430,51 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
           </View>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: T.superficie, borderColor: T.borde }]}>
           <TouchableOpacity style={styles.bandejaHeader} onPress={toggleBandeja} activeOpacity={0.85}>
-            <Text style={styles.cardTitle}>NOTIFICACIONES</Text>
-            <Text style={styles.bandejaToggle}>{bandejaAbierta ? 'OCULTAR' : 'MOSTRAR'}</Text>
+            <Text style={[styles.cardTitle, { color: esOscuro ? '#7FE34F' : COLORS.verdeOscuro }]}>NOTIFICACIONES</Text>
+            <Text style={[styles.bandejaToggle, { color: esOscuro ? '#7FE34F' : COLORS.verdeOscuro }]}>
+              {bandejaAbierta ? 'OCULTAR' : 'MOSTRAR'}
+            </Text>
           </TouchableOpacity>
 
           {bandejaAbierta ? (
             <View style={styles.bandejaBody}>
-              {notificaciones.length === 0 ? ( // RF25: estado vacío.
-                <Text style={styles.bandejaEmpty}>No hay notificaciones institucionales registradas.</Text>
-              ) : ( // RF25: lista de tarjetas.
+              {notificaciones.length === 0 ? (
+                <Text style={[styles.bandejaEmpty, { color: T.textoSecundario }]}>
+                  No hay notificaciones institucionales registradas.
+                </Text>
+              ) : (
                 <View style={styles.bandejaList}>
-                  {(verTodasNotif ? notificaciones : notificaciones.slice(0, 2)).map((n) => ( // RF25: por defecto solo 2; opcional ver todas.
-                    <View key={n.id} style={[styles.notifCard, { borderLeftColor: colorNotificacion(n.tipo) }]}>
+                  {(verTodasNotif ? notificaciones : notificaciones.slice(0, 2)).map((n) => (
+                    <View
+                      key={n.id}
+                      style={[
+                        styles.notifCard,
+                        {
+                          backgroundColor: T.superficieAlt,
+                          borderColor: T.borde,
+                          borderLeftColor: colorNotificacion(n.tipo),
+                        },
+                      ]}
+                    >
                       <View style={[styles.notifIcon, { backgroundColor: colorNotificacion(n.tipo) }]}>
                         <Text style={styles.notifIconText}>{iconoNotificacion(n.tipo)}</Text>
                       </View>
 
                       <View style={styles.notifContent}>
-                        <Text style={styles.notifTitle} numberOfLines={2}>{String(n?.titulo ?? '')}</Text>
-                        <Text style={styles.notifMessage} numberOfLines={4}>{String(n?.mensaje ?? '')}</Text>
+                        <Text style={[styles.notifTitle, { color: T.textoPrimario }]} numberOfLines={2}>
+                          {String(n?.titulo ?? '')}
+                        </Text>
+                        <Text style={[styles.notifMessage, { color: T.textoSecundario }]} numberOfLines={4}>
+                          {String(n?.mensaje ?? '')}
+                        </Text>
                         <View style={styles.notifMetaRow}>
-                          <Text style={styles.notifMetaText}>{formatFecha(String(n?.createdAt ?? ''))}</Text>
-                          <Text style={styles.notifMetaDot}>•</Text>
-                          <Text style={styles.notifMetaText}>
+                          <Text style={[styles.notifMetaText, { color: T.textoTenue }]}>
+                            {formatFecha(String(n?.createdAt ?? ''))}
+                          </Text>
+                          <Text style={[styles.notifMetaDot, { color: T.textoTenue }]}>•</Text>
+                          <Text style={[styles.notifMetaText, { color: T.textoTenue }]}>
                             {n?.actorNombre ? `Firmado: ${String(n.actorNombre)}` : 'Firmado: Sistema'}
                           </Text>
                         </View>
@@ -438,12 +499,18 @@ export default function HomeScreen({ navigation }: { navigation: any }) { // UX:
                         setVerTodasNotif((v) => !v);
                       }}
                     >
-                      <Text style={styles.verMasTexto}>
+                      <Text style={[styles.verMasTexto, { color: esOscuro ? '#7FE34F' : COLORS.verdeOscuro }]}>
                         {verTodasNotif
                           ? `Mostrar solo las últimas 2`
                           : `Ver todas (${notificaciones.length})`}
                       </Text>
-                      <Text style={[styles.verMasFlecha, verTodasNotif && styles.verMasFlechaUp]}>
+                      <Text
+                        style={[
+                          styles.verMasFlecha,
+                          { color: esOscuro ? '#7FE34F' : COLORS.verdeOscuro },
+                          verTodasNotif && styles.verMasFlechaUp,
+                        ]}
+                      >
                         ⌄
                       </Text>
                     </TouchableOpacity>

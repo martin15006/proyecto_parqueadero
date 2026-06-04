@@ -50,17 +50,14 @@ export class DashboardService {
       totalUsuarios,
       totalVehiculos,
       estadoGlobal,
-      metricas,
       ingresosHoy,
       ingresosMes,
       alertasRaw,
     ] = await Promise.all([
       this.usuarioRepository.count(),
       this.vehiculoRepository.count(),
-      // Estado administrativo: parqueaderoDeshabilitado + estadoParqueadero
+      // Conteo por movimientos (QR escaneados activos), única fuente de verdad para ocupación.
       this.bahiasService.obtenerOcupacion(),
-      // Conteos basados en el estado físico de los sensores activos
-      this.bahiasService.obtenerMetricasSensorizadas(),
       this.movimientoRepository
         .createQueryBuilder('m')
         .where('m.hora_ingreso >= :hoy', { hoy })
@@ -75,20 +72,24 @@ export class DashboardService {
       ),
     ]);
 
+    const total = estadoGlobal.total ?? 0;
+    const ocupados = estadoGlobal.ocupados ?? 0;
+    const disponibles = Math.max(total - ocupados, 0);
+    const porcentajeOcupacion = total > 0 ? Math.round((ocupados / total) * 1000) / 10 : 0;
+
     return {
       totalUsuarios,
       totalVehiculos,
       parqueaderoDeshabilitado: estadoGlobal.parqueaderoDeshabilitado,
       estadoParqueadero: estadoGlobal.estadoParqueadero,
       ocupacion: {
-        /** Bahías con sensor activo (fuente de verdad física). */
-        total: metricas.totalBahias,
-        /** Bahías en estado OCUPADO o DISCREPANCIA. */
-        ocupados: metricas.bahiasOcupadas,
-        /** Bahías en estado LIBRE o TRANSITO. */
-        disponibles: metricas.bahiasDisponibles,
-        /** (ocupados / total) × 100, 1 decimal. */
-        porcentajeOcupacion: metricas.porcentajeOcupacion,
+        /** Total de bahías registradas (cupo máximo). */
+        total,
+        /** QRs escaneados activos (vehículos adentro). */
+        ocupados,
+        /** total - ocupados (mínimo 0). */
+        disponibles,
+        porcentajeOcupacion,
       },
       ingresosHoy,
       ingresosMes,
@@ -97,20 +98,11 @@ export class DashboardService {
   }
 
   /**
-   * Genera datos para el mapa de calor basado en la frecuencia histórica de uso de las bahías.
+   * Mapa de calor deshabilitado tras quitar la relación movimiento ↔ bahía.
+   * Se conserva el método para no romper el contrato del controller; devuelve vacío.
    */
   async obtenerMapaCalor() {
-    const heatmap = await this.movimientoRepository
-      .createQueryBuilder('movimiento')
-      .select('movimiento.id_bahia', 'idBahia')
-      .addSelect('COUNT(*)', 'intensidad')
-      .groupBy('movimiento.id_bahia')
-      .getRawMany();
-
-    return heatmap.map(h => ({
-      idBahia: parseInt(h.idBahia, 10),
-      intensidad: parseInt(h.intensidad, 10),
-    }));
+    return [];
   }
 
   /**
@@ -177,7 +169,7 @@ export class DashboardService {
   async obtenerHistorial(page: number = 1, limit: number = 20) {
     // PAGINATION: Búsqueda paginada de movimientos históricos
     const [data, total] = await this.movimientoRepository.findAndCount({
-      relations: ['registroVehiculo', 'registroVehiculo.vehiculo', 'registroVehiculo.usuario', 'bahia'],
+      relations: ['registroVehiculo', 'registroVehiculo.vehiculo', 'registroVehiculo.usuario'],
       order: { horaIngreso: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -196,7 +188,7 @@ export class DashboardService {
    */
   async exportarExcel(res: Response, user: any) {
     const movimientos = await this.movimientoRepository.find({
-      relations: ['registroVehiculo', 'registroVehiculo.usuario', 'registroVehiculo.vehiculo', 'bahia'],
+      relations: ['registroVehiculo', 'registroVehiculo.usuario', 'registroVehiculo.vehiculo'],
       order: { horaIngreso: 'DESC' },
     });
 
@@ -208,7 +200,6 @@ export class DashboardService {
       { header: 'ID MOV', key: 'id', width: 10 },
       { header: 'PLACA', key: 'placa', width: 15 },
       { header: 'USUARIO', key: 'usuario', width: 35 },
-      { header: 'BAHÍA', key: 'bahia', width: 15 },
       { header: 'FECHA INGRESO', key: 'ingreso', width: 25 },
       { header: 'FECHA SALIDA', key: 'salida', width: 25 },
       { header: 'ESTADO ACTUAL', key: 'estado', width: 15 },
@@ -219,7 +210,6 @@ export class DashboardService {
         id: m.idMovimiento,
         placa: m.registroVehiculo.vehiculo.placa,
         usuario: m.registroVehiculo.usuario.nombreCompleto,
-        bahia: m.bahia?.nombreBahia ?? 'N/A',
         ingreso: m.horaIngreso,
         salida: m.horaSalida || 'N/A',
         estado: m.estado,
@@ -247,7 +237,7 @@ export class DashboardService {
    */
   async exportarPDF(res: Response, user: any) {
     const movimientos = await this.movimientoRepository.find({
-      relations: ['registroVehiculo', 'registroVehiculo.usuario', 'registroVehiculo.vehiculo', 'bahia'],
+      relations: ['registroVehiculo', 'registroVehiculo.usuario', 'registroVehiculo.vehiculo'],
       order: { horaIngreso: 'DESC' },
     });
 
@@ -265,7 +255,7 @@ export class DashboardService {
     // Listado de movimientos
     movimientos.forEach((m, index) => {
       doc.fontSize(11).fillColor('#2c3e50').text(`${index + 1}. ${m.registroVehiculo.vehiculo.placa} - ${m.registroVehiculo.usuario.nombreCompleto}`);
-      doc.fontSize(9).fillColor('#7f8c8d').text(`   Ubicación: ${m.bahia?.nombreBahia ?? 'N/A'} | Ingreso: ${m.horaIngreso.toLocaleString()} | Estado: ${m.estado}`);
+      doc.fontSize(9).fillColor('#7f8c8d').text(`   Ingreso: ${m.horaIngreso.toLocaleString()} | Estado: ${m.estado}`);
       doc.moveDown(0.5);
     });
 

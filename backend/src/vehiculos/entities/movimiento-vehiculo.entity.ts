@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, Index } from 'typeorm';
 import { RegistroVehiculo } from './registro-vehiculo.entity';
-import { Bahia } from '../../bahias/entities/bahia.entity';
+import { Usuario } from '../../usuarios/entities/usuario.entity';
 
 export enum EstadoMovimiento {
   TRANSITO = 'TRANSITO',
@@ -10,34 +10,23 @@ export enum EstadoMovimiento {
 }
 
 @Entity({ name: 'movimiento_vehiculo' })
-@Index(['estado', 'idBahia']) // PERFORMANCE: Índice compuesto para búsquedas de ocupación en tiempo real
 export class MovimientoVehiculo {
   @PrimaryGeneratedColumn()
   idMovimiento: number;
 
-  @Index() // PERFORMANCE: Acelera reportes históricos por fecha de ingreso
+  @Index() // Acelera reportes históricos por fecha de ingreso
   @Column({ type: 'timestamp' })
   horaIngreso: Date;
 
-  @Index() // PERFORMANCE: Acelera reportes históricos por fecha de salida
+  @Index() // Acelera reportes históricos por fecha de salida
   @Column({ type: 'timestamp', nullable: true })
   horaSalida: Date | null;
 
-  @Index() // PERFORMANCE: Optimiza búsquedas de historial por vehículo
+  @Index() // Optimiza búsquedas de historial por vehículo
   @Column({ type: 'int' })
   idRegistroVehiculo: number;
 
-  /**
-   * Bahía asignada al movimiento.
-   * Es `null` mientras el vehículo está en tránsito de ingreso (QR escaneado,
-   * sensor aún no ha detectado presencia física). El `SerialBridgeService` es
-   * el único responsable de asignar este valor al disparar `OCCUPIED`.
-   */
-  @Index()
-  @Column({ type: 'smallint', nullable: true })
-  idBahia: number | null;
-
-  @Index() // PERFORMANCE: Filtrado rápido por estado (ADENTRO/SALIDA)
+  @Index() // Filtrado rápido por estado (ADENTRO/SALIDA)
   @Column({
     type: 'enum',
     enum: EstadoMovimiento,
@@ -47,14 +36,25 @@ export class MovimientoVehiculo {
   @Column({ default: false })
   esManual: boolean;
 
-  // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
+  /**
+   * Documento del usuario que efectivamente realizó el ingreso al escanear el QR.
+   * Puede ser:
+   *  - el propietario del vehículo, o
+   *  - un usuario al que se le compartió el vehículo (ACEPTADO).
+   *
+   * Solo este mismo usuario podrá registrar la salida.
+   */
+  @Index()
+  @Column({ name: 'documento_ingreso', type: 'varchar', length: 10, nullable: true })
+  documentoIngreso: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
-  @Index() // PERFORMANCE: Optimiza consultas que excluyen registros eliminados (soft delete)
+  @Index() // Optimiza consultas que excluyen registros eliminados (soft delete)
   @DeleteDateColumn({ type: 'timestamptz', nullable: true })
   deletedAt: Date;
 
@@ -62,7 +62,12 @@ export class MovimientoVehiculo {
   @JoinColumn({ name: 'id_registro_vehiculo' })
   registroVehiculo: RegistroVehiculo;
 
-  @ManyToOne(() => Bahia, (bahia) => bahia.movimientos, { nullable: true })
-  @JoinColumn({ name: 'id_bahia' })
-  bahia: Bahia | null;
+  /**
+   * Relación con el usuario que ejecutó el ingreso (puede ser dueño o receptor de compartido).
+   * onDelete SET NULL: si se elimina el usuario, el movimiento se conserva pero pierde el vínculo
+   * (preserva el historial para auditoría).
+   */
+  @ManyToOne(() => Usuario, { nullable: true, onDelete: 'SET NULL', onUpdate: 'CASCADE' })
+  @JoinColumn({ name: 'documento_ingreso' })
+  usuarioIngreso: Usuario | null;
 }

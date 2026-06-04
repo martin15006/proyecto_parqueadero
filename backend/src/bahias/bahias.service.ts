@@ -143,13 +143,12 @@ export class BahiasService implements OnModuleInit {
       .update(MovimientoVehiculo)
       .set({ estado: EstadoMovimiento.ANULADO, horaSalida: new Date() })
       .where('estado = :estado', { estado: EstadoMovimiento.ADENTRO })
-      .andWhere('id_bahia IS NULL')
       .andWhere('hora_ingreso < :umbral', { umbral })
       .execute();
 
     if (result.affected && result.affected > 0) {
       this.logger.warn(
-        `[Startup] ${result.affected} movimiento(s) ADENTRO sin bahía cerrados automáticamente ` +
+        `[Startup] ${result.affected} movimiento(s) ADENTRO antiguos cerrados automáticamente ` +
         `(> ${umbralHoras} h sin actividad).`,
       );
     }
@@ -220,19 +219,9 @@ export class BahiasService implements OnModuleInit {
       order: { idBahia: 'ASC' },
     });
 
-    const movimientosActivos = await this.movimientoRepository.find({
-      where: [
-        { idBahia: In(idsBahias), estado: EstadoMovimiento.ADENTRO },
-        { idBahia: In(idsBahias), estado: EstadoMovimiento.TRANSITO },
-      ],
-      relations: ['registroVehiculo', 'registroVehiculo.vehiculo'],
-    });
-
     return bahias.map((b) => {
       const sensor = sensores.find((s) => s.idBahia === b.idBahia)!;
-      const movimiento = movimientosActivos.find((m) => m.idBahia === b.idBahia);
-
-      const estadoPanel = this.derivarEstadoPanel(b.estadoReconciliado, movimiento);
+      const estadoPanel = this.derivarEstadoPanel(b.estadoReconciliado);
 
       return {
         idBahia: b.idBahia,
@@ -241,17 +230,16 @@ export class BahiasService implements OnModuleInit {
         estadoReconciliado: b.estadoReconciliado,
         estadoSensor: sensor.estadoActual,
         estadoPanel,
-        placa: movimiento?.registroVehiculo?.vehiculo?.placa ?? null,
-        estadoMovimiento: movimiento?.estado ?? null,
+        placa: null,
+        estadoMovimiento: null,
         ultimaTelemetriaAt: b.ultimaTelemetriaAt,
       };
     });
   }
 
-  /** Mapea estado físico + movimiento al valor visual que consume el frontend. */
+  /** Mapea estado físico al valor visual que consume el frontend. */
   private derivarEstadoPanel(
     estadoReconciliado: BahiaReconciliacionEstadoEnum,
-    movimiento: MovimientoVehiculo | undefined,
   ): EstadoPanelEnum {
     switch (estadoReconciliado) {
       case BahiaReconciliacionEstadoEnum.OCUPADO:
@@ -263,11 +251,6 @@ export class BahiasService implements OnModuleInit {
       case BahiaReconciliacionEstadoEnum.DESHABILITADO:
         return EstadoPanelEnum.DESHABILITADO;
       case BahiaReconciliacionEstadoEnum.LIBRE:
-        // Bahía libre físicamente pero con movimiento en tránsito de salida.
-        if (movimiento?.estado === EstadoMovimiento.TRANSITO && movimiento.idBahia != null) {
-          return EstadoPanelEnum.SALIDA_PENDIENTE;
-        }
-        return EstadoPanelEnum.LIBRE;
       default:
         return EstadoPanelEnum.LIBRE;
     }
@@ -287,27 +270,68 @@ export class BahiasService implements OnModuleInit {
 
   /**
    * Calcula el estado de ocupación global del parqueadero.
-   * Utilizado para dashboards y sincronización realtime.
+   *
+   * Reglas:
+   *  - `total`     = bahías físicas (con sensor activo). Cupo máximo real.
+   *  - `ocupados`  = cantidad de QRs escaneados ACTIVOS (movimientos
+   *                  con estado ADENTRO o TRANSITO).
+   *                  Al escanear QR de entrada se crea un movimiento → sube.
+   *                  Al escanear QR de salida se cierra el movimiento → baja.
+   *  - `disponibles` = total - ocupados (mínimo 0).
+   *  - `LLENO`     = ocupados >= total.
+   *
+   * Nota: los sensores físicos NO afectan el contador de ocupados;
+   *       solo se usan para el mapa visual y para definir el total real.
    */
   async obtenerOcupacion(): Promise<IOcupacionPayload> {
     const parqueadero = await this.getOrCreateParqueaderoEstado();
-    const bahias = await this.bahiaRepository.find({
-      relations: ['tipoBahia'],
+
+    // Total = solo bahías con sensor activo (cupo físico real).
+    const sensoresActivos = await this.bahiaRepository.manager.find(Sensor, {
+      where: { activo: true },
     });
-    
-    // Obtenemos movimientos activos para cruzar con la infraestructura
+    const idsSensorizados = sensoresActivos.map((s) => s.idBahia);
+
+    const bahias = idsSensorizados.length > 0
+      ? await this.bahiaRepository.find({
+          where: { idBahia: In(idsSensorizados) },
+          relations: ['tipoBahia'],
+        })
+      : [];
+
+    // Movimientos activos = QRs escaneados que aún no han salido.
     const movimientosActivos = await this.movimientoRepository.find({
       where: { estado: In([EstadoMovimiento.TRANSITO, EstadoMovimiento.ADENTRO]) },
       relations: ['registroVehiculo', 'registroVehiculo.vehiculo'],
     });
 
-    const total = bahias.length;
-    const ocupados = movimientosActivos.length;
     const parqueaderoDeshabilitado = Boolean(parqueadero.deshabilitado);
-    const disponibles = total - ocupados;
+
+    const total = bahias.length; // bahías sensorizadas (físicas)
+    const ocupados = movimientosActivos.length; // QRs activos
+    const disponibles = Math.max(total - ocupados, 0);
+
     const estadoParqueadero: IOcupacionPayload['estadoParqueadero'] = parqueaderoDeshabilitado
       ? 'DESHABILITADO'
-      : (disponibles <= 0 ? 'LLENO' : 'DISPONIBLE');
+      : (total > 0 && ocupados >= total ? 'LLENO' : 'DISPONIBLE');
+
+    const bahiasConEstado = bahias.map((b) => {
+      const estadoManual = b.estadoManual ?? null;
+      const estadoReconciliado = b.estadoReconciliado ?? BahiaReconciliacionEstadoEnum.LIBRE;
+
+      const estadoFinal = parqueaderoDeshabilitado
+        ? IotStatusEnum.DISABLED
+        : (estadoManual === IotStatusEnum.AVAILABLE || estadoManual === IotStatusEnum.OCCUPIED || estadoManual === IotStatusEnum.DISABLED)
+          ? estadoManual
+          : this.mapReconciliacionToSocketEstado(estadoReconciliado) ?? IotStatusEnum.AVAILABLE;
+
+      return {
+        idBahia: b.idBahia,
+        nombreBahia: b.nombreBahia,
+        estado: estadoFinal,
+        tipo: b.tipoBahia?.tipoBahia || 'Estándar',
+      };
+    });
 
     return {
       total,
@@ -315,52 +339,20 @@ export class BahiasService implements OnModuleInit {
       disponibles,
       parqueaderoDeshabilitado,
       estadoParqueadero,
-      bahias: bahias.map(b => {
-        const movimiento = movimientosActivos.find(m => m.idBahia === b.idBahia);
-        
-        const estadoAuto = !!movimiento ? IotStatusEnum.OCCUPIED : IotStatusEnum.AVAILABLE;
-        const estadoManual = b.estadoManual ?? null;
-        const estadoReconciliado = b.estadoReconciliado ?? BahiaReconciliacionEstadoEnum.LIBRE;
-
-        const estadoFinal = parqueaderoDeshabilitado
-          ? IotStatusEnum.DISABLED
-          : (estadoManual === IotStatusEnum.AVAILABLE || estadoManual === IotStatusEnum.OCCUPIED || estadoManual === IotStatusEnum.DISABLED)
-            ? estadoManual
-            : this.mapReconciliacionToSocketEstado(estadoReconciliado) ?? estadoAuto;
-
-        return {
-          idBahia: b.idBahia,
-          nombreBahia: b.nombreBahia,
-          estado: estadoFinal,
-          tipo: b.tipoBahia?.tipoBahia || 'Estándar',
-        };
-      }),
+      bahias: bahiasConEstado,
     };
   }
 
   async obtenerConteoGlobal() {
-    const parqueadero = await this.getOrCreateParqueaderoEstado();
-    const total = await this.bahiaRepository.count({
-      where: { deletedAt: IsNull() },
-    });
-
-    const ocupados = await this.movimientoRepository.count({
-      where: { estado: In([EstadoMovimiento.TRANSITO, EstadoMovimiento.ADENTRO]) },
-    });
-
-    const parqueaderoDeshabilitado = Boolean(parqueadero.deshabilitado);
-    const disponibles = Math.max(total - ocupados, 0);
-
-    const estadoParqueadero: 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO' = parqueaderoDeshabilitado
-      ? 'DESHABILITADO'
-      : (disponibles <= 0 ? 'LLENO' : 'DISPONIBLE');
-
+    // Reutilizamos obtenerOcupacion() para mantener una única fuente de verdad:
+    // ocupados = bahías físicamente ocupadas (sensores), no QRs escaneados.
+    const ocupacion = await this.obtenerOcupacion();
     return {
-      total,
-      ocupados,
-      disponibles,
-      parqueaderoDeshabilitado,
-      estadoParqueadero,
+      total: ocupacion.total,
+      ocupados: ocupacion.ocupados,
+      disponibles: ocupacion.disponibles,
+      parqueaderoDeshabilitado: ocupacion.parqueaderoDeshabilitado,
+      estadoParqueadero: ocupacion.estadoParqueadero,
     };
   }
 
@@ -467,51 +459,52 @@ export class BahiasService implements OnModuleInit {
       });
     }
 
-    const [metricas, conteo] = await Promise.all([
-      this.obtenerMetricasSensorizadas(),
-      this.obtenerConteoGlobal(),
-    ]);
-    const estadoParqueaderoSocket: 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO' = conteo.parqueaderoDeshabilitado
-      ? 'DESHABILITADO'
-      : metricas.bahiasDisponibles <= 0 && metricas.totalBahias > 0 ? 'LLENO' : 'DISPONIBLE';
+    const conteo = await this.obtenerConteoGlobal();
     this.eventosGateway.emitirConteoGlobalDisponibles({
-      total: metricas.totalBahias,
-      ocupados: metricas.bahiasOcupadas,
-      disponibles: metricas.bahiasDisponibles,
-      estadoParqueadero: estadoParqueaderoSocket,
+      total: conteo.total,
+      ocupados: conteo.ocupados,
+      disponibles: conteo.disponibles,
+      estadoParqueadero: conteo.estadoParqueadero,
       actualizadoEn: new Date(),
     });
 
-    return guardado; // RF14: retorna el estado persistido para confirmación del admin.
+    return guardado;
   }
 
   /**
-   * RF14/RF39: Valida de forma centralizada si se permite un ingreso (operativo o contingencia).
+   * Valida si se permite un ingreso.
    * - Si está DESHABILITADO: se rechaza siempre.
-   * - Si está LLENO: se rechaza hasta que ocurra una salida.
+   * - Si la cantidad de QRs escaneados activos (movimientos ADENTRO/TRANSITO)
+   *   iguala o supera el total de bahías: se rechaza con alerta de "lleno".
    *
-   * RNF2: el mensaje de error es semántico y no incluye PII (no cédula, no tokens).
+   * Esto controla la ocupación por CONTEO DE QR, no por sensores físicos:
+   * cada ingreso suma 1, cada salida resta 1. Cuando llega al 100%, no entra nadie.
    */
   async validarIngresoPermitido() {
-    const estado = await this.getOrCreateParqueaderoEstado(); // RF14: obtenemos bandera institucional antes de permitir ingreso.
+    const estado = await this.getOrCreateParqueaderoEstado();
 
     if (estado.deshabilitado) {
-      const duracionTexto = estado.duracionEstimada ? ` Duración estimada: ${estado.duracionEstimada}.` : ''; // RF14: duración opcional.
-      throw new ForbiddenException({ // RF14: bloqueo fulminante, el operativo no puede evadir la decisión administrativa.
-        message: `Parqueadero deshabilitado. Motivo: ${estado.motivo ?? 'No especificado'}.${duracionTexto}`, // RF14: mensaje semántico para UI.
-        errorCode: 'PARQUEADERO_DESHABILITADO', // RF14: código técnico para frontends.
-      }); // RNF2: no incluye PII; solo razón institucional.
+      const duracionTexto = estado.duracionEstimada ? ` Duración estimada: ${estado.duracionEstimada}.` : '';
+      throw new ForbiddenException({
+        message: `Parqueadero deshabilitado. Motivo: ${estado.motivo ?? 'No especificado'}.${duracionTexto}`,
+        errorCode: 'PARQUEADERO_DESHABILITADO',
+      });
     }
 
-    // RF39: la capacidad se evalúa por estado físico del sensor, no por conteo de movimientos.
-    // Movimientos con idBahia=null (modelo desacoplado) no deben bloquear ingresos cuando
-    // las bahías están físicamente libres.
-    const metricas = await this.obtenerMetricasSensorizadas();
-    if (metricas.totalBahias > 0 && metricas.bahiasDisponibles <= 0) {
-      throw new BadRequestException({ // RF39: bloqueo reactivo cuando el parqueadero está lleno.
-        message: 'Capacidad máxima alcanzada: el parqueadero está lleno.', // RF39: mensaje semántico para UI.
-        errorCode: 'PARQUEADERO_LLENO', // RF39: código técnico para UI.
-      }); // RF39: evita ingresos adicionales hasta que ocurra una salida.
+    // Conteo basado en QRs escaneados activos (movimientos ADENTRO/TRANSITO).
+    // Cada QR de entrada suma 1 al contador, cada QR de salida resta 1.
+    const conteo = await this.obtenerConteoGlobal();
+
+    if (conteo.total > 0 && conteo.ocupados >= conteo.total) {
+      // Disparar alerta de ocupación máxima inmediatamente (antes de rechazar)
+      try {
+        await this.evaluarAlertasOcupacion();
+      } catch (_) { /* no bloquear por fallo en notificación */ }
+
+      throw new BadRequestException({
+        message: 'Capacidad máxima alcanzada: el parqueadero está lleno. No se permiten más ingresos hasta que ocurra una salida.',
+        errorCode: 'PARQUEADERO_LLENO',
+      });
     }
   }
 
@@ -545,18 +538,36 @@ export class BahiasService implements OnModuleInit {
 
     if (nuevoUmbral === 80) {
       this.eventosGateway.emitirAlertaParqueadero({
-        tipo: 'UMBRAL_80', // RF13/RF39: alerta intermedia (>=80%).
-        mensaje: 'Alerta: el parqueadero alcanzó el 80% de ocupación.', // RF13/RF39: mensaje claro para dashboards.
-        fecha: new Date(), // RNF2: timestamp técnico.
+        tipo: 'UMBRAL_80',
+        mensaje: `Alerta: el parqueadero alcanzó el 80% de ocupación (${ocupados}/${total}).`,
+        fecha: new Date(),
       });
-      return; // RF39: finaliza luego de emitir alerta del 80%.
+      // Persistir notificación para los admins
+      try {
+        await this.notificacionesService.notificarAdmins({
+          tipo: 'PARQUEADERO_UMBRAL_80',
+          titulo: 'Parqueadero al 80%',
+          mensaje: `El parqueadero alcanzó el 80% de ocupación (${ocupados}/${total} bahías ocupadas).`,
+          metadata: { ocupados, total, porcentaje: Math.round(porcentaje) },
+        });
+      } catch (_) { /* no bloquear flujo */ }
+      return;
     }
 
+    // 100% → emitir + notificar persistente
     this.eventosGateway.emitirAlertaParqueadero({
-      tipo: 'PARQUEADERO_LLENO', // RF13/RF39: alerta crítica (100%).
-      mensaje: 'Alerta: capacidad máxima alcanzada (100%). El parqueadero está lleno.', // RF13/RF39: mensaje claro para dashboards.
-      fecha: new Date(), // RNF2: timestamp técnico.
+      tipo: 'PARQUEADERO_LLENO',
+      mensaje: `Alerta: capacidad máxima alcanzada (${ocupados}/${total}). El parqueadero está lleno.`,
+      fecha: new Date(),
     });
+    try {
+      await this.notificacionesService.notificarAdmins({
+        tipo: 'PARQUEADERO_LLENO',
+        titulo: 'Parqueadero LLENO',
+        mensaje: `Capacidad máxima alcanzada (${ocupados}/${total} bahías ocupadas). Ya no se permiten más ingresos hasta que ocurra una salida.`,
+        metadata: { ocupados, total, porcentaje: 100 },
+      });
+    } catch (_) { /* no bloquear flujo */ }
   }
 
   private async resetUmbralSiNecesario(estado: ParqueaderoEstado, valor: number) {
@@ -593,18 +604,12 @@ export class BahiasService implements OnModuleInit {
       userAgent: actor.userAgent,
     });
 
-    const [metricasForzar, conteoForzar] = await Promise.all([
-      this.obtenerMetricasSensorizadas(),
-      this.obtenerConteoGlobal(),
-    ]);
-    const estadoForzar: 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO' = conteoForzar.parqueaderoDeshabilitado
-      ? 'DESHABILITADO'
-      : metricasForzar.bahiasDisponibles <= 0 && metricasForzar.totalBahias > 0 ? 'LLENO' : 'DISPONIBLE';
+    const conteoForzar = await this.obtenerConteoGlobal();
     this.eventosGateway.emitirConteoGlobalDisponibles({
-      total: metricasForzar.totalBahias,
-      ocupados: metricasForzar.bahiasOcupadas,
-      disponibles: metricasForzar.bahiasDisponibles,
-      estadoParqueadero: estadoForzar,
+      total: conteoForzar.total,
+      ocupados: conteoForzar.ocupados,
+      disponibles: conteoForzar.disponibles,
+      estadoParqueadero: conteoForzar.estadoParqueadero,
       actualizadoEn: new Date(),
     });
 
@@ -823,18 +828,12 @@ export class BahiasService implements OnModuleInit {
     // conteo porque un cambio de estado de bahía puede no coincidir con operaciones
     // de portería y el frontend necesita los KPIs actualizados.
     try {
-      const [metricas, conteo] = await Promise.all([
-        this.obtenerMetricasSensorizadas(),
-        this.obtenerConteoGlobal(),
-      ]);
-      const estadoParqueaderoSocket: 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO' = conteo.parqueaderoDeshabilitado
-        ? 'DESHABILITADO'
-        : metricas.bahiasDisponibles <= 0 && metricas.totalBahias > 0 ? 'LLENO' : 'DISPONIBLE';
+      const conteo = await this.obtenerConteoGlobal();
       this.eventosGateway.emitirConteoGlobalDisponibles({
-        total: metricas.totalBahias,
-        ocupados: metricas.bahiasOcupadas,
-        disponibles: metricas.bahiasDisponibles,
-        estadoParqueadero: estadoParqueaderoSocket,
+        total: conteo.total,
+        ocupados: conteo.ocupados,
+        disponibles: conteo.disponibles,
+        estadoParqueadero: conteo.estadoParqueadero,
         actualizadoEn: new Date(),
       });
     } catch (err) {
@@ -1020,17 +1019,6 @@ export class BahiasService implements OnModuleInit {
         bahia.discrepanciaDesde = null;
         await manager.save(Bahia, bahia);
 
-        const movimientoTransito = await manager.findOne(MovimientoVehiculo, {
-          where: { idBahia: bahia.idBahia, estado: EstadoMovimiento.TRANSITO },
-          order: { horaIngreso: 'DESC' },
-          lock: { mode: 'pessimistic_write' },
-        });
-        if (movimientoTransito) {
-          movimientoTransito.estado = EstadoMovimiento.ANULADO;
-          movimientoTransito.horaSalida = ahora;
-          await manager.save(MovimientoVehiculo, movimientoTransito);
-        }
-
         this.eventosGateway.emitirBahiaModificada(
           {
             idBahia: `B-${bahia.idBahia}`,
@@ -1042,35 +1030,4 @@ export class BahiasService implements OnModuleInit {
       }
     });
   }
-
-  private async seleccionarBahiaLibreParaTransito(manager: EntityManager): Promise<Bahia> {
-    const disponible = await manager
-      .createQueryBuilder(Bahia, 'bahia')
-      .setLock('pessimistic_write')
-      .setOnLocked('skip_locked')
-      .where('bahia.deleted_at IS NULL')
-      .andWhere('(bahia.estado_manual IS NULL OR bahia.estado_manual <> :manualDisabled)', { manualDisabled: IotStatusEnum.DISABLED })
-      .andWhere('bahia.estado_reconciliado = :estado', { estado: BahiaReconciliacionEstadoEnum.LIBRE })
-      .andWhere((qb: any) => {
-        const subQuery = qb
-          .subQuery()
-          .select('mov.id_bahia')
-          .from(MovimientoVehiculo, 'mov')
-          .where('mov.estado IN (:...estados)', { estados: [EstadoMovimiento.TRANSITO, EstadoMovimiento.ADENTRO] })
-          .andWhere('mov.deleted_at IS NULL')
-          .getQuery();
-        return 'bahia.id_bahia NOT IN ' + subQuery;
-      })
-      .getOne();
-
-    if (!disponible) {
-      throw new BadRequestException({
-        message: 'Capacidad máxima alcanzada: no hay bahías disponibles para tránsito.',
-        errorCode: 'SIN_BAHIAS_DISPONIBLES',
-      });
-    }
-
-    return disponible;
-  }
-
 }
