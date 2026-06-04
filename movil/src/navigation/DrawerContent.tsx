@@ -21,9 +21,9 @@ interface ItemMenu {
 }
 
 const ITEMS: ItemMenu[] = [
-  { nombre: 'Mi Perfil', ruta: 'Home', icono: '👤' },
-  { nombre: 'Mis Vehículos', ruta: 'VehiculosStack', icono: '🚗' },
-  { nombre: 'Compartidos Conmigo', ruta: 'CompartidosStack', icono: '🤝' },
+  { nombre: 'Mi Perfil', ruta: 'MiPerfil', icono: '👤' },
+  { nombre: 'Mis Vehículos', ruta: 'MisVehiculos', icono: '🚗' },
+  { nombre: 'Compartidos Conmigo', ruta: 'CompartidosTab', icono: '🤝' },
   { nombre: 'Cambiar Contraseña', ruta: 'CambiarContrasena', icono: '🔒' },
   { nombre: 'Configuración', ruta: 'ConfiguracionStack', icono: '⚙️' },
 ];
@@ -57,8 +57,15 @@ export default function DrawerContent(props: any) {
     ]);
   };
 
+  const TAB_RUTAS = ['MiPerfil', 'MisVehiculos', 'CompartidosTab'];
+
   const navegar = (ruta: string) => {
-    props.navigation.navigate(ruta);
+    if (TAB_RUTAS.includes(ruta)) {
+      props.navigation.navigate('Home', { screen: ruta });
+    } else {
+      props.navigation.navigate(ruta);
+    }
+    props.navigation.closeDrawer();
   };
 
   return (

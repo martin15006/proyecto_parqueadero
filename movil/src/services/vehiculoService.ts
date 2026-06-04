@@ -4,6 +4,7 @@ import {
   TipoVehiculo,
   VehiculoUsuario,
   SolicitudVehiculo,
+  CorregirSolicitudDto,
   VehiculoCompartido,
   InvitacionCompartido,
   InfoCompartido,
@@ -79,6 +80,20 @@ export const vehiculoService = {
   async listarMisSolicitudes(): Promise<SolicitudVehiculo[]> {
     return apiRequest<SolicitudVehiculo[]>('/vehiculos/solicitudes', {
       method: 'GET',
+      conAuth: true,
+    });
+  },
+
+  /**
+   * Corrige una solicitud rechazada (solo los campos marcados por el admin) y la reenvía.
+   */
+  async corregirSolicitud(
+    idSolicitud: number,
+    datos: CorregirSolicitudDto,
+  ): Promise<{ mensaje: string }> {
+    return apiRequest<{ mensaje: string }>(`/vehiculos/solicitudes/${idSolicitud}/corregir`, {
+      method: 'PATCH',
+      body: JSON.stringify(datos),
       conAuth: true,
     });
   },

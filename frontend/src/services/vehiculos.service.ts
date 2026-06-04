@@ -138,10 +138,12 @@ export const vehiculosService = {
     idSolicitud: number,
     estado: 'APROBADO' | 'RECHAZADO',
     motivoRechazo?: string,
+    camposRechazados?: string[],
   ): Promise<BackendEnvelope<{ mensaje: string }>> => {
     const response = await api.patch(`/admin/vehiculos/solicitudes/${idSolicitud}`, {
       estado,
       motivoRechazo,
+      camposRechazados,
     });
     return response.data;
   },

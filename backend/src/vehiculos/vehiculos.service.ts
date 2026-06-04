@@ -18,6 +18,7 @@ import { ActualizarVehiculoDto } from './dto/actualizar-vehiculo.dto';
 import { AdminListVehiculosQueryDto } from './dto/admin-list-vehiculos.query.dto';
 import { CompartirVehiculoDto } from './dto/compartir-vehiculo.dto';
 import { ResolverSolicitudDto } from './dto/resolver-solicitud.dto';
+import { CorregirSolicitudDto } from './dto/corregir-solicitud.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
@@ -140,22 +141,32 @@ export class VehiculosService {
     }
 
     if (dto.estado === EstadoSolicitud.RECHAZADO) {
-      if (!dto.motivoRechazo?.trim()) {
-        throw new BadRequestException('Debes indicar el motivo del rechazo');
+      const motivo = dto.motivoRechazo?.trim();
+      const campos = Array.isArray(dto.camposRechazados)
+        ? Array.from(new Set(dto.camposRechazados))
+        : [];
+
+      if (!motivo && campos.length === 0) {
+        throw new BadRequestException(
+          'Debes indicar el motivo del rechazo o marcar al menos un campo a corregir',
+        );
       }
+
       solicitud.estado = EstadoSolicitud.RECHAZADO;
-      solicitud.motivoRechazo = dto.motivoRechazo.trim();
+      solicitud.motivoRechazo = motivo ?? null;
+      solicitud.camposRechazados = campos.length > 0 ? campos : null;
       solicitud.resueltoEn = new Date();
       await this.solicitudRepository.save(solicitud);
 
       // Notificar al usuario del rechazo
+      const detalleMotivo = motivo ? ` Motivo: ${motivo}` : '';
       await this.notificacionesService.notificarUsuario({
         idUsuario: solicitud.documento,
         tipo: 'SOLICITUD_VEHICULO_RECHAZADA',
         titulo: 'Solicitud de vehículo rechazada',
-        mensaje: `Tu solicitud para registrar el vehículo con placa ${solicitud.placa} fue rechazada. Motivo: ${dto.motivoRechazo}`,
+        mensaje: `Tu solicitud para registrar el vehículo con placa ${solicitud.placa} fue rechazada.${detalleMotivo} Corrige los datos marcados y reenvíala.`,
         actorNombre: adminDocumento,
-        metadata: { placa: solicitud.placa, motivo: dto.motivoRechazo },
+        metadata: { placa: solicitud.placa, motivo: motivo ?? null, camposRechazados: solicitud.camposRechazados },
       });
 
       return { mensaje: 'Solicitud rechazada y usuario notificado.' };
@@ -235,6 +246,92 @@ export class VehiculosService {
       relations: ['tipoVehiculo'],
       order: { creadoEn: 'DESC' },
     });
+  }
+
+  /**
+   * Corrige una solicitud RECHAZADA y la reenvía a revisión (vuelve a PENDIENTE).
+   * Solo se actualizan los campos que el administrador marcó como incorrectos.
+   */
+  async corregirSolicitud(
+    documento: string,
+    idSolicitud: number,
+    dto: CorregirSolicitudDto,
+  ): Promise<{ mensaje: string }> {
+    const solicitud = await this.solicitudRepository.findOne({ where: { idSolicitud } });
+    if (!solicitud) throw new NotFoundException('Solicitud no encontrada');
+    if (solicitud.documento !== documento) {
+      throw new ForbiddenException('No puedes corregir esta solicitud');
+    }
+    if (solicitud.estado !== EstadoSolicitud.RECHAZADO) {
+      throw new BadRequestException('Solo puedes corregir solicitudes rechazadas');
+    }
+
+    const camposPermitidos = solicitud.camposRechazados ?? [];
+    const puede = (campo: string) => camposPermitidos.includes(campo);
+
+    if (dto.placa !== undefined && puede('placa')) {
+      const placaNormalizada = this.normalizarPlaca(dto.placa);
+      const vehiculoExistente = await this.vehiculoRepository.findOne({
+        where: { placa: placaNormalizada },
+      });
+      if (vehiculoExistente) {
+        throw new ConflictException('Esta placa ya se encuentra registrada en el sistema');
+      }
+      const otraPendiente = await this.solicitudRepository.findOne({
+        where: { documento, placa: placaNormalizada, estado: EstadoSolicitud.PENDIENTE },
+      });
+      if (otraPendiente) {
+        throw new ConflictException('Ya tienes una solicitud pendiente para esta placa');
+      }
+      solicitud.placa = placaNormalizada;
+    }
+
+    if (dto.color !== undefined && puede('color')) {
+      solicitud.color = dto.color.trim();
+    }
+
+    if (dto.idTipoVehiculo !== undefined && puede('idTipoVehiculo')) {
+      const tipo = await this.tipoVehiculoRepository.findOne({
+        where: { idTipoV: dto.idTipoVehiculo },
+      });
+      if (!tipo) throw new BadRequestException('Tipo de vehículo no válido');
+      solicitud.idTipoVehiculo = dto.idTipoVehiculo;
+    }
+
+    if (dto.fotoVehiculo !== undefined && puede('fotoVehiculo')) {
+      solicitud.fotoVehiculo = dto.fotoVehiculo;
+    }
+    if (dto.fotoTarjetaP !== undefined && puede('fotoTarjetaP')) {
+      solicitud.fotoTarjetaP = dto.fotoTarjetaP;
+    }
+    if (dto.fotoPlaca !== undefined && puede('fotoPlaca')) {
+      solicitud.fotoPlaca = dto.fotoPlaca;
+    }
+
+    // Reenviar: vuelve a pendiente y se limpian las marcas del rechazo anterior
+    solicitud.estado = EstadoSolicitud.PENDIENTE;
+    solicitud.motivoRechazo = null;
+    solicitud.camposRechazados = null;
+    solicitud.resueltoEn = null;
+    await this.solicitudRepository.save(solicitud);
+
+    await this.auditoriaService.create({
+      accion: 'CORREGIR_SOLICITUD_VEHICULO',
+      entidad: 'SOLICITUD_VEHICULO',
+      idEntidad: solicitud.idSolicitud,
+      idUsuario: documento,
+      datosNuevos: { placa: solicitud.placa },
+    });
+
+    // Notificar a los administradores que hay una solicitud corregida
+    await this.notificacionesService.notificarAdmins({
+      tipo: 'SOLICITUD_VEHICULO',
+      titulo: 'Solicitud corregida',
+      mensaje: `El usuario ${documento} corrigió y reenvió la solicitud del vehículo con placa ${solicitud.placa}.`,
+      metadata: { idSolicitud: solicitud.idSolicitud, placa: solicitud.placa, documento },
+    });
+
+    return { mensaje: 'Solicitud corregida y reenviada para revisión.' };
   }
 
   // ─── COMPARTIR VEHÍCULO ───────────────────────────────────────────────────────

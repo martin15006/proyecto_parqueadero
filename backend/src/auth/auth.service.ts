@@ -584,7 +584,7 @@ export class AuthService implements OnModuleInit {
       { usado: true },
     );
 
-    const codigo = this.isDevEmailDisabled ? '000000' : crypto.randomInt(100000, 1000000).toString();
+    const codigo = crypto.randomInt(100000, 1000000).toString();
     const expiraEn = new Date();
     expiraEn.setMinutes(expiraEn.getMinutes() + 5);
 

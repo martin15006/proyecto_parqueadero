@@ -22,7 +22,8 @@ export default function ConfiguracionScreen({ navigation }: any) {
         <View style={[styles.container, { backgroundColor: colores.fondo }]}>
             <SenaHeader
                 titulo="Configuración"
-                onMenuPress={() => navigation.openDrawer()}
+                mostrarVolver
+                onBackPress={() => navigation.navigate('Home', { screen: 'MiPerfil' })}
             />
 
             {/* Aurora decorativa solo en oscuro */}

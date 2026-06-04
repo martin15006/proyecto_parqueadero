@@ -6,11 +6,24 @@ import { Modal } from '../../components/ui/Modal';
 import { Check, X, Clock, Eye, AlertTriangle, RefreshCw } from 'lucide-react';
 import type { SolicitudVehiculoAdmin, EstadoSolicitudVehiculo } from '../../types';
 
+/** Campos de la solicitud que el admin puede marcar como incorrectos. */
+const CAMPOS_SOLICITUD: { key: string; label: string }[] = [
+  { key: 'fotoVehiculo', label: 'Foto del vehículo' },
+  { key: 'fotoTarjetaP', label: 'Foto tarjeta de propiedad' },
+  { key: 'fotoPlaca', label: 'Foto de la placa' },
+  { key: 'placa', label: 'Placa' },
+  { key: 'color', label: 'Color' },
+  { key: 'idTipoVehiculo', label: 'Tipo de vehículo' },
+];
+
+const etiquetaCampo = (key: string) =>
+  CAMPOS_SOLICITUD.find((c) => c.key === key)?.label ?? key;
+
 /**
  * Gestión de solicitudes de registro de vehículo (Admin).
  * Permite aprobar o rechazar las solicitudes enviadas por los aprendices desde el móvil.
  *  - Si se aprueba: el vehículo queda registrado y aparece en "Mis Vehículos" del usuario.
- *  - Si se rechaza: el usuario recibe una notificación con el motivo.
+ *  - Si se rechaza: el admin marca qué campos están mal y el usuario los corrige desde el móvil.
  */
 export const SolicitudesPage: React.FC = () => {
   const [solicitudes, setSolicitudes] = useState<SolicitudVehiculoAdmin[]>([]);
@@ -25,6 +38,7 @@ export const SolicitudesPage: React.FC = () => {
   // Modal de rechazo
   const [rechazoOpen, setRechazoOpen] = useState(false);
   const [motivoRechazo, setMotivoRechazo] = useState('');
+  const [camposRechazados, setCamposRechazados] = useState<string[]>([]);
   const [procesando, setProcesando] = useState(false);
   const [feedbackOk, setFeedbackOk] = useState<string | null>(null);
 
@@ -74,13 +88,23 @@ export const SolicitudesPage: React.FC = () => {
 
   const abrirRechazo = () => {
     setMotivoRechazo('');
+    setCamposRechazados([]);
     setRechazoOpen(true);
+  };
+
+  const toggleCampo = (key: string) => {
+    setCamposRechazados((prev) =>
+      prev.includes(key) ? prev.filter((c) => c !== key) : [...prev, key],
+    );
+    if (error) setError(null);
   };
 
   const confirmarRechazo = async () => {
     if (!seleccionada) return;
-    if (!motivoRechazo.trim() || motivoRechazo.trim().length < 5) {
-      setError('Debes indicar un motivo de al menos 5 caracteres');
+    const motivo = motivoRechazo.trim();
+    // Debe marcar al menos un campo a corregir o escribir un motivo válido.
+    if (camposRechazados.length === 0 && motivo.length < 5) {
+      setError('Marca al menos un campo a corregir o indica un motivo de al menos 5 caracteres');
       return;
     }
     setProcesando(true);
@@ -89,12 +113,14 @@ export const SolicitudesPage: React.FC = () => {
       await vehiculosService.resolverSolicitud(
         seleccionada.idSolicitud,
         'RECHAZADO',
-        motivoRechazo.trim(),
+        motivo || undefined,
+        camposRechazados.length > 0 ? camposRechazados : undefined,
       );
       setFeedbackOk(`Solicitud #${seleccionada.idSolicitud} rechazada. El usuario fue notificado.`);
       setRechazoOpen(false);
       setSeleccionada(null);
       setMotivoRechazo('');
+      setCamposRechazados([]);
       await cargarSolicitudes();
       setTimeout(() => setFeedbackOk(null), 4000);
     } catch (err) {
@@ -248,10 +274,26 @@ export const SolicitudesPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-              {sol.estado === 'RECHAZADO' && sol.motivoRechazo && (
+              {sol.estado === 'RECHAZADO' && (sol.motivoRechazo || (sol.camposRechazados?.length ?? 0) > 0) && (
                 <div className="bg-rose-50 border-t border-rose-200 px-4 py-2">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-rose-700">Motivo del rechazo</p>
-                  <p className="text-xs font-semibold text-rose-800 mt-1">{sol.motivoRechazo}</p>
+                  {(sol.camposRechazados?.length ?? 0) > 0 && (
+                    <div className="mb-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-rose-700">Campos a corregir</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {sol.camposRechazados!.map((c) => (
+                          <span key={c} className="px-2 py-0.5 rounded-full bg-rose-200 text-rose-800 text-[10px] font-bold">
+                            {etiquetaCampo(c)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {sol.motivoRechazo && (
+                    <>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-rose-700">Motivo del rechazo</p>
+                      <p className="text-xs font-semibold text-rose-800 mt-1">{sol.motivoRechazo}</p>
+                    </>
+                  )}
                 </div>
               )}
               <div className="border-t border-slate-200 p-3 flex gap-2">
@@ -339,6 +381,16 @@ export const SolicitudesPage: React.FC = () => {
               <p><b>Documento:</b> {seleccionada.documento}</p>
               <p><b>Fecha solicitud:</b> {formatFecha(seleccionada.creadoEn)}</p>
               <p><b>Estado:</b> {renderEstadoBadge(seleccionada.estado)}</p>
+              {(seleccionada.camposRechazados?.length ?? 0) > 0 && (
+                <div className="flex flex-wrap items-center gap-1">
+                  <b>Campos a corregir:</b>
+                  {seleccionada.camposRechazados!.map((c) => (
+                    <span key={c} className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[11px] font-bold">
+                      {etiquetaCampo(c)}
+                    </span>
+                  ))}
+                </div>
+              )}
               {seleccionada.motivoRechazo && (
                 <p><b>Motivo rechazo:</b> {seleccionada.motivoRechazo}</p>
               )}
@@ -367,35 +419,74 @@ export const SolicitudesPage: React.FC = () => {
         )}
       </Modal>
 
-      {/* Modal de rechazo (motivo) */}
+      {/* Modal de rechazo (campos + motivo) */}
       <Modal
         isOpen={rechazoOpen}
         onClose={() => {
           setRechazoOpen(false);
           setMotivoRechazo('');
+          setCamposRechazados([]);
           setError(null);
         }}
         title={`Rechazar solicitud #${seleccionada?.idSolicitud ?? ''}`}
       >
         <div className="space-y-3">
           <p className="text-sm text-slate-600">
-            Indica el motivo del rechazo. El usuario recibirá una notificación con este
-            mensaje y podrá hacer las correcciones necesarias antes de volver a solicitar.
+            Marca los campos que el usuario debe corregir. Solo esos campos podrán editarse
+            desde el móvil; el resto de la solicitud se conserva.
           </p>
-          <textarea
-            value={motivoRechazo}
-            onChange={(e) => {
-              setMotivoRechazo(e.target.value);
-              if (error) setError(null);
-            }}
-            rows={4}
-            maxLength={500}
-            placeholder="Ej: La foto del vehículo no es clara. La placa no coincide con la tarjeta de propiedad..."
-            className="w-full p-3 border border-slate-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-rose-500"
-          />
-          <p className="text-[10px] font-bold text-slate-500 text-right">
-            {motivoRechazo.length}/500
-          </p>
+
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
+              Campos a corregir
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {CAMPOS_SOLICITUD.map((campo) => {
+                const activo = camposRechazados.includes(campo.key);
+                return (
+                  <button
+                    key={campo.key}
+                    type="button"
+                    onClick={() => toggleCampo(campo.key)}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left text-xs font-bold transition-all ${
+                      activo
+                        ? 'bg-rose-50 border-rose-400 text-rose-800'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`w-4 h-4 rounded flex items-center justify-center border ${
+                        activo ? 'bg-rose-500 border-rose-500' : 'border-slate-300'
+                      }`}
+                    >
+                      {activo && <Check size={12} className="text-white" />}
+                    </span>
+                    {campo.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">
+              Motivo / comentario (opcional)
+            </p>
+            <textarea
+              value={motivoRechazo}
+              onChange={(e) => {
+                setMotivoRechazo(e.target.value);
+                if (error) setError(null);
+              }}
+              rows={3}
+              maxLength={500}
+              placeholder="Ej: La foto del vehículo está borrosa, vuelve a tomarla con buena luz..."
+              className="w-full p-3 border border-slate-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-rose-500"
+            />
+            <p className="text-[10px] font-bold text-slate-500 text-right">
+              {motivoRechazo.length}/500
+            </p>
+          </div>
           {error && (
             <div className="bg-rose-50 border border-rose-200 rounded-lg p-3">
               <p className="text-xs font-semibold text-rose-800">{error}</p>
@@ -407,6 +498,7 @@ export const SolicitudesPage: React.FC = () => {
               onClick={() => {
                 setRechazoOpen(false);
                 setMotivoRechazo('');
+                setCamposRechazados([]);
                 setError(null);
               }}
               className="flex-1"

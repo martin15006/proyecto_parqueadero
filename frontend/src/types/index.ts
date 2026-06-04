@@ -165,6 +165,7 @@ export interface SolicitudVehiculoAdmin {
   idTipoVehiculo: number;
   estado: EstadoSolicitudVehiculo;
   motivoRechazo: string | null;
+  camposRechazados: string[] | null;
   creadoEn: string;
   resueltoEn: string | null;
   usuario?: {

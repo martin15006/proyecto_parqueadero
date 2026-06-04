@@ -8,6 +8,7 @@ import {
   Alert,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
@@ -16,6 +17,15 @@ import SenaHeader from '../components/SenaHeader';
 import FadeInView from '../components/FadeInView';
 import { vehiculoService } from '../services/vehiculoService';
 import { SolicitudVehiculo, EstadoSolicitud } from '../types/vehiculo';
+
+const CAMPO_LABELS: Record<string, string> = {
+  placa: 'Placa',
+  color: 'Color',
+  idTipoVehiculo: 'Tipo de vehículo',
+  fotoVehiculo: 'Foto del vehículo',
+  fotoTarjetaP: 'Foto tarjeta de propiedad',
+  fotoPlaca: 'Foto de la placa',
+};
 
 const colorEstado = (estado: EstadoSolicitud) => {
   switch (estado) {
@@ -81,12 +91,41 @@ export default function MisSolicitudesScreen({ navigation }: any) {
             <Text style={[styles.fecha, { color: colores.textoTenue }]}>
               📅 {new Date(item.creadoEn).toLocaleDateString()}
             </Text>
-            {item.estado === 'RECHAZADO' && item.motivoRechazo ? (
+            {item.estado === 'RECHAZADO' &&
+            (item.motivoRechazo || (item.camposRechazados?.length ?? 0) > 0) ? (
               <View style={[styles.motivoBox, { backgroundColor: 'rgba(229,57,53,0.10)' }]}>
-                <Text style={[styles.motivoTitulo, { color: '#E53935' }]}>Motivo del rechazo:</Text>
-                <Text style={[styles.motivoTexto, { color: colores.textoPrimario }]}>
-                  {item.motivoRechazo}
-                </Text>
+                {(item.camposRechazados?.length ?? 0) > 0 ? (
+                  <>
+                    <Text style={[styles.motivoTitulo, { color: '#E53935' }]}>Debes corregir:</Text>
+                    <View style={styles.chipsCampos}>
+                      {item.camposRechazados!.map((c) => (
+                        <View key={c} style={styles.campoChip}>
+                          <Text style={styles.campoChipTexto}>{CAMPO_LABELS[c] ?? c}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                ) : null}
+                {item.motivoRechazo ? (
+                  <>
+                    <Text style={[styles.motivoTitulo, { color: '#E53935', marginTop: 6 }]}>
+                      Motivo:
+                    </Text>
+                    <Text style={[styles.motivoTexto, { color: colores.textoPrimario }]}>
+                      {item.motivoRechazo}
+                    </Text>
+                  </>
+                ) : null}
+
+                {(item.camposRechazados?.length ?? 0) > 0 ? (
+                  <TouchableOpacity
+                    style={[styles.botonCorregir, { backgroundColor: colores.verde }]}
+                    onPress={() => navigation.navigate('CorregirSolicitud', { solicitud: item })}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.botonCorregirTexto}>✏ Corregir y reenviar</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             ) : null}
           </View>
@@ -162,6 +201,21 @@ const styles = StyleSheet.create({
   motivoBox: { marginTop: 8, padding: 8, borderRadius: 8 },
   motivoTitulo: { fontSize: fonts.pequeno, fontWeight: '700' },
   motivoTexto: { fontSize: fonts.pequeno, marginTop: 2 },
+  chipsCampos: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  campoChip: {
+    backgroundColor: 'rgba(229,57,53,0.18)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
+  },
+  campoChipTexto: { color: '#C62828', fontSize: fonts.pequeno, fontWeight: '700' },
+  botonCorregir: {
+    marginTop: 10,
+    paddingVertical: 9,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  botonCorregirTexto: { color: '#fff', fontWeight: '800', fontSize: fonts.normal },
   vacio: { alignItems: 'center', paddingVertical: 80 },
   emoji: { fontSize: 70, marginBottom: 16 },
   vacioTitulo: { fontSize: fonts.medio, fontWeight: 'bold' },

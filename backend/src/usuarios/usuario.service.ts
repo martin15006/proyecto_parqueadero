@@ -102,7 +102,7 @@ export class UsuarioService {
       };
     } catch (error) {
       const pgError = error as { code?: string; constraint?: string };
-      if (pgError.code === '23503' && pgError.constraint === 'usuario_idformacion_fkey') {
+      if (pgError.code === '23503') {
         throw new BadRequestException('La ficha de formación proporcionada no es válida.');
       }
       throw error;
@@ -154,7 +154,7 @@ export class UsuarioService {
       return usuarioSinContrasena;
     } catch (error) {
       const pgError = error as { code?: string; constraint?: string };
-      if (pgError.code === '23503' && pgError.constraint === 'usuario_idformacion_fkey') {
+      if (pgError.code === '23503') {
         throw new BadRequestException('La ficha de formación proporcionada no es válida.');
       }
       throw error;

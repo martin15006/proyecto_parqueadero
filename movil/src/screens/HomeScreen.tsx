@@ -14,15 +14,12 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import Barcode from 'react-native-barcode-qr-generator';
 import QRCode from 'react-native-qrcode-svg';
 import AvatarIniciales from '../components/AvatarIniciales';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiRequest } from '../services/api';
 import { notificacionService } from '../services/notificacionService';
-
-type ModoVisualizacion = 'BARRAS' | 'QR'; // RF8: modos explícitos para conmutación dual.
 
 type IndicadorGlobal = 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO' | 'SIN_DATOS'; // RF16: estados de capacidad consumibles por UI.
 
@@ -77,7 +74,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     badgeBg: esOscuro ? 'rgba(95,217,36,0.16)' : 'rgba(255,255,255,0.14)',
   }), [esOscuro]);
 
-  const [modoVisualizacion, setModoVisualizacion] = useState<ModoVisualizacion>('BARRAS'); // RF8: inicia en BARRAS por hardware actual de portería.
   const [codigoAcceso, setCodigoAcceso] = useState<string>(''); // RF8/RNF2: token opaco (alfanumérico) para render Code128.
   const [codigoAccesoQr, setCodigoAccesoQr] = useState<string>(''); // RF8/RNF2: token opaco (puede incluir guiones) para render QR.
   const [estado, setEstado] = useState<EstadoAprendiz>({ // RF16: estado inicial neutral mientras carga.
@@ -238,23 +234,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     setRefrescando(false);
   }, [cargarLiveData]);
 
-  useEffect(() => { // RF8: animación suave al alternar entre BARRAS y QR.
-    Animated.sequence([ // UX: fade-out + fade-in para transición sin saltos.
-      Animated.timing(animSwitch, { toValue: 0, duration: 90, useNativeDriver: true }), // UX: baja opacidad rápido antes de cambiar.
-      Animated.timing(animSwitch, { toValue: 1, duration: 140, useNativeDriver: true }), // UX: sube opacidad para revelar el nuevo formato.
-    ]).start(); // UX: ejecuta la transición.
-  }, [modoVisualizacion, animSwitch]); // RF8: depende del modo.
-
   if (!usuario) return null; // RF7: sin sesión, no renderiza contenido (evita flashes con datos vacíos).
 
   const toggleBandeja = () => { // RF25: interacción para abrir/cerrar bandeja.
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); // UX: animación de layout para colapso suave.
     setBandejaAbierta((v) => !v); // RF25: alterna estado de expansión.
   }; // RF25: fin toggle.
-
-  const toggleModo = () => { // RF8: conmutación dual entre barras y QR.
-    setModoVisualizacion((m) => (m === 'BARRAS' ? 'QR' : 'BARRAS')); // RF8: alterna de forma determinista.
-  }; // RF8: fin toggleModo.
 
   const eliminarNotificacion = (id: number) => {
     Alert.alert('Eliminar notificación', '¿Eliminar esta notificación?', [
@@ -397,36 +382,19 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 ) : !esAprendiz ? (
                   <Text style={[styles.codeUnavailable, { color: T.textoSecundario }]}>Disponible solo para Aprendiz</Text>
                 ) : tieneCodigoAcceso ? (
-                  modoVisualizacion === 'BARRAS' ? ( // RF8: modo actual (hardware real).
-                    <Barcode
-                      value={codigoAccesoBarras || codigoAccesoQrSeguro}
-                      format="CODE128" // RF8: Code128 compatible con lectores de barras actuales.
-                      maxWidth={280} // UX: ancho máximo estable para pantallas móviles.
-                      height={90} // UX: altura suficiente para lectura confiable.
-                      lineColor="#111827" // UI: negro casi puro para contraste alto.
-                      background={COLORS.blanco} // UI: fondo blanco para mejorar lectura por cámara/lector.
-                    />
-                  ) : ( // RF8: modo QR (hardware futuro).
-                    <QRCode
-                      value={codigoAccesoQrSeguro || codigoAccesoBarras}
-                      size={170} // UX: tamaño estable dentro del frame.
-                      backgroundColor={COLORS.blanco} // UI: fondo blanco para contraste.
-                      color="#111827" // UI: alto contraste.
-                    />
-                  )
+                  <QRCode
+                    value={codigoAccesoQrSeguro || codigoAccesoBarras}
+                    size={170} // UX: tamaño estable dentro del frame.
+                    backgroundColor={COLORS.blanco} // UI: fondo blanco para contraste.
+                    color="#111827" // UI: alto contraste.
+                  />
                 ) : (
                   <Text style={[styles.codeUnavailable, { color: T.textoSecundario }]}>Código no disponible</Text>
                 )}
               </Animated.View>
             </View>
 
-            <Text style={[styles.credencialHint, { color: T.textoSecundario }]}>Presenta este código en la portería vehicular</Text>
-
-            <TouchableOpacity style={styles.toggleButton} onPress={toggleModo} disabled={!tieneCodigoAcceso}>
-              <Text style={styles.toggleButtonText}>
-                {modoVisualizacion === 'BARRAS' ? 'CAMBIAR A QR' : 'CAMBIAR A BARRAS'}
-              </Text>
-            </TouchableOpacity>
+            <Text style={[styles.credencialHint, { color: T.textoSecundario }]}>Presenta este código QR en la portería vehicular</Text>
           </View>
         </View>
 
@@ -735,21 +703,6 @@ const styles = StyleSheet.create({ // UI: StyleSheet nativo para rendimiento y c
     textAlign: 'center', // UX: centrado.
     marginTop: 12, // UX: separación.
   }, // RF8: fin hint.
-  toggleButton: { // RF8: botón institucional de conmutación.
-    backgroundColor: COLORS.verdeOscuro, // RF8: color exigido para acciones institucionales.
-    borderRadius: 12, // UI: bordes elegantes.
-    paddingVertical: 14, // UX: altura cómoda.
-    paddingHorizontal: 16, // UX: ancho cómodo.
-    alignItems: 'center', // UX: centra texto.
-    marginTop: 14, // UX: separación.
-    opacity: 1, // UX: estado base (se controla por disabled a nivel RN).
-  }, // RF8: fin toggleButton.
-  toggleButtonText: { // RF8: texto botón.
-    color: COLORS.blanco, // UI: contraste alto.
-    fontSize: 12, // UI: legible.
-    fontWeight: '900', // UI: institucional.
-    letterSpacing: 1.2, // UI: look SENA.
-  }, // RF8: fin toggleButtonText.
   bandejaHeader: { // RF25: header de bandeja.
     flexDirection: 'row', // UI: título + acción.
     alignItems: 'center', // UI: centrado.

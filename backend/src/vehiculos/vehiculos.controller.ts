@@ -1,10 +1,11 @@
 import {
-  Controller, Post, Body, Get, UseGuards, Delete, Param, Patch, Query,
+  Controller, Post, Body, Get, UseGuards, Delete, Param, Patch, Query, ParseIntPipe,
 } from '@nestjs/common';
 import { VehiculosService } from './vehiculos.service';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
 import { ActualizarVehiculoDto } from './dto/actualizar-vehiculo.dto';
 import { CompartirVehiculoDto } from './dto/compartir-vehiculo.dto';
+import { CorregirSolicitudDto } from './dto/corregir-solicitud.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -51,6 +52,19 @@ export class VehiculosController {
   @Get('solicitudes')
   misSolicitudes(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
     return this.vehiculosService.listarMisSolicitudes(usuario.documento);
+  }
+
+  /**
+   * Corrige una solicitud rechazada (solo los campos marcados por el admin) y la reenvía.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Patch('solicitudes/:id/corregir')
+  corregirSolicitud(
+    @CurrentUser() usuario: Omit<Usuario, 'contra'>,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CorregirSolicitudDto,
+  ) {
+    return this.vehiculosService.corregirSolicitud(usuario.documento, id, dto);
   }
 
   @UseGuards(JwtAuthGuard)

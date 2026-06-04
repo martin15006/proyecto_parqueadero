@@ -35,9 +35,19 @@ export interface SolicitudVehiculo {
   idTipoVehiculo: number;
   estado: EstadoSolicitud;
   motivoRechazo: string | null;
+  camposRechazados: string[] | null;
   creadoEn: string;
   resueltoEn: string | null;
   tipoVehiculo?: TipoVehiculo;
+}
+
+export interface CorregirSolicitudDto {
+  placa?: string;
+  color?: string;
+  idTipoVehiculo?: number;
+  fotoVehiculo?: string;
+  fotoTarjetaP?: string;
+  fotoPlaca?: string;
 }
 
 export type EstadoCompartido = 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO';
