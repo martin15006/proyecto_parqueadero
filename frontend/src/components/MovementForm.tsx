@@ -679,15 +679,6 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
         </div>
       </div>
 
-      {!showContingencia && (
-        <button
-          onClick={() => setShowContingencia(true)}
-          className="w-full py-3 border border-dashed border-gray-100 dark:border-white/10 hover:border-gray-200 dark:hover:border-white/20 rounded-xl text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest transition-all"
-        >
-          + Activar Registro Manual
-        </button>
-      )}
-
       {/* Overlay: Selección de USUARIO en registro manual de placa (vehículo compartido) */}
       {infoPlaca && (
         <div className="fixed inset-0 z-[110] bg-[#012E25]/90 backdrop-blur-sm p-4 flex items-center justify-center overflow-y-auto animate-in fade-in duration-300">
