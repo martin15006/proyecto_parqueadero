@@ -31,6 +31,9 @@ function Login() {
 
   const [codigoOtp, setCodigoOtp] = useState('');
   const [mostrarOtp, setMostrarOtp] = useState(false);
+  // 'login': OTP del flujo normal (2FA). 'verificacion': cuenta sin verificar,
+  // el código activa el correo vía /auth/verificar-registro.
+  const [otpMode, setOtpMode] = useState<'login' | 'verificacion'>('login');
 
   const [status, setStatus] = useState('');
   const [statusType, setStatusType] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -161,15 +164,29 @@ function Login() {
       await api.post('/auth/login', formData);
       setStatus('Código OTP enviado. Revisa tu correo.');
       setStatusType('success');
+      setOtpMode('login');
       setMostrarOtp(true);
     } catch (error: any) {
       console.error('Error en el login:', error);
+
+      const backendMsg: string = error.response?.data?.message || '';
+
+      // Cuenta sin verificar: el backend ya reenvió el código, así que
+      // pasamos a la pantalla de código en modo verificación en lugar de
+      // dejar al usuario atascado en el formulario.
+      if (backendMsg.toLowerCase().includes('verificar tu correo')) {
+        setOtpMode('verificacion');
+        setMostrarOtp(true);
+        setStatus('Tu cuenta aún no está verificada. Te enviamos un código: ingrésalo aquí para activarla.');
+        setStatusType('success');
+        return;
+      }
 
       // Manejo robusto de errores de red/CORS
       if (error.code === 'ERR_NETWORK' || (!error.response && !error.message)) {
         setStatus('Error de conexión con el servidor. Verifica que el backend esté corriendo.');
       } else {
-        setStatus(error.response?.data?.message || error.message || 'Credenciales incorrectas');
+        setStatus(backendMsg || error.message || 'Credenciales incorrectas');
       }
       setStatusType('error');
     } finally {
@@ -186,7 +203,10 @@ function Login() {
     setStatusType('loading');
 
     try {
-      const response = await api.post('/auth/verificar-otp', {
+      // En modo verificación se usa /auth/verificar-registro: valida el código,
+      // marca el correo como verificado y emite tokens (login automático).
+      const endpoint = otpMode === 'verificacion' ? '/auth/verificar-registro' : '/auth/verificar-otp';
+      const response = await api.post(endpoint, {
         correo: formData.correo,
         codigo: codigoOtp
       });
@@ -462,8 +482,14 @@ function Login() {
                 <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-100">
                   <ShieldCheck className="w-8 h-8 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900">Verificar código</h3>
-                <p className="text-sm text-gray-500 leading-relaxed px-4">Se ha enviado un código de seguridad de 6 dígitos a tu correo electrónico institucional.</p>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {otpMode === 'verificacion' ? 'Verifica tu correo' : 'Verificar código'}
+                </h3>
+                <p className="text-sm text-gray-500 leading-relaxed px-4">
+                  {otpMode === 'verificacion'
+                    ? 'Tu cuenta aún no está activada. Ingresa el código de 6 dígitos que enviamos a tu correo para verificarla e iniciar sesión.'
+                    : 'Se ha enviado un código de seguridad de 6 dígitos a tu correo electrónico institucional.'}
+                </p>
               </div>
 
               <input
@@ -496,6 +522,8 @@ function Login() {
                   type="button"
                   onClick={() => {
                     setMostrarOtp(false);
+                    setOtpMode('login');
+                    setCodigoOtp('');
                     setStatus('');
                     setStatusType('idle');
                   }}
