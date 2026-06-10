@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { 
-  Scan, LayoutGrid, ClipboardList, 
+import {
+  Scan, LayoutGrid, ClipboardList,
   Bell, Settings, LogOut,
-  Menu, Sun, Moon
+  Sun, Moon, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -19,6 +19,7 @@ export const OperativoLayout: React.FC = () => {
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Actualizar hora cada minuto
@@ -30,6 +31,7 @@ export const OperativoLayout: React.FC = () => {
   // Control responsive
   useEffect(() => {
     const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
       if (window.innerWidth < 768) {
         setIsCollapsed(false);
       } else if (window.innerWidth < 1024) {
@@ -68,6 +70,16 @@ export const OperativoLayout: React.FC = () => {
   const operadorNombre = user?.usuario?.nombreCompleto || 'Operador';
 
   const sidebarWidth = isCollapsed ? 'w-20' : 'w-64';
+  // Estado visible del menú según el modo: en móvil manda isMobileOpen, en escritorio el colapso.
+  const menuAbierto = isMobile ? isMobileOpen : !isCollapsed;
+
+  const toggleMenu = () => {
+    if (isMobile) {
+      setIsMobileOpen((v) => !v);
+    } else {
+      setIsCollapsed((v) => !v);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-[#F8F9FA] dark:bg-[#0a0a0a] font-sans overflow-hidden transition-colors duration-300">
@@ -167,23 +179,21 @@ export const OperativoLayout: React.FC = () => {
 
       {/* Área de Contenido Principal - Corregida para no ser sobrepasada */}
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+        {/* Pestaña de menú en el borde del sidebar: flecha hacia afuera cuando
+            está oculto/colapsado y hacia adentro cuando está desplegado. */}
+        <button
+          onClick={toggleMenu}
+          aria-label={menuAbierto ? 'Ocultar menú' : 'Mostrar menú'}
+          title={menuAbierto ? 'Ocultar menú' : 'Mostrar menú'}
+          className="absolute left-0 top-6 z-[80] w-6 h-12 rounded-r-xl bg-[#012E25] text-white/80 shadow-lg border border-l-0 border-white/10 flex items-center justify-center hover:text-white hover:w-7 transition-all duration-200"
+        >
+          {menuAbierto ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+        </button>
+
         {/* Header Superior Sobrio */}
         <header className="bg-white dark:bg-[#121212] border-b border-gray-100 dark:border-white/5 px-6 lg:px-8 py-4 flex items-center justify-between sticky top-0 z-[40] transition-colors duration-300">
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => {
-                if (window.innerWidth < 1024) {
-                  setIsMobileOpen(!isMobileOpen);
-                } else {
-                  setIsCollapsed(!isCollapsed);
-                }
-              }}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg transition-all"
-            >
-              <Menu size={20} />
-            </button>
-            
-            <div>
+            <div className="pl-6">
               <h1 className="text-lg font-bold text-[#012E25] dark:text-white tracking-tight">{pageMeta.title}</h1>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{pageMeta.subtitle}</p>
             </div>
