@@ -4,13 +4,26 @@ import { usuariosService } from '../../services/usuarios.service';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 
-const isPasswordSecure = (value: string) => {
-  const tieneMinimo = value.length >= 8;
-  const tieneMayuscula = /[A-Z]/.test(value);
-  const tieneMinuscula = /[a-z]/.test(value);
-  const tieneNumero = /[0-9]/.test(value);
-  const tieneEspecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>\/?¿¡~`]/.test(value);
-  return tieneMinimo && tieneMayuscula && tieneMinuscula && tieneNumero && tieneEspecial;
+/** Devuelve la lista de condiciones de seguridad que la contraseña NO cumple (RF3). */
+const condicionesFaltantes = (value: string): string[] => {
+  const faltantes: string[] = [];
+  if (value.length < 8) faltantes.push('mínimo 8 caracteres');
+  if (!/[A-Z]/.test(value)) faltantes.push('una letra mayúscula');
+  if (!/[a-z]/.test(value)) faltantes.push('una letra minúscula');
+  if (!/[0-9]/.test(value)) faltantes.push('un número');
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>\/?¿¡~`]/.test(value)) faltantes.push('un carácter especial (! @ # $ %…)');
+  return faltantes;
+};
+
+/** Extrae el mensaje real del backend; class-validator envía `message` como array. */
+const mensajeDeError = (e: any, fallback: string): string => {
+  const raw = e?.response?.data?.message ?? e?.message;
+  if (Array.isArray(raw)) {
+    const textos = raw.filter((m) => typeof m === 'string' && m.trim());
+    if (textos.length) return textos.join(' • ');
+  }
+  if (typeof raw === 'string' && raw.trim()) return raw;
+  return fallback;
 };
 
 export const ConfiguracionAdminPage: React.FC = () => {
@@ -25,8 +38,9 @@ export const ConfiguracionAdminPage: React.FC = () => {
     if (!contraActual || !contraNueva || !contraNueva2) return null;
     if (contraNueva !== contraNueva2) return 'La confirmación no coincide';
     if (contraActual === contraNueva) return 'La nueva contraseña no puede ser igual a la anterior';
-    if (!isPasswordSecure(contraNueva)) {
-      return 'RF3: mínimo 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial';
+    const faltantes = condicionesFaltantes(contraNueva);
+    if (faltantes.length > 0) {
+      return `La contraseña no cumple las condiciones. Le falta: ${faltantes.join(', ')}.`;
     }
     return null;
   }, [contraActual, contraNueva, contraNueva2]);
@@ -54,7 +68,7 @@ export const ConfiguracionAdminPage: React.FC = () => {
       setContraNueva2('');
       setSuccess('Contraseña actualizada exitosamente');
     } catch (e: any) {
-      setError(e?.message || 'No se pudo actualizar la contraseña');
+      setError(mensajeDeError(e, 'No se pudo actualizar la contraseña'));
     } finally {
       setLoading(false);
     }

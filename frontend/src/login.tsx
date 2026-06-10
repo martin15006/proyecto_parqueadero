@@ -20,6 +20,34 @@ import {
 } from 'lucide-react';
 import senaLogo from './assets/sena.registro.png';
 
+/**
+ * Requisitos de contraseña — espejo exacto del decorador @ContrasenaSegura()
+ * del backend, para poder decirle al usuario QUÉ condición le falta en lugar
+ * de un error genérico.
+ */
+const REQUISITOS_CONTRASENA: Array<{ id: string; label: string; falta: string; test: (p: string) => boolean }> = [
+  { id: 'longitud', label: 'Mínimo 8 caracteres', falta: 'mínimo 8 caracteres', test: (p) => p.length >= 8 },
+  { id: 'mayuscula', label: 'Una letra mayúscula (A-Z)', falta: 'una letra mayúscula', test: (p) => /[A-Z]/.test(p) },
+  { id: 'minuscula', label: 'Una letra minúscula (a-z)', falta: 'una letra minúscula', test: (p) => /[a-z]/.test(p) },
+  { id: 'numero', label: 'Un número (0-9)', falta: 'un número', test: (p) => /[0-9]/.test(p) },
+  { id: 'especial', label: 'Un carácter especial (!@#$%…)', falta: 'un carácter especial (por ejemplo ! @ # $ %)', test: (p) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?¿¡~`]/.test(p) },
+];
+
+/**
+ * Extrae el mensaje real de un error del backend. Cuando falla la validación
+ * de un DTO (class-validator), `message` llega como ARRAY de strings; si se
+ * muestra tal cual o se ignora, el usuario ve un error genérico sin la razón.
+ */
+const extraerMensajeError = (error: any, fallback: string): string => {
+  const raw = error?.response?.data?.message;
+  if (Array.isArray(raw)) {
+    const textos = raw.filter((m) => typeof m === 'string' && m.trim());
+    if (textos.length) return textos.join(' • ');
+  }
+  if (typeof raw === 'string' && raw.trim()) return raw;
+  return fallback;
+};
+
 function Login() {
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
@@ -90,7 +118,7 @@ function Login() {
       await api.post('/auth/recuperar/solicitar', { correo: recoveryEmail });
       setRecoveryStep('verificar');
     } catch (error: any) {
-      setRecoveryStatus(error.response?.data?.message || 'Error al solicitar recuperación');
+      setRecoveryStatus(extraerMensajeError(error, 'Error al solicitar recuperación'));
       setRecoveryStatusType('error');
     } finally {
       setRecoveryLoading(false);
@@ -105,7 +133,7 @@ function Login() {
       await api.post('/auth/recuperar/verificar', { correo: recoveryEmail, codigo: recoveryOtp });
       setRecoveryStep('restablecer');
     } catch (error: any) {
-      setRecoveryStatus(error.response?.data?.message || 'Código inválido');
+      setRecoveryStatus(extraerMensajeError(error, 'Código inválido'));
       setRecoveryStatusType('error');
     } finally {
       setRecoveryLoading(false);
@@ -114,6 +142,16 @@ function Login() {
 
   const handleRestablecerContrasena = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validación en el cliente con la razón exacta: en vez de un error genérico,
+    // se informa qué condición de seguridad falta (misma regla que el backend).
+    const requisitosFaltantes = REQUISITOS_CONTRASENA.filter((r) => !r.test(recoveryPass));
+    if (requisitosFaltantes.length > 0) {
+      setRecoveryStatus(`La contraseña no cumple las condiciones. Le falta: ${requisitosFaltantes.map((r) => r.falta).join(', ')}.`);
+      setRecoveryStatusType('error');
+      return;
+    }
+
     if (recoveryPass !== recoveryConfirmPass) {
       setRecoveryStatus('Las contraseñas no coinciden');
       setRecoveryStatusType('error');
@@ -129,7 +167,7 @@ function Login() {
       });
       setRecoveryStep('exito');
     } catch (error: any) {
-      setRecoveryStatus(error.response?.data?.message || 'Error al restablecer contraseña');
+      setRecoveryStatus(extraerMensajeError(error, 'No se pudo restablecer la contraseña. Verifica el código e intenta de nuevo.'));
       setRecoveryStatusType('error');
     } finally {
       setRecoveryLoading(false);
@@ -701,6 +739,33 @@ function Login() {
                         className="w-full pl-14 pr-5 py-4.5 rounded-2xl bg-gray-50 border border-transparent focus:bg-white focus:border-[#39A900] outline-none transition-all font-semibold"
                       />
                     </div>
+
+                    {/* Checklist de condiciones en vivo — se pone verde a medida que se cumplen */}
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 mt-2">
+                      <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">La contraseña debe tener:</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {REQUISITOS_CONTRASENA.map((r) => {
+                          const cumple = r.test(recoveryPass);
+                          return (
+                            <div key={r.id} className={`flex items-center gap-2 text-[12px] font-semibold transition-colors ${cumple ? 'text-[#39A900]' : 'text-gray-400'}`}>
+                              {cumple
+                                ? <Check className="w-4 h-4 stroke-[3px] shrink-0" />
+                                : <X className="w-4 h-4 shrink-0 opacity-60" />}
+                              {r.label}
+                            </div>
+                          );
+                        })}
+                        {recoveryConfirmPass.length > 0 && (
+                          <div className={`flex items-center gap-2 text-[12px] font-semibold transition-colors ${recoveryPass === recoveryConfirmPass ? 'text-[#39A900]' : 'text-rose-500'}`}>
+                            {recoveryPass === recoveryConfirmPass
+                              ? <Check className="w-4 h-4 stroke-[3px] shrink-0" />
+                              : <X className="w-4 h-4 shrink-0" />}
+                            Las contraseñas coinciden
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <button type="submit" disabled={recoveryLoading} className="w-full bg-[#39A900] hover:bg-[#007832] text-white py-5 rounded-2xl font-bold mt-4 shadow-lg shadow-green-500/10 transition-all">
                       {recoveryLoading ? <RefreshCw className="w-6 h-6 animate-spin" /> : 'Actualizar contraseña'}
                     </button>
