@@ -1,11 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'; // UI: hooks para estado, refs y efectos (operación en tiempo real).
-import { AlertCircle, Car, CheckCircle2, FileText, Hash, ScanLine, ShieldAlert, XCircle } from 'lucide-react'; // UI: iconos con alto contraste para feedback a distancia (WCAG).
+import { useEffect, useMemo, useRef, useState, useImperativeHandle, forwardRef } from 'react';
+import { AlertCircle, Car, CheckCircle2, FileText, Hash, ScanLine, ShieldAlert, XCircle } from 'lucide-react';
 import { operativoService } from '../services/operativo.service'; // RF10/RF14: integración real con backend operativo (entrada/salida/contingencia).
 import { socketService } from '../services/socket.service';
 
 interface MovementFormProps {
   onSuccess: (msg: string) => void;
   onError: (msg: string) => void;
+}
+
+export interface MovementFormHandle {
+  activateManualMode: () => void;
 }
 
 interface FeedbackState {
@@ -55,7 +59,7 @@ type EscaneoCodigoAutoResponse = OperativoResponse & {
 type EscaneoCodigoSeleccionResponse = {
   ok: boolean; // RF31: operación de escaneo exitosa, pero requiere selección.
   modo: 'SELECCION'; // RF31: múltiples vehículos => modal de selección obligatorio.
-  aprendiz: { 
+  aprendiz: {
     nombreCompleto: string;
     documento: string;
     fotoPersona: string;
@@ -89,10 +93,11 @@ type InfoPlacaResponse = {
 };
 
 /**
- * FEATURE: MovementForm - Control de ingresos/salidas con escaneo híbrido y contingencia (RF33, RF34)
- * REFACTOR: Eliminación de placeholders y conexión real a backend con feedback visual profesional.
+ * FEATURE: MovementForm - Control de ingresos/salidas con escaneo híbrido y contingencia (RF33, RF34).
+ * UI alineada a la estética institucional compacta (paleta #012E25 / #39B000 con modo oscuro);
+ * conserva intactos los flujos del backend: info-placa, multivehículo, contingencia y evidencias.
  */
-export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }) => {
+export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({ onSuccess, onError }, ref) => {
   const [inputValue, setInputValue] = useState<string>(''); // RF10/RF11/RF14: entrada única (placa o token escaneado) para flujo operativo.
   const [motivo, setMotivo] = useState<string>(''); // RF34: motivo requerido en registro manual (contingencia).
   const [showContingencia, setShowContingencia] = useState<boolean>(false); // RF34: UI para habilitar/deshabilitar contingencia.
@@ -113,6 +118,13 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
   const scannerBufferRef = useRef<string>(''); // RF33: buffer local para capturar ráfagas del lector (keyboard wedge) cuando el foco se pierde.
   const lastScanKeyAtRef = useRef<number>(0); // RF33: timestamp del último carácter recibido; permite detectar ráfagas y reconstruir el código completo.
   const lastInputChangeAtRef = useRef<number>(0); // RF33: timestamp del último onChange del input para detectar nueva ráfaga del lector.
+
+  useImperativeHandle(ref, () => ({
+    activateManualMode: () => {
+      setShowContingencia(true);
+      setTimeout(() => motivoRef.current?.focus(), 100);
+    },
+  }));
 
   async function loadTurnoIngresos() {
     try {
@@ -148,34 +160,34 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
     const focusScanInput = () => { // RF33: función central para forzar foco "mouse-free".
       if (showContingencia) return; // RF34: si el operador está escribiendo motivo, no robamos el foco.
       inputRef.current?.focus(); // RF33: enfoque directo al input de lectura (lector físico).
-    }; // RF33: fin focusScanInput.
+    };
 
     focusScanInput(); // RF33: foco inicial al montar para comenzar operación inmediata.
 
     const handleWindowFocus = () => focusScanInput(); // RF33: si el usuario vuelve a la pestaña, retoma foco al lector.
-    window.addEventListener('focus', handleWindowFocus); // RF33: asegura operación continua en monitoreo.
+    window.addEventListener('focus', handleWindowFocus);
 
     const handleGlobalKeys = (e: KeyboardEvent) => { // RF33: atajos globales para operación sin mouse.
       if (e.key === 'F2') { // RF33: F2 fuerza el foco al lector en cualquier momento.
-        e.preventDefault(); // RF33: evita comportamientos por defecto del navegador.
-        focusScanInput(); // RF33: recupera foco para escaneo inmediato.
-        return; // RF33: salida temprana.
-      } // RF33: fin F2.
+        e.preventDefault();
+        focusScanInput();
+        return;
+      }
 
       if (e.key === 'Escape') { // RF33: ESC limpia campo y prepara el siguiente escaneo.
-        e.preventDefault(); // RF33: evita salir de modales del navegador o acciones no deseadas.
-        setInputValue(''); // RF33: limpia el input para recibir nueva lectura.
-        setFeedback({ type: null, message: '' }); // RF33: limpia feedback para evitar confusión visual.
-        setFeedbackOverlayOpen(false); // RF33: cierra overlay masivo si estaba activo.
-        setMultiVehiculos(null); // RF31: si estaba en selección, se cancela para evitar confirmación accidental.
-        setCodigoPendiente(''); // RF31: limpia token pendiente.
-        setAprendizPendiente(''); // RF31: limpia nombre visible.
+        e.preventDefault();
+        setInputValue('');
+        setFeedback({ type: null, message: '' });
+        setFeedbackOverlayOpen(false);
+        setMultiVehiculos(null);
+        setCodigoPendiente('');
+        setAprendizPendiente('');
         setInfoPlaca(null); // Cierra el modal de selección de usuario manual
-        setTimeout(() => focusScanInput(), 0); // RF33: re-enfoca inmediatamente tras limpiar.
+        setTimeout(() => focusScanInput(), 0);
         scannerBufferRef.current = '';
         lastScanKeyAtRef.current = 0;
         return;
-      } // RF33: fin ESC.
+      }
 
       if (showContingencia || multiVehiculos || infoPlaca || feedback.type === 'loading') {
         scannerBufferRef.current = '';
@@ -222,12 +234,12 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
         setInputValue(buffered);
         handleAction('codigo', buffered);
       }
-    }; // RF33: fin handler de teclado global.
+    };
 
     window.addEventListener('keydown', handleGlobalKeys);
 
-    // Los overlays YA NO se cierran solos por tiempo. Solo se cierran cuando:
-    //  - El operativo presiona "Autorizar y cerrar" / "Cerrar Aviso"
+    // Los overlays NO se cierran solos por tiempo. Solo se cierran cuando:
+    //  - El operativo presiona "Autorizar y cerrar" / clic en el aviso
     //  - El operativo presiona ESC
     //  - Se inicia una nueva acción (handleAction) que limpia el estado al comenzar
 
@@ -238,13 +250,13 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
   }, [feedback.type, lastResponse, showContingencia, multiVehiculos, infoPlaca, handleAction]);
 
   const clearState = () => {
-    setInputValue(''); // RF33: prepara el input para el siguiente escaneo.
-    setMotivo(''); // RF34: limpia motivo (contingencia).
-    setShowContingencia(false); // RF34: vuelve al flujo principal por defecto.
-    setMultiVehiculos(null); // RF31: cierra el modal de selección si estaba abierto.
-    setCodigoPendiente(''); // RF31: limpia token pendiente para evitar confirmaciones accidentales.
-    setAprendizPendiente(''); // RF31: limpia nombre mostrado en la UI.
-    setTimeout(() => inputRef.current?.focus(), 50); // RF33: re-enfoca el lector tras limpiar estado.
+    setInputValue('');
+    setMotivo('');
+    setShowContingencia(false);
+    setMultiVehiculos(null);
+    setCodigoPendiente('');
+    setAprendizPendiente('');
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   const closeFeedback = () => {
@@ -268,16 +280,16 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
     const identificacionLimpia = targetValue.replace(/[- ]/g, '').toUpperCase();
 
     if (!targetValue && action !== 'codigo') { // RF33: validación de entrada mínima.
-      setFeedback({ type: 'error', message: 'LA PLACA O CÓDIGO ES OBLIGATORIO' }); // RF33: feedback semántico y visible.
-      setFeedbackOverlayOpen(true); // RF33: muestra overlay masivo para lectura a distancia.
-      return; // RF33: aborta.
-    } // RF33: fin validación.
+      setFeedback({ type: 'error', message: 'LA PLACA O CÓDIGO ES OBLIGATORIO' });
+      setFeedbackOverlayOpen(true);
+      return;
+    }
 
     // Cierra cualquier modal/feedback anterior antes de empezar la nueva operación.
     setLastResponse(null);
     setFeedbackOverlayOpen(false);
     setFeedback({ type: 'loading', message: 'COMUNICANDO CON EL SERVIDOR...' });
-    
+
     try {
       const upper = targetValue.toUpperCase(); // RF33: normalización para evaluar formatos.
 
@@ -306,12 +318,9 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
           break;
         }
 
-        case 'salida':
+        case 'salida': {
           const resSalida: OperativoResponse = await operativoService.registrarSalida(upper); // RF11: registra salida por placa (normalizada).
-          setFeedback({ 
-            type: 'success', 
-            message: resSalida.mensaje 
-          });
+          setFeedback({ type: 'success', message: resSalida.mensaje });
           setLastResponse(resSalida);
           setFeedbackOverlayOpen(true); // RF33: muestra overlay verde para confirmación.
           onSuccess(`Salida: ${targetValue}`);
@@ -320,16 +329,14 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
           setMotivo('');
           setShowContingencia(false);
           break;
+        }
 
-        case 'manual':
+        case 'manual': {
           if (!motivo || motivo.length < 10) {
             throw new Error('EL MOTIVO DEBE TENER AL MENOS 10 CARACTERES');
           }
           const resManual: OperativoResponse = await operativoService.registrarIngresoManual(identificacionLimpia, motivo); // RF34: registro manual con motivo.
-          setFeedback({ 
-            type: 'success', 
-            message: resManual.mensaje 
-          });
+          setFeedback({ type: 'success', message: resManual.mensaje });
           setLastResponse(resManual);
           setFeedbackOverlayOpen(true); // RF33: overlay para confirmación.
           onSuccess(`Manual: ${targetValue} -> ${resManual.bahia}`);
@@ -338,15 +345,13 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
           setMotivo('');
           setShowContingencia(false);
           break;
+        }
 
-        case 'codigo':
+        case 'codigo': {
           const resCodigo: EscaneoCodigoResponse = await operativoService.escanearCodigo(upper); // RF33: identifica aprendiz por token opaco.
 
           if (resCodigo.modo === 'AUTO') { // RF31: un solo vehículo => ingreso/salida directo.
-            setFeedback({ 
-              type: 'success', 
-              message: resCodigo.mensaje
-            });
+            setFeedback({ type: 'success', message: resCodigo.mensaje });
             setLastResponse(resCodigo);
             setFeedbackOverlayOpen(true); // RF33: overlay verde masivo.
             onSuccess(resCodigo.mensaje);
@@ -355,13 +360,14 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
             setMotivo('');
             setShowContingencia(false);
           } else { // RF31: múltiples vehículos => abre modal de selección.
-            setMultiVehiculos(resCodigo.vehiculos); // RF31: inyecta lista de opciones.
-            setCodigoPendiente(resCodigo.codigo); // RF31: guarda token para reenvío.
-            setAprendizPendiente(resCodigo.aprendiz?.nombreCompleto || 'USUARIO DESCONOCIDO'); // RF33: muestra nombre del dueño.
+            setMultiVehiculos(resCodigo.vehiculos);
+            setCodigoPendiente(resCodigo.codigo);
+            setAprendizPendiente(resCodigo.aprendiz?.nombreCompleto || 'USUARIO DESCONOCIDO');
             setLastResponse(null);
-            setFeedback({ type: null, message: '' }); // Limpia carga.
+            setFeedback({ type: null, message: '' });
           }
           break;
+        }
       }
     } catch (error: any) {
       const msg = error.message || error.response?.data?.message || 'ERROR DE COMUNICACIÓN CON EL SERVIDOR';
@@ -384,9 +390,6 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
     }
   };
 
-  /**
-   * Procesa la confirmación manual de un vehículo (Aprendiz multi-vehículo).
-   */
   // Flag para evitar dobles confirmaciones por clicks rápidos
   const procesandoMultiRef = useRef<boolean>(false);
 
@@ -443,10 +446,7 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
     setFeedback({ type: 'loading', message: 'CONFIRMANDO SELECCIÓN...' });
     try {
       const res: OperativoResponse = await operativoService.confirmarIngresoMultivehiculo(codigoPendiente, placa);
-      setFeedback({
-        type: 'success',
-        message: res.mensaje,
-      });
+      setFeedback({ type: 'success', message: res.mensaje });
       setLastResponse(res);
       setFeedbackOverlayOpen(true);
       onSuccess(res.mensaje);
@@ -470,386 +470,334 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
     }
   }
 
-  const handleEmergencia = async () => {
-    if (!window.confirm('¿CONFIRMA SALIDA DE EMERGENCIA GLOBAL?')) return;
-    setFeedback({ type: 'loading', message: 'ACTIVANDO PROTOCOLO DE EMERGENCIA...' });
-    try {
-      await operativoService.salidaEmergencia();
-      setFeedback({ type: 'success', message: '¡EMERGENCIA! TODAS LAS BAHÍAS LIBERADAS.' });
-      setFeedbackOverlayOpen(true); // RF18: overlay masivo para confirmar el evento crítico.
-      onSuccess('Protocolo de emergencia ejecutado');
-      loadTurnoIngresos();
-      clearState();
-    } catch (error: any) {
-      setFeedback({ type: 'error', message: 'ERROR AL ACTIVAR EMERGENCIA' });
-      setFeedbackOverlayOpen(true); // RF18: overlay masivo de error.
-    }
-  };
-
-  const overlayTone = useMemo(() => { // RF33: mapea el feedback a una paleta de alto contraste estilo SENA.
-    if (feedback.type === 'success') return { bg: 'bg-[#39A900]', icon: CheckCircle2, label: 'ACCESO PERMITIDO' }; // Paleta SENA: verde.
-    if (feedback.type === 'error') return { bg: 'bg-[#D32F2F]', icon: XCircle, label: 'ACCESO DENEGADO' }; // Paleta SENA: rojo.
-    if (feedback.type === 'loading') return { bg: 'bg-[#003939]', icon: ScanLine, label: 'PROCESANDO' }; // Paleta SENA: verde oscuro.
-    return null; // UX: sin overlay si no hay estado.
-  }, [feedback.type]); // UX: recalcula solo si cambia el tipo.
-
   // RF33: El modal profesional se muestra cuando hay una respuesta exitosa.
   const showProfessionalModal = Boolean(feedback.type === 'success' && lastResponse);
 
+  const horaTurno = useMemo(() => (iso: string) => {
+    try {
+      return iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    } catch {
+      return '';
+    }
+  }, []);
+
   return (
-    <div className="relative"> {/* UI: wrapper para superponer overlays sin romper el layout del dashboard. */}
-      {/* Overlay de Error o Carga (Simple) */}
-      {feedbackOverlayOpen && overlayTone && feedback.type && (feedback.type !== 'success') && (
-        <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/80 p-4 pt-16 backdrop-blur-md">
-          <div className={`w-full max-w-3xl rounded-3xl ${overlayTone.bg} text-white shadow-[0_0_100px_rgba(0,0,0,0.5)] border border-white/20 animate-in zoom-in duration-300`}>
-            <div className="p-8 sm:p-12 flex items-start gap-8">
-              <div className="flex-shrink-0 bg-white/20 p-4 rounded-2xl">
-                <overlayTone.icon className="w-16 h-16 sm:w-20 sm:h-20" />
-              </div>
-              <div className="flex-1">
-                <p className="text-[12px] sm:text-[14px] font-black uppercase tracking-[0.3em] opacity-80 mb-2">{overlayTone.label}</p>
-                <p className="text-3xl sm:text-4xl font-black leading-tight break-words">{feedback.message}</p>
-                <div className="mt-6 flex items-center gap-4 text-white/60 text-xs font-bold uppercase tracking-widest">
-                  <span>F2: Enfocar</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                  <span>ESC: Limpiar</span>
+    <div className="space-y-6 relative" onClick={() => !showContingencia && !infoPlaca && !multiVehiculos && inputRef.current?.focus()}>
+      {/* Overlay de Error o Carga — lectura a distancia */}
+      {feedbackOverlayOpen && feedback.type && feedback.type !== 'success' && (
+        <div
+          className={`
+            fixed inset-0 z-[150] flex items-center justify-center p-6
+            animate-in fade-in duration-200 backdrop-blur-sm
+            ${feedback.type === 'loading' ? 'bg-[#012E25]/95' : 'bg-red-900/95'}
+          `}
+          onClick={feedback.type === 'error' ? closeFeedback : undefined}
+        >
+          <div className="text-center text-white max-w-2xl space-y-6">
+            <div className="flex justify-center">
+              {feedback.type === 'loading' ? (
+                <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center border border-white/20">
+                  <ScanLine size={60} strokeWidth={2} className="animate-pulse" />
                 </div>
-              </div>
+              ) : (
+                <div className="w-24 h-24 bg-red-600 rounded-full flex items-center justify-center shadow-lg shadow-red-900/20">
+                  <XCircle size={60} strokeWidth={2} />
+                </div>
+              )}
             </div>
-            <div className="px-8 sm:px-12 pb-10 flex justify-end">
-              <button
-                type="button"
-                onClick={closeFeedback}
-                className="rounded-2xl bg-white/10 hover:bg-white/20 px-8 py-4 text-sm font-black uppercase tracking-[0.2em] transition-all focus:outline-none focus:ring-4 focus:ring-white/40 active:scale-95"
-              >
-                Cerrar Aviso
-              </button>
-            </div>
+            <h2 className="text-3xl lg:text-5xl font-bold tracking-tight uppercase break-words">
+              {feedback.message}
+            </h2>
+            <p className="text-sm font-bold opacity-40 uppercase tracking-[0.2em]">
+              {feedback.type === 'error' ? 'ESC o toque para cerrar • F2 enfocar' : 'Procesando, un momento...'}
+            </p>
           </div>
         </div>
       )}
 
-      <div
-        className="bg-white border border-slate-200 rounded-3xl shadow-[0_18px_55px_rgba(15,23,42,0.10)] overflow-hidden"
-        onClick={() => !showContingencia && inputRef.current?.focus()} // RF33: click en el contenedor devuelve foco al lector.
-      >
-        <div className="p-6 sm:p-8"> {/* UI: padding grande para uso continuo. */}
-          <header className="flex items-start justify-between gap-4"> {/* UI: header del formulario. */}
-            <div className="flex-1"> {/* UI: bloque izquierdo. */}
-              <div className="flex items-center gap-3"> {/* UI: icono + título. */}
-                <div className="w-11 h-11 rounded-2xl bg-[#003939] text-white flex items-center justify-center shadow-sm"> {/* Paleta: verde oscuro en cabecera. */}
-                  <ScanLine className="w-6 h-6" /> {/* RF33: icono de escaneo. */}
-                </div> {/* UI: fin icono container. */}
-                <div> {/* UI: títulos. */}
-                  <h3 className="text-lg sm:text-xl font-black text-[#003939] tracking-tight">Control de Acceso</h3> {/* Paleta: verde oscuro institucional. */}
-                  <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Code128 / QR • Operación Mouse-Free</p> {/* RF33: etiqueta de modo operativo. */}
-                </div> {/* UI: fin títulos. */}
-              </div> {/* UI: fin fila título. */}
-            </div> {/* UI: fin bloque izquierdo. */}
+      {/* Input de Escaneo Compacto */}
+      <div className="relative group max-w-xl mx-auto">
+        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+          <ScanLine className={`w-5 h-5 transition-colors ${inputValue ? 'text-[#39B000]' : 'text-gray-300 dark:text-gray-600 group-focus-within:text-[#39B000]'}`} />
+        </div>
+        <label className="sr-only" htmlFor="scan-input">Código o Placa</label>
+        <input
+          id="scan-input"
+          ref={inputRef}
+          type="text"
+          placeholder="ESCANEAR O ESCRIBIR PLACA..."
+          autoComplete="off"
+          value={inputValue}
+          onChange={(e) => {
+            // Distinguir entre escritura humana y ráfaga del lector físico:
+            //  - Lector físico: dispara MUCHOS caracteres muy rápido (>= 4 chars
+            //    de diferencia en un único onChange).
+            //  - Humano: escribe 1 char por tecla.
+            //
+            // Solo cuando el lector envía una ráfaga grande mientras ya había contenido
+            // (sobre-escribir un resultado previo), reemplazamos en vez de concatenar.
+            const now = Date.now();
+            const gap = now - lastInputChangeAtRef.current;
+            const valorAnterior = inputValue;
+            const valorNuevo = e.target.value.toUpperCase();
+            const diff = valorNuevo.length - valorAnterior.length;
 
-            <div className="text-right"> {/* UI: bloque derecho para estado actual. */}
-              <span
-                className={[
-                  'inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-widest',
-                  feedback.type === 'loading'
-                    ? 'bg-[#003939]/10 text-[#003939] border-[#003939]/20'
-                    : 'bg-[#39A900]/10 text-[#003939] border-[#39A900]/30',
-                ].join(' ')}
-              >
-                <span className={[
-                  'w-2.5 h-2.5 rounded-full',
-                  feedback.type === 'loading' ? 'bg-[#FF6B00] animate-pulse' : 'bg-[#39A900]',
-                ].join(' ')} />
-                {feedback.type === 'loading' ? 'Procesando' : 'Listo'}
-              </span>
-            </div> {/* UI: fin bloque derecho. */}
-          </header>
+            const esRafagaLector = gap > 250 && valorAnterior.length > 0 && diff >= 4;
 
-          <div className="mt-7"> {/* UI: cuerpo del formulario. */}
-            <div className="flex items-center justify-between gap-4"> {/* RF33: fila de etiqueta “lector en escucha”. */}
-              <div className="flex items-center gap-3"> {/* RF33: icono “láser” + texto. */}
-                <span className="relative inline-flex h-3 w-3"> {/* RF33: contenedor del punto. */}
-                  <span className="absolute inline-flex h-full w-full rounded-full bg-[#39A900]/40 animate-ping" /> {/* Paleta: pulso verde (lector activo). */}
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-[#39A900]" /> {/* Paleta: punto verde fijo. */}
-                </span> {/* RF33: fin dot. */}
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-700">Lector Físico en Escucha Activa (Code128 / QR)</p> {/* RF33: confianza operacional. */}
-              </div> {/* RF33: fin fila laser. */}
-              <p className="hidden sm:block text-[11px] font-bold text-slate-500">F2: Enfocar • ESC: Limpiar • Enter: Enviar</p> {/* RF33: guía de atajos (accesible). */}
-            </div> {/* RF33: fin fila. */}
-
-            <div className="mt-4"> {/* RF33: zona del input principal. */}
-              <label className="sr-only" htmlFor="scan-input">Código o Placa</label> {/* WCAG: label accesible aunque visualmente oculto. */}
-              <div className="relative"> {/* UI: wrapper para icono interno. */}
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-5"> {/* UI: icono no-interactivo. */}
-                  <span className="w-3 h-3 rounded-full bg-[#003939] animate-pulse" /> {/* UI: punto “láser” en verde oscuro. */}
-                </div> {/* UI: fin icono. */}
-                <input
-                  id="scan-input"
-                  ref={inputRef}
-                  value={inputValue}
-                  onChange={(e) => {
-                    // Distinguir entre escritura humana y ráfaga del lector físico:
-                    //  - Lector físico: dispara MUCHOS caracteres muy rápido (>= 4 chars
-                    //    de diferencia en un único onChange).
-                    //  - Humano: escribe 1 char por tecla.
-                    //
-                    // Solo cuando el lector envía una ráfaga grande mientras ya había contenido
-                    // (sobre-escribir un resultado previo), reemplazamos en vez de concatenar.
-                    const now = Date.now();
-                    const gap = now - lastInputChangeAtRef.current;
-                    const valorAnterior = inputValue;
-                    const valorNuevo = e.target.value.toUpperCase();
-                    const diff = valorNuevo.length - valorAnterior.length;
-
-                    const esRafagaLector = gap > 250 && valorAnterior.length > 0 && diff >= 4;
-
-                    if (esRafagaLector) {
-                      const nuevosCaracteres = valorNuevo.slice(valorAnterior.length);
-                      setInputValue(nuevosCaracteres);
-                    } else {
-                      setInputValue(valorNuevo);
-                    }
-                    lastInputChangeAtRef.current = now;
-                  }}
-                  onKeyDown={handleKeyDown} // RF33: Enter dispara el flujo unificado de escaneo.
-                  disabled={feedback.type === 'loading'} // UX: evita doble envío.
-                  placeholder="ESCANEAR CÓDIGO (BARRAS/QR) O DIGITAR PLACA"
-                  className={[
-                    'w-full rounded-2xl bg-[#F8FAFC] text-slate-900 placeholder:text-slate-500',
-                    'border-4 border-[#003939] focus:border-[#39A900]',
-                    'px-14 py-5 text-lg font-black tracking-wide',
-                    'outline-none focus:ring-4 focus:ring-[#39A900]/20',
-                    'disabled:opacity-60',
-                  ].join(' ')}
-                />
-              </div> {/* UI: fin wrapper input. */}
-            </div> {/* RF33: fin zona input. */}
-
-            <div className="mt-5 grid grid-cols-2 gap-4"> {/* RF10/RF11: acciones principales entrada/salida. */}
-              <button
-                type="button"
-                onClick={() => handleAction('entrada')}
-                disabled={feedback.type === 'loading'}
-                className="h-14 rounded-2xl bg-[#39A900] text-white font-black uppercase tracking-widest text-[12px] shadow-sm hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-[#39A900]/30 disabled:opacity-60"
-              >
-                Entrada
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAction('salida')}
-                disabled={feedback.type === 'loading'}
-                className="h-14 rounded-2xl bg-[#003939] text-white font-black uppercase tracking-widest text-[12px] shadow-sm hover:brightness-110 focus:outline-none focus:ring-4 focus:ring-[#003939]/25 disabled:opacity-60"
-              >
-                Salida
-              </button>
-            </div>
-
-            <div className="mt-6"> {/* RF34: acceso a contingencia manual. */}
-              <button
-                type="button"
-                onClick={() => setShowContingencia((v) => !v)}
-                className="w-full rounded-2xl border-2 border-[#003939]/20 bg-white px-5 py-4 text-left hover:bg-[#F1F5F9] focus:outline-none focus:ring-4 focus:ring-[#003939]/15"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <FileText className="w-5 h-5 text-[#003939]" />
-                    <div>
-                      <p className="text-[12px] font-black text-[#003939] uppercase tracking-widest">Registro Manual (Contingencia)</p>
-                      <p className="mt-1 text-sm text-slate-600 font-medium">Usar solo si el lector/sensor no está operativo. Requiere motivo.</p>
-                    </div>
-                  </div>
-                  <span className="text-[12px] font-black text-slate-600">{showContingencia ? 'Ocultar' : 'Abrir'}</span>
-                </div>
-              </button>
-
-              {showContingencia && (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-[#F8FAFC] p-5">
-                  <label className="block text-[11px] font-black uppercase tracking-[0.18em] text-slate-600" htmlFor="motivo-input">
-                    Motivo (mínimo 10 caracteres)
-                  </label>
-                  <input
-                    id="motivo-input"
-                    ref={motivoRef}
-                    value={motivo}
-                    onChange={(e) => setMotivo(e.target.value)}
-                    className="mt-3 w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-slate-900 font-semibold focus:outline-none focus:ring-4 focus:ring-[#39A900]/20 focus:border-[#39A900]"
-                    placeholder="Describe la contingencia de manera clara..."
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleAction('manual')}
-                    disabled={feedback.type === 'loading'}
-                    className="mt-4 w-full h-12 rounded-xl bg-[#FF6B00] text-white font-black uppercase tracking-widest text-[12px] hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-[#FF6B00]/25 disabled:opacity-60"
-                  >
-                    Confirmar Contingencia
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-slate-200"> {/* RF18: acción crítica de emergencia. */}
-              <button
-                type="button"
-                onClick={handleEmergencia}
-                className="w-full rounded-2xl border-2 border-[#D32F2F]/30 bg-[#D32F2F]/5 px-5 py-4 text-left hover:bg-[#D32F2F]/10 focus:outline-none focus:ring-4 focus:ring-[#D32F2F]/20"
-              >
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-[#D32F2F]" />
-                  <div>
-                    <p className="text-[12px] font-black uppercase tracking-widest text-[#D32F2F]">Protocolo de Emergencia</p>
-                    <p className="mt-1 text-sm text-slate-700 font-medium">Libera bahías según política institucional. Requiere confirmación.</p>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
+            if (esRafagaLector) {
+              const nuevosCaracteres = valorNuevo.slice(valorAnterior.length);
+              setInputValue(nuevosCaracteres);
+            } else {
+              setInputValue(valorNuevo);
+            }
+            lastInputChangeAtRef.current = now;
+          }}
+          onKeyDown={handleKeyDown}
+          disabled={feedback.type === 'loading'}
+          className={`
+            w-full pl-12 pr-16 py-4 bg-gray-50 dark:bg-white/5 border-2 rounded-xl
+            text-lg font-bold tracking-widest transition-all outline-none disabled:opacity-60
+            ${feedback.type === 'error'
+              ? 'border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-900/20 text-red-600'
+              : 'border-transparent focus:border-[#39B000] focus:bg-white dark:focus:bg-[#121212] text-[#012E25] dark:text-white'}
+          `}
+        />
+        <div className="absolute inset-y-0 right-4 flex items-center gap-2">
+          <div className="px-2 py-1 bg-gray-200 dark:bg-white/10 rounded text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase">F2</div>
         </div>
       </div>
 
-      <div className="mt-6 rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)] overflow-hidden">
-        <div className="p-6 border-b border-slate-200 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.28em] text-slate-500">Vehículos Ingresados en tu Turno</p>
-            <p className="mt-1 text-lg font-black text-[#232323]">Últimos ingresos registrados por ti</p>
-          </div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-[#F8FAFC] px-3 py-2 text-[11px] font-black uppercase tracking-widest text-[#003939]">
-            <span className={['w-2.5 h-2.5 rounded-full', turnoLoading ? 'bg-[#FF6B00] animate-pulse' : 'bg-[#39A900]'].join(' ')} />
+      <p className="text-center text-[9px] font-bold text-gray-300 dark:text-gray-600 uppercase tracking-widest -mt-3">
+        Lector físico en escucha activa • F2: Enfocar • ESC: Limpiar • Enter: Enviar
+      </p>
+
+      {/* Botones de Acción */}
+      <div className="grid grid-cols-2 gap-4 max-w-xl mx-auto">
+        <button
+          onClick={() => handleAction('entrada')}
+          disabled={feedback.type === 'loading'}
+          className="flex flex-col items-center justify-center gap-2 p-6 bg-[#39B000] text-white rounded-2xl hover:bg-[#007832] transition-all shadow-lg shadow-green-900/10 active:scale-95 group disabled:opacity-60"
+        >
+          <CheckCircle2 size={24} className="group-hover:scale-110 transition-transform" />
+          <span className="text-sm font-bold uppercase tracking-widest">Entrada</span>
+        </button>
+        <button
+          onClick={() => handleAction('salida')}
+          disabled={feedback.type === 'loading'}
+          className="flex flex-col items-center justify-center gap-2 p-6 bg-[#012E25] text-white rounded-2xl hover:bg-black transition-all shadow-lg shadow-black/10 active:scale-95 group disabled:opacity-60"
+        >
+          <XCircle size={24} className="group-hover:scale-110 transition-transform" />
+          <span className="text-sm font-bold uppercase tracking-widest">Salida</span>
+        </button>
+      </div>
+
+      {/* Actividad Reciente Compacta — Vehículos ingresados en tu turno */}
+      <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-white/5">
+        <div className="flex items-center justify-between px-1">
+          <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Ingresos de tu turno</h4>
+          <span className={`text-[9px] font-bold uppercase tracking-widest ${turnoLoading ? 'text-orange-400 animate-pulse' : 'text-[#39B000] animate-pulse'}`}>
             {turnoLoading ? 'Cargando' : 'En vivo'}
           </span>
         </div>
-        <div className="p-6">
-          {turnoIngresos.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-[#F8FAFC] px-6 py-10 text-center">
-              <p className="text-sm font-semibold text-slate-600">Aún no hay ingresos registrados en tu turno.</p>
-              <p className="mt-2 text-[11px] font-black uppercase tracking-widest text-slate-500">Se actualiza automáticamente</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {turnoLoading ? (
+            Array(2).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 dark:bg-white/5 rounded-xl animate-pulse" />)
+          ) : turnoIngresos.length === 0 ? (
+            <div className="col-span-full py-6 text-center border border-dashed border-gray-100 dark:border-white/5 rounded-xl">
+              <p className="text-[10px] font-bold text-gray-300 dark:text-gray-700 uppercase tracking-widest">Sin registros recientes</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead>
-                  <tr className="text-left text-[11px] font-black uppercase tracking-widest text-slate-500">
-                    <th className="py-3 pr-4">Placa</th>
-                    <th className="py-3 pr-4">Hora ingreso</th>
-                    <th className="py-3">Tipo</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {turnoIngresos.map((row) => {
-                    const hora = row.horaIngreso ? new Date(row.horaIngreso).toLocaleTimeString() : '';
-                    return (
-                      <tr key={`${row.placa}-${row.horaIngreso}`} className="text-sm">
-                        <td className="py-4 pr-4">
-                          <span className="inline-flex items-center rounded-xl bg-[#003939] text-white px-3 py-2 font-black tracking-widest">
-                            {row.placa}
-                          </span>
-                        </td>
-                        <td className="py-4 pr-4 text-slate-700 font-semibold">{hora}</td>
-                        <td className="py-4">
-                          <span className="inline-flex items-center rounded-xl border border-[#39A900]/30 bg-[#39A900]/10 px-3 py-2 text-[12px] font-black text-[#003939]">
-                            {row.tipoVehiculo || 'N/D'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            turnoIngresos.slice(0, 6).map((ingreso, i) => (
+              <div key={`${ingreso.placa}-${i}`} className="flex items-center gap-3 p-3 bg-white dark:bg-[#121212] border border-gray-100 dark:border-white/5 rounded-xl hover:border-gray-200 dark:hover:border-white/10 transition-all group">
+                <div className="w-8 h-8 rounded-lg bg-gray-50 dark:bg-white/5 flex items-center justify-center text-[#39B000] font-bold text-[10px] group-hover:bg-[#39B000] group-hover:text-white transition-all">
+                  {ingreso.placa.substring(0, 2)}
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <p className="text-sm font-bold text-[#012E25] dark:text-white leading-none truncate">{ingreso.placa}</p>
+                  <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 mt-1 uppercase truncate">
+                    {(ingreso.tipoVehiculo || 'N/D')} • {horaTurno(ingreso.horaIngreso)}
+                  </p>
+                </div>
+              </div>
+            ))
           )}
         </div>
       </div>
 
-      {/* Overlay: Selección de USUARIO en registro manual de placa */}
-      {infoPlaca && (
-        <div className="fixed inset-0 z-[110] bg-[#003939]/95 backdrop-blur-sm p-6 flex flex-col items-center justify-center overflow-y-auto animate-in fade-in zoom-in duration-300">
-          <div className="max-w-5xl w-full">
-            <p className="text-[#39A900] text-center text-sm font-black uppercase tracking-[0.4em] mb-3">Registro manual</p>
-            <h2 className="text-white text-center text-4xl sm:text-5xl font-black uppercase tracking-tighter mb-2">
-              {infoPlaca.vehiculo.placa}
-            </h2>
-            <p className="text-white/60 text-center text-xs font-bold uppercase tracking-widest mb-8">
-              {infoPlaca.vehiculo.tipoVehiculo} • {infoPlaca.vehiculo.color}
+      {/* Registro Manual (Contingencia) */}
+      <div className={`
+        overflow-hidden transition-all duration-300 rounded-xl
+        ${showContingencia ? 'max-h-[400px] border border-[#39B000]/20 bg-green-50/20 dark:bg-[#39B000]/5 p-6' : 'max-h-0'}
+      `}>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold text-[#012E25] dark:text-white uppercase tracking-widest flex items-center gap-2">
+              <AlertCircle size={14} /> Contingencia Manual
             </p>
+            <span className="text-[8px] font-bold text-[#39B000] uppercase">Uso exclusivo sin lector QR</span>
+          </div>
 
-            {/* Galería de fotos del vehículo */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-              <FotoCard label="Vehículo" url={infoPlaca.vehiculo.fotoVehiculo} />
-              <FotoCard label="Tarjeta de Propiedad" url={infoPlaca.vehiculo.fotoTarjetaP} />
-              <FotoCard label="Foto de la Placa" url={infoPlaca.vehiculo.fotoPlaca} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Placa o Documento</label>
+              <input
+                type="text"
+                placeholder="Identificación..."
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value.toUpperCase())}
+                className="w-full px-4 py-3 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 focus:border-[#39B000] rounded-lg outline-none text-xs font-bold transition-all dark:text-white"
+              />
             </div>
-
-            <p className="text-white/80 text-center text-[11px] font-black uppercase tracking-widest mb-6">
-              Selecciona el usuario que está ingresando
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {infoPlaca.usuariosAutorizados.map((u) => (
-                <button
-                  key={u.documento}
-                  type="button"
-                  onClick={() => handleConfirmarUsuarioManual(u.documento)}
-                  disabled={feedback.type === 'loading'}
-                  className="group rounded-2xl bg-[#003939] text-white p-5 text-left shadow-sm hover:brightness-110 focus:outline-none focus:ring-4 focus:ring-[#39A900]/25 disabled:opacity-60 flex items-center gap-4"
-                >
-                  <div className="w-16 h-16 rounded-xl bg-white/10 overflow-hidden flex items-center justify-center shrink-0">
-                    {u.fotoPersona ? (
-                      <img src={u.fotoPersona} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-2xl font-black">{u.nombreCompleto?.charAt(0) || '?'}</span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xl font-black uppercase tracking-tight truncate">{u.nombreCompleto}</p>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">CC {u.documento}</p>
-                    <span className={`mt-2 inline-block px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${
-                      u.rol === 'PROPIETARIO' ? 'bg-[#39A900]/20 text-[#39A900]' : 'bg-amber-500/20 text-amber-300'
-                    }`}>
-                      {u.rol === 'PROPIETARIO' ? 'Propietario' : 'Compartido'}
-                    </span>
-                  </div>
-                </button>
-              ))}
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Motivo (mínimo 10 caracteres)</label>
+              <input
+                ref={motivoRef}
+                type="text"
+                placeholder="Ej: Falla del lector, visitante..."
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                className="w-full px-4 py-3 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 focus:border-[#39B000] rounded-lg outline-none text-xs font-bold transition-all dark:text-white"
+              />
             </div>
+          </div>
 
+          <div className="flex justify-end gap-3 pt-2">
             <button
-              type="button"
-              onClick={() => { setInfoPlaca(null); setFeedback({ type: null, message: '' }); }}
-              className="mt-10 w-full text-white/40 hover:text-white text-[10px] font-black uppercase tracking-[0.3em] transition-colors"
+              onClick={() => { setShowContingencia(false); setMotivo(''); }}
+              className="px-4 py-2 text-[10px] font-bold uppercase text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors"
             >
-              [ ESC ] Cancelar operación
+              Cancelar
             </button>
+            <button
+              onClick={() => handleAction('manual')}
+              disabled={feedback.type === 'loading'}
+              className="px-8 py-2 bg-[#39B000] text-white rounded-lg text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-green-900/10 active:scale-95 transition-all disabled:opacity-60"
+            >
+              Confirmar Registro
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {!showContingencia && (
+        <button
+          onClick={() => setShowContingencia(true)}
+          className="w-full py-3 border border-dashed border-gray-100 dark:border-white/10 hover:border-gray-200 dark:hover:border-white/20 rounded-xl text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest transition-all"
+        >
+          + Activar Registro Manual
+        </button>
+      )}
+
+      {/* Overlay: Selección de USUARIO en registro manual de placa (vehículo compartido) */}
+      {infoPlaca && (
+        <div className="fixed inset-0 z-[110] bg-[#012E25]/90 backdrop-blur-sm p-4 flex items-center justify-center overflow-y-auto animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-[#121212] rounded-2xl w-full max-w-3xl my-auto overflow-hidden shadow-2xl border border-gray-100 dark:border-white/5 transition-colors duration-300">
+            <div className="p-6 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-[#39B000] uppercase tracking-widest mb-1">Registro manual • Vehículo compartido</p>
+                <h3 className="text-2xl font-bold text-[#012E25] dark:text-white tracking-widest">{infoPlaca.vehiculo.placa}</h3>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                  {infoPlaca.vehiculo.tipoVehiculo} • {infoPlaca.vehiculo.color}
+                </p>
+              </div>
+              <button
+                onClick={() => { setInfoPlaca(null); setFeedback({ type: null, message: '' }); }}
+                className="p-2 hover:bg-gray-50 dark:hover:bg-white/5 text-gray-400 rounded-lg transition-all"
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Galería de fotos del vehículo */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <FotoCard label="Vehículo" url={infoPlaca.vehiculo.fotoVehiculo} />
+                <FotoCard label="Tarjeta de Propiedad" url={infoPlaca.vehiculo.fotoTarjetaP} />
+                <FotoCard label="Foto de la Placa" url={infoPlaca.vehiculo.fotoPlaca} />
+              </div>
+
+              <p className="text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Selecciona el usuario que está ingresando
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {infoPlaca.usuariosAutorizados.map((u) => (
+                  <button
+                    key={u.documento}
+                    type="button"
+                    onClick={() => handleConfirmarUsuarioManual(u.documento)}
+                    disabled={feedback.type === 'loading'}
+                    className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 dark:border-white/5 hover:border-[#39B000] hover:bg-green-50/30 dark:hover:bg-[#39B000]/10 transition-all group text-left disabled:opacity-60"
+                  >
+                    <div className="w-12 h-12 rounded-lg bg-gray-50 dark:bg-white/5 overflow-hidden flex items-center justify-center shrink-0">
+                      {u.fotoPersona ? (
+                        <img src={u.fotoPersona} className="w-full h-full object-cover" alt={u.nombreCompleto} />
+                      ) : (
+                        <span className="text-lg font-bold text-gray-400">{u.nombreCompleto?.charAt(0) || '?'}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-[#012E25] dark:text-white truncate">{u.nombreCompleto}</p>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">CC {u.documento}</p>
+                      <span className={`mt-1 inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest ${
+                        u.rol === 'PROPIETARIO'
+                          ? 'bg-[#39B000]/10 text-[#39B000]'
+                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                      }`}>
+                        {u.rol === 'PROPIETARIO' ? 'Propietario' : 'Compartido'}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => { setInfoPlaca(null); setFeedback({ type: null, message: '' }); }}
+                className="w-full text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 text-[9px] font-bold uppercase tracking-[0.3em] transition-colors"
+              >
+                [ ESC ] Cancelar operación
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Overlay de Selección de Vehículo (RF31) */}
       {multiVehiculos && (
-        <div className="fixed inset-0 z-[100] bg-[#003939]/95 backdrop-blur-sm p-6 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300">
-          <div className="max-w-4xl w-full">
-            <p className="text-[#39A900] text-center text-sm font-black uppercase tracking-[0.4em] mb-4">Aprendiz identificado</p>
-            <h2 className="text-white text-center text-4xl sm:text-6xl font-black uppercase tracking-tighter mb-12">{aprendizPendiente}</h2>
-            
-            <p className="text-white/60 text-center text-[10px] font-black uppercase tracking-widest mb-6">Seleccione el vehículo para registrar el ingreso</p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="fixed inset-0 z-[100] bg-[#012E25]/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-[#121212] rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl border border-gray-100 dark:border-white/5 transition-colors duration-300">
+            <div className="p-6 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-[#39B000] uppercase tracking-widest mb-1">Selección de Vehículo</p>
+                <h3 className="text-lg font-bold text-[#012E25] dark:text-white">{aprendizPendiente}</h3>
+              </div>
+              <button onClick={clearState} className="p-2 hover:bg-gray-50 dark:hover:bg-white/5 text-gray-400 rounded-lg transition-all">
+                <XCircle size={20} />
+              </button>
+            </div>
+            <div className="p-6 grid grid-cols-1 gap-3">
               {multiVehiculos.map((v) => (
                 <button
                   key={v.placa}
-                  type="button"
                   onClick={() => handleConfirmarMultivehiculo(v.placa)}
                   disabled={feedback.type === 'loading'}
-                  className="group rounded-2xl bg-[#003939] text-white p-6 text-left shadow-sm hover:brightness-110 focus:outline-none focus:ring-4 focus:ring-[#39A900]/25 disabled:opacity-60"
+                  className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 dark:border-white/5 hover:border-[#39B000] hover:bg-green-50/30 dark:hover:bg-[#39B000]/10 transition-all group text-left disabled:opacity-60"
                 >
-                  <p className="text-4xl font-black tracking-tighter group-hover:scale-105 transition-transform">{v.placa}</p>
-                  <p className="mt-2 text-[10px] font-black uppercase tracking-widest opacity-60">{v.tipoVehiculo} • {v.color}</p>
+                  <div className="w-10 h-10 rounded-lg bg-gray-50 dark:bg-white/5 flex items-center justify-center text-gray-400 group-hover:bg-[#39B000] group-hover:text-white transition-all">
+                    <Car size={20} />
+                  </div>
+                  <div>
+                    <p className="text-base font-bold text-[#012E25] dark:text-white">{v.placa}</p>
+                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{v.tipoVehiculo} • {v.color}</p>
+                  </div>
                 </button>
               ))}
             </div>
-
             <button
               type="button"
               onClick={clearState}
-              className="mt-12 w-full text-white/40 hover:text-white text-[10px] font-black uppercase tracking-[0.3em] transition-colors"
+              className="w-full pb-5 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 text-[9px] font-bold uppercase tracking-[0.3em] transition-colors"
             >
               [ ESC ] Cancelar operación
             </button>
@@ -860,16 +808,16 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
       {/* Modal de Confirmación de Ingreso/Salida (Panel Profesional para el Vigilante) */}
       {showProfessionalModal && lastResponse && (
         <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-6xl sm:rounded-[3rem] overflow-hidden shadow-[0_0_150px_rgba(0,0,0,0.9)] animate-in zoom-in duration-500 my-auto border border-white/20">
+          <div className="bg-white w-full max-w-6xl sm:rounded-[2rem] overflow-hidden shadow-[0_0_150px_rgba(0,0,0,0.9)] animate-in zoom-in duration-500 my-auto border border-white/20">
             {/* Header de Estado Ultra-Prominente */}
-            <div className={`p-6 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 border-b-[12px] ${lastResponse.movimiento?.horaSalida ? 'bg-orange-600 border-orange-700' : 'bg-[#003939] border-[#39A900]'}`}>
+            <div className={`p-6 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 border-b-[12px] ${lastResponse.movimiento?.horaSalida ? 'bg-orange-600 border-orange-700' : 'bg-[#012E25] border-[#39B000]'}`}>
               <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
                 <div className="bg-white/20 p-5 rounded-[2rem] shadow-2xl backdrop-blur-xl border border-white/30">
                   <CheckCircle2 size={60} className="text-white" />
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 mb-3">
-                    <span className={`px-8 py-3 rounded-2xl text-2xl font-black uppercase tracking-[0.5em] shadow-[0_10px_30px_rgba(0,0,0,0.3)] ${lastResponse.movimiento?.horaSalida ? 'bg-white text-orange-600' : 'bg-[#39A900] text-white'}`}>
+                    <span className={`px-8 py-3 rounded-2xl text-2xl font-black uppercase tracking-[0.5em] shadow-[0_10px_30px_rgba(0,0,0,0.3)] ${lastResponse.movimiento?.horaSalida ? 'bg-white text-orange-600' : 'bg-[#39B000] text-white'}`}>
                       {lastResponse.movimiento?.horaSalida ? 'SALIDA' : 'INGRESO'}
                     </span>
                     <p className="text-white/80 text-sm font-black uppercase tracking-[0.5em] border-l-4 border-white/30 pl-4">Confirmado</p>
@@ -880,9 +828,9 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
                   <p className="text-white/90 text-xl font-bold uppercase tracking-[0.2em]">{lastResponse.mensaje}</p>
                 </div>
               </div>
-              <button 
-                onClick={closeFeedback} 
-                className="group bg-white/10 hover:bg-white/20 p-6 rounded-[2.5rem] transition-all duration-300 shadow-xl border border-white/10"
+              <button
+                onClick={closeFeedback}
+                className="group bg-white/10 hover:bg-white/20 p-6 rounded-[2rem] transition-all duration-300 shadow-xl border border-white/10"
               >
                 <XCircle size={48} className="text-white/60 group-hover:text-white group-hover:scale-110 transition-transform" />
               </button>
@@ -890,35 +838,35 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
 
             <div className="p-6 sm:p-12">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12">
-                
+
                 {/* Columna Izquierda: Usuario y Tiempos */}
                 <div className="lg:col-span-5 space-y-8 sm:space-y-12">
-                  
+
                   {/* Perfil del Usuario */}
-                  <div className="bg-slate-50 p-8 rounded-[3rem] border-2 border-slate-100 flex items-center gap-8 shadow-inner">
+                  <div className="bg-slate-50 p-8 rounded-[2rem] border-2 border-slate-100 flex items-center gap-8 shadow-inner">
                     <div className="relative">
-                      <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-[2.5rem] overflow-hidden border-8 border-white shadow-2xl bg-white">
+                      <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-[2rem] overflow-hidden border-8 border-white shadow-2xl bg-white">
                         {lastResponse.aprendiz?.fotoPersona ? (
-                          <img 
-                            src={lastResponse.aprendiz.fotoPersona} 
+                          <img
+                            src={lastResponse.aprendiz.fotoPersona}
                             alt={lastResponse.aprendiz?.nombreCompleto}
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-slate-100 text-[#003939]/30">
+                          <div className="w-full h-full flex items-center justify-center bg-slate-100 text-[#012E25]/30">
                             <span className="text-7xl font-black">
                               {(lastResponse.aprendiz?.nombreCompleto || 'S').charAt(0)}
                             </span>
                           </div>
                         )}
                       </div>
-                      <div className="absolute -bottom-3 -right-3 bg-[#39A900] text-white px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl border-4 border-white">
+                      <div className="absolute -bottom-3 -right-3 bg-[#39B000] text-white px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl border-4 border-white">
                         VÁLIDO
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[#39A900] text-xs font-black uppercase tracking-[0.3em] mb-2">Identidad del Usuario</p>
-                      <h4 className="text-[#003939] text-3xl sm:text-4xl font-black truncate leading-none mb-3">
+                      <p className="text-[#39B000] text-xs font-black uppercase tracking-[0.3em] mb-2">Identidad del Usuario</p>
+                      <h4 className="text-[#012E25] text-3xl sm:text-4xl font-black truncate leading-none mb-3">
                         {lastResponse.aprendiz?.nombreCompleto || 'USUARIO DESCONOCIDO'}
                       </h4>
                       <div className="inline-flex bg-slate-200/50 px-4 py-2 rounded-xl">
@@ -931,8 +879,8 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
 
                   {/* Tiempos de Operación */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div className="bg-slate-900 p-8 rounded-[3rem] shadow-2xl flex flex-col items-center justify-center text-center">
-                      <p className="text-[#39A900] text-xs font-black uppercase tracking-[0.3em] mb-4">Hora de Registro</p>
+                    <div className="bg-slate-900 p-8 rounded-[2rem] shadow-2xl flex flex-col items-center justify-center text-center">
+                      <p className="text-[#39B000] text-xs font-black uppercase tracking-[0.3em] mb-4">Hora de Registro</p>
                       <span className="text-white text-5xl font-black tracking-tighter tabular-nums leading-none mb-2">
                         {new Date(lastResponse.movimiento?.horaSalida || lastResponse.movimiento?.horaIngreso || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>
@@ -940,7 +888,7 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
                     </div>
 
                     {lastResponse.movimiento?.horaSalida && lastResponse.movimiento?.horaIngreso ? (
-                      <div className="bg-orange-50 p-8 rounded-[3rem] border-4 border-orange-100 flex flex-col items-center justify-center text-center">
+                      <div className="bg-orange-50 p-8 rounded-[2rem] border-4 border-orange-100 flex flex-col items-center justify-center text-center">
                         <p className="text-orange-600 text-xs font-black uppercase tracking-[0.3em] mb-4">Ingresó el Día</p>
                         <span className="text-orange-950 text-4xl font-black tracking-tighter tabular-nums leading-none mb-2">
                           {new Date(lastResponse.movimiento.horaIngreso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -948,10 +896,10 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
                         <p className="text-orange-600/60 text-[10px] font-bold uppercase tracking-widest">Entrada registrada</p>
                       </div>
                     ) : lastResponse.bahia ? (
-                      <div className="bg-[#39A900]/10 p-8 rounded-[3rem] border-4 border-[#39A900]/20 flex flex-col items-center justify-center text-center">
-                        <p className="text-[#39A900] text-xs font-black uppercase tracking-[0.3em] mb-4">Bahía Asignada</p>
-                        <span className="text-[#003939] text-6xl font-black tracking-tighter leading-none mb-2">{lastResponse.bahia}</span>
-                        <p className="text-[#39A900]/60 text-[10px] font-bold uppercase tracking-widest">Zona Autorizada</p>
+                      <div className="bg-[#39B000]/10 p-8 rounded-[2rem] border-4 border-[#39B000]/20 flex flex-col items-center justify-center text-center">
+                        <p className="text-[#39B000] text-xs font-black uppercase tracking-[0.3em] mb-4">Bahía Asignada</p>
+                        <span className="text-[#012E25] text-6xl font-black tracking-tighter leading-none mb-2">{lastResponse.bahia}</span>
+                        <p className="text-[#39B000]/60 text-[10px] font-bold uppercase tracking-widest">Zona Autorizada</p>
                       </div>
                     ) : null}
                   </div>
@@ -960,7 +908,7 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
                 {/* Columna Derecha: Galería de Inspección */}
                 <div className="lg:col-span-7 space-y-8">
                   <div className="flex items-center justify-between px-4">
-                    <p className="text-[#003939] text-sm font-black uppercase tracking-[0.5em] border-l-8 border-[#39A900] pl-4">
+                    <p className="text-[#012E25] text-sm font-black uppercase tracking-[0.5em] border-l-8 border-[#39B000] pl-4">
                       Evidencia del Registro
                     </p>
                     <div className="flex items-center gap-2 text-slate-400">
@@ -968,14 +916,14 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
                       <span className="text-[10px] font-black uppercase tracking-widest">Validación Requerida</span>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-8">
                     {/* Foto Principal: Vehículo */}
                     <div className="col-span-2 relative group cursor-zoom-in">
-                      <div className="absolute top-6 left-6 z-10 bg-[#003939]/90 backdrop-blur-md text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl border border-white/20">
+                      <div className="absolute top-6 left-6 z-10 bg-[#012E25]/90 backdrop-blur-md text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl border border-white/20">
                         Vehículo Registrado
                       </div>
-                      <div className="h-80 sm:h-96 rounded-[3.5rem] overflow-hidden border-8 border-slate-100 shadow-2xl bg-slate-100">
+                      <div className="h-80 sm:h-96 rounded-[2rem] overflow-hidden border-8 border-slate-100 shadow-2xl bg-slate-100">
                         {lastResponse.vehiculo?.fotoVehiculo ? (
                           <img src={lastResponse.vehiculo.fotoVehiculo} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Vehículo" />
                         ) : (
@@ -991,7 +939,7 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
                       <div className="absolute top-5 left-5 z-10 bg-black/70 backdrop-blur-md text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg">
                         Placa Física
                       </div>
-                      <div className="h-56 rounded-[3rem] overflow-hidden border-6 border-slate-100 shadow-xl bg-slate-100">
+                      <div className="h-56 rounded-[2rem] overflow-hidden border-4 border-slate-100 shadow-xl bg-slate-100">
                         {lastResponse.vehiculo?.fotoPlaca ? (
                           <img src={lastResponse.vehiculo.fotoPlaca} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Placa" />
                         ) : (
@@ -1007,7 +955,7 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
                       <div className="absolute top-5 left-5 z-10 bg-black/70 backdrop-blur-md text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg">
                         Documento Legal
                       </div>
-                      <div className="h-56 rounded-[3rem] overflow-hidden border-6 border-slate-100 shadow-xl bg-slate-100">
+                      <div className="h-56 rounded-[2rem] overflow-hidden border-4 border-slate-100 shadow-xl bg-slate-100">
                         {lastResponse.vehiculo?.fotoTarjetaP ? (
                           <img src={lastResponse.vehiculo.fotoTarjetaP} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Tarjeta" />
                         ) : (
@@ -1021,7 +969,7 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
                 </div>
               </div>
             </div>
-            
+
             <div className="p-10 bg-slate-50 border-t-2 border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-8">
               <div className="flex items-center gap-5 text-slate-500 max-w-xl">
                 <div className="bg-orange-500/10 p-3 rounded-2xl text-orange-600">
@@ -1032,9 +980,9 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
                   Verifique que la placa física coincida exactamente con la digital antes de permitir el movimiento.
                 </p>
               </div>
-              <button 
+              <button
                 onClick={closeFeedback}
-                className="w-full sm:w-auto bg-[#003939] hover:bg-[#39A900] text-white px-16 py-7 rounded-[2rem] font-black uppercase tracking-[0.3em] text-lg shadow-[0_20px_50px_rgba(0,57,57,0.3)] transition-all duration-300 hover:scale-105 active:scale-95 border-b-8 border-black/20"
+                className="w-full sm:w-auto bg-[#012E25] hover:bg-[#39B000] text-white px-16 py-7 rounded-[2rem] font-black uppercase tracking-[0.3em] text-lg shadow-[0_20px_50px_rgba(1,46,37,0.3)] transition-all duration-300 hover:scale-105 active:scale-95 border-b-8 border-black/20"
               >
                 AUTORIZAR Y CERRAR
               </button>
@@ -1044,19 +992,21 @@ export const MovementForm: React.FC<MovementFormProps> = ({ onSuccess, onError }
       )}
     </div>
   );
-};
+});
+
+MovementForm.displayName = 'MovementForm';
 
 /** Tarjeta pequeña de foto del vehículo para el modal de registro manual */
-const FotoCard: React.FC<{ label: string; url: string | null }> = ({ label, url }) => (
-  <div className="rounded-2xl overflow-hidden border-2 border-white/10 bg-white/5">
-    <div className="bg-black/40 px-3 py-2">
-      <p className="text-white/80 text-[10px] font-black uppercase tracking-widest">{label}</p>
+const FotoCard = ({ label, url }: { label: string; url: string | null }) => (
+  <div className="rounded-xl overflow-hidden border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/5">
+    <div className="px-3 py-2 border-b border-gray-100 dark:border-white/5">
+      <p className="text-gray-400 text-[9px] font-bold uppercase tracking-widest">{label}</p>
     </div>
-    <div className="h-40 bg-slate-100 flex items-center justify-center">
+    <div className="h-32 bg-slate-100 dark:bg-white/5 flex items-center justify-center">
       {url ? (
         <img src={url} className="w-full h-full object-cover" alt={label} />
       ) : (
-        <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">Sin foto</span>
+        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Sin foto</span>
       )}
     </div>
   </div>

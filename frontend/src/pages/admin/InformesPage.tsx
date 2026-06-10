@@ -276,34 +276,30 @@ export const InformesPage: React.FC = () => { // UI: componente principal de la 
   return ( // UI: inicio de layout “Suite Ejecutiva de Auditoría”.
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900"> {/* Paleta SENA/WCAG: fondo gris institucional y texto oscuro con contraste alto. */}
       <div className="mx-auto max-w-[1600px] space-y-8 px-4 py-8 md:px-6"> {/* Layout: ancho amplio sin forzar scroll horizontal; padding responsive. */}
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"> {/* UI: header ejecutivo; stack en móvil, fila en desktop. */}
-          <div> {/* UI: bloque de identidad (izquierda). */}
-            <p className="text-[11px] font-black uppercase tracking-[0.28em] text-slate-500">Administrador</p> {/* WCAG: texto secundario con tamaño pequeño pero peso alto para legibilidad. */}
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-[#003939] md:text-4xl">Suite de Auditoría e Informes</h1> {/* Paleta SENA: verde oscuro; jerarquía tipográfica clara. */}
-            <p className="mt-2 text-sm font-medium text-slate-600">RF21 • RF22 • RF23 — Histórico analítico y exportación institucional</p> {/* UX: contexto funcional (reduce incertidumbre). */}
-          </div> {/* UI: fin bloque izquierdo. */}
-
-          <div className="flex items-center gap-3"> {/* UI: bloque de acciones (derecha). */}
-            <Badge variant="info">ADMIN</Badge> {/* UI: refuerzo de rol actual; consistencia con otros módulos. */}
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-end -mt-20 mb-10 relative z-50">
+          <div className="flex items-center gap-3">
+            <Badge variant="info" className="bg-white/80 backdrop-blur-sm border-slate-200 text-slate-600">ADMIN</Badge>
             <button
-              type="button" // HTML: asegura semántica de botón (evita submit accidental).
-              onClick={descargarCsv} // RF23: handler de exportación.
-              disabled={isExporting} // RF23: lock de doble export.
-              className={[ // Tailwind: clases agrupadas para legibilidad (sin componentes externos adicionales).
-                'inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3', // UI: hit-area amplia (target táctil) y esquinas premium.
-                'bg-[#003939] text-[11px] font-black uppercase tracking-widest text-white', // Paleta SENA: botón principal verde oscuro con texto blanco.
-                'hover:brightness-110', // UX: feedback hover sutil (no cambia color drásticamente).
-                'focus:outline-none focus:ring-4 focus:ring-[#003939]/20', // WCAG: anillo de foco visible y consistente (teclado).
-                'disabled:cursor-not-allowed disabled:opacity-60', // WCAG/UX: estado deshabilitado evidente.
-              ].join(' ')} // UI: fin className.
-              aria-busy={isExporting} // WCAG: comunica estado de “ocupado” a lectores de pantalla.
-              aria-label={isExporting ? 'Procesando reporte para exportación' : 'Exportar reporte histórico a CSV'} // WCAG: etiqueta explícita (útil si iconos cambian).
+              type="button"
+              onClick={descargarCsv}
+              disabled={isExporting}
+              className={[
+                'inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3',
+                'bg-[#39A900] text-[11px] font-black uppercase tracking-widest text-white',
+                'hover:bg-[#2F8A00] shadow-[0_8px_20px_rgba(57,169,0,0.3)]',
+                'focus:outline-none focus:ring-4 focus:ring-[#39A900]/20',
+                'disabled:cursor-not-allowed disabled:opacity-60',
+              ].join(' ')}
+              aria-busy={isExporting}
+              aria-label={isExporting ? 'Procesando reporte para exportación' : 'Exportar reporte histórico a CSV'}
             >
-              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {/* UX: spinner vs icono; tamaño constante evita layout shift. */}
-              {isExporting ? 'Procesando Reporte...' : 'Exportar CSV'} {/* RF23: texto cambia para prevenir duplicados y explicar bloqueo. */}
-            </button> {/* UI: fin botón export. */}
-          </div> {/* UI: fin bloque derecho. */}
-        </header> {/* UI: fin header. */}
+              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              <span>{isExporting ? 'Exportando...' : 'Descargar reporte (CSV)'}</span>
+            </button>
+          </div>
+        </header>
+
+        {/* KPIs Analíticos — Cards de alto impacto solicitado */}
 
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"> {/* UI: grilla de KPIs (4) solicitada; responsive sin overflow. */}
           <KpiCard title="Total accesos" value={String(statsKpi.totalAccesos)} subtitle="Ingresos en el período" gradient="bg-gradient-to-br from-[#003939] to-[#004d4d]" Icon={ShieldCheck} /> {/* KPI: volumen total. */}

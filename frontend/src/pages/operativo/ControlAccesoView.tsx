@@ -1,0 +1,187 @@
+import React, { useMemo, useRef } from 'react';
+import {
+  ShieldAlert, ShieldCheck, ClipboardList,
+  Car, Users, LayoutGrid, Info, LogOut
+} from 'lucide-react';
+import { useOperativo } from '../../hooks/useOperativo';
+import { useNotification } from '../../contexts/NotificationContext';
+import { MovementForm } from '../../components/MovementForm';
+import type { MovementFormHandle } from '../../components/MovementForm';
+import { operativoService } from '../../services/operativo.service';
+
+export const ControlAccesoView: React.FC = () => {
+  const { stats, alerts, vehiculos, loading, refresh, handleQuickSalida } = useOperativo();
+  const { showNotification } = useNotification();
+  const formRef = useRef<MovementFormHandle>(null);
+
+  const handleSalidaEmergencia = async () => {
+    if (!window.confirm('¿ESTÁ SEGURO? Esta acción registrará la salida de todos los vehículos activos.')) return;
+    try {
+      await operativoService.salidaEmergencia();
+      showNotification('Protocolo de emergencia activado. Salidas registradas.', 'success');
+      refresh();
+    } catch (err: any) {
+      showNotification(err.response?.data?.mensaje || err.response?.data?.message || 'Error al activar emergencia', 'error');
+    }
+  };
+
+  const handleIngresoManual = () => {
+    formRef.current?.activateManualMode();
+  };
+
+  const estadoGlobal = useMemo(() => {
+    const tipos = alerts.map(a => String(a.tipo || '').toUpperCase());
+    if (tipos.some(t => t.includes('PARQUEADERO_DESHABILITADO'))) return 'DESHABILITADO';
+    if (tipos.some(t => t.includes('PARQUEADERO_LLENO'))) return 'LLENO';
+    if (tipos.some(t => t.includes('UMBRAL_80'))) return 'ALERTA_80';
+    if (stats.total > 0 && stats.disponibles === 0) return 'LLENO';
+    return 'DISPONIBLE';
+  }, [alerts, stats.disponibles, stats.total]);
+
+  const estadoStyle = useMemo(() => {
+    if (estadoGlobal === 'DESHABILITADO') return { bg: 'bg-red-600', label: 'DESHABILITADO', color: 'text-red-600' };
+    if (estadoGlobal === 'LLENO') return { bg: 'bg-orange-500', label: 'LLENO', color: 'text-orange-500' };
+    if (estadoGlobal === 'ALERTA_80') return { bg: 'bg-orange-400', label: 'ALERTA 80%', color: 'text-orange-400' };
+    return { bg: 'bg-[#39B000]', label: 'DISPONIBLE', color: 'text-[#39B000]' };
+  }, [estadoGlobal]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="w-10 h-10 border-4 border-[#39B000]/20 border-t-[#39B000] rounded-full animate-spin" />
+    </div>
+  );
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto animate-in fade-in duration-500">
+      {/* Resumen de Estado Superior - Compacto */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="md:col-span-1 bg-white dark:bg-[#121212] p-4 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center gap-4 transition-colors duration-300">
+          <div className={`w-10 h-10 rounded-lg ${estadoStyle.bg} flex items-center justify-center text-white shrink-0`}>
+            <ShieldCheck size={20} />
+          </div>
+          <div>
+            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Sistema</p>
+            <p className={`text-sm font-bold ${estadoStyle.color}`}>{estadoStyle.label}</p>
+          </div>
+        </div>
+
+        <KpiMini label="Capacidad" value={stats.total} icon={<LayoutGrid size={16} />} />
+        <KpiMini label="Ocupados" value={stats.ocupados} icon={<Car size={16} />} />
+        <KpiMini label="Disponibles" value={stats.disponibles} icon={<Info size={16} />} highlight />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Área Principal de Gestión */}
+        <div className="lg:col-span-8 space-y-6">
+          <div className="bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 overflow-hidden transition-colors duration-300">
+            <div className="px-6 py-4 border-b border-gray-50 dark:border-white/5 bg-gray-50/30 dark:bg-white/5 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-[#012E25] dark:text-white uppercase tracking-widest">Control de Acceso</h2>
+              <div className="flex items-center gap-2">
+                 <div className="w-1.5 h-1.5 rounded-full bg-[#39B000] animate-pulse" />
+                 <span className="text-[9px] font-bold text-gray-400 uppercase">Escáner Activo</span>
+              </div>
+            </div>
+            <div className="p-8">
+              <MovementForm
+                ref={formRef}
+                onSuccess={(msg) => { showNotification(msg, 'success'); refresh(); }}
+                onError={(msg) => { showNotification(msg, 'error'); }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Acciones Secundarias */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 p-6 space-y-4 transition-colors duration-300">
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Protocolos Especiales</h3>
+
+            <button
+              onClick={handleIngresoManual}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-left group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-gray-50 dark:bg-white/5 flex items-center justify-center text-gray-400 group-hover:bg-[#39B000] group-hover:text-white transition-all">
+                <ClipboardList size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[#012E25] dark:text-white">Ingreso Manual</p>
+                <p className="text-[9px] text-gray-400 uppercase">Sin código QR</p>
+              </div>
+            </button>
+
+            <button
+              onClick={handleSalidaEmergencia}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border border-red-50 dark:border-red-900/20 bg-red-50/10 dark:bg-red-900/10 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-left group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/40 flex items-center justify-center text-red-600 dark:text-red-400 group-hover:bg-red-600 group-hover:text-white transition-all">
+                <ShieldAlert size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-red-700 dark:text-red-400">Emergencia</p>
+                <p className="text-[9px] text-red-400 dark:text-red-500/60 uppercase">Liberación total</p>
+              </div>
+            </button>
+          </div>
+
+          {/* Vehículos activos — salida rápida (RF11) */}
+          <div className="bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 p-6 transition-colors duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Salida Rápida</h3>
+              <span className="text-[9px] font-bold text-[#39B000] uppercase tracking-widest">{vehiculos.length} activos</span>
+            </div>
+            <div className="space-y-3 max-h-[320px] overflow-y-auto custom-scrollbar">
+              {vehiculos.length === 0 ? (
+                <div className="py-6 text-center border border-dashed border-gray-100 dark:border-white/5 rounded-xl">
+                  <p className="text-[10px] font-bold text-gray-300 dark:text-gray-700 uppercase tracking-widest">Sin vehículos activos</p>
+                </div>
+              ) : (
+                vehiculos.slice(0, 6).map((v) => (
+                  <div key={v.placa} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/5 hover:border-gray-200 dark:hover:border-white/10 transition-all group">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-[#012E25] dark:text-white tracking-widest truncate">{v.placa}</p>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">{v.bahia}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickSalida(v.placa)}
+                      className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-[#012E25] dark:bg-[#39B000] text-white rounded-lg text-[9px] font-bold uppercase tracking-widest hover:bg-black dark:hover:bg-[#007832] transition-all active:scale-95"
+                    >
+                      <LogOut size={12} />
+                      Salida
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="bg-[#012E25] rounded-2xl p-6 text-white relative overflow-hidden shadow-lg shadow-[#012E25]/20">
+             <div className="absolute top-0 right-0 w-24 h-24 bg-[#39B000]/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
+             <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest mb-3">Soporte Técnico</p>
+             <div className="flex items-center gap-3 relative z-10">
+                <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center border border-white/10">
+                  <Users className="w-5 h-5 text-[#39B000]" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold">Mesa de Ayuda</p>
+                  <p className="text-[10px] text-white/50">Ext: 22536</p>
+                </div>
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const KpiMini: React.FC<{ label: string; value: string | number; icon: React.ReactNode; highlight?: boolean }> = ({ label, value, icon, highlight }) => (
+  <div className="bg-white dark:bg-[#121212] p-4 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center gap-4 transition-colors duration-300">
+    <div className={`p-2 rounded-lg ${highlight ? 'bg-[#39B000]/10 text-[#39B000]' : 'bg-gray-50 dark:bg-white/5 text-gray-400'}`}>
+      {icon}
+    </div>
+    <div>
+      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
+      <p className={`text-base font-bold ${highlight ? 'text-[#39B000]' : 'text-[#012E25] dark:text-white'}`}>{value}</p>
+    </div>
+  </div>
+);

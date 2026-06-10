@@ -167,7 +167,7 @@ const Registro: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#39A900] hover:bg-[#2f8f00] text-white py-4 rounded-xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-[#39A900]/25 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-[#39A900] hover:bg-[#007832] text-white py-4 rounded-xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-[#39A900]/25 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Registrar Nuevo Usuario'}
             </button>

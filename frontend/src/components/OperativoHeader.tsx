@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 
-// FIX: Implementado OperativoHeader con datos reales del operador y reloj realtime
+
 export const OperativoHeader: React.FC = () => {
   const { user, logout } = useAuth();
   const [now, setNow] = useState(new Date());
@@ -11,7 +11,7 @@ export const OperativoHeader: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // REFACTOR: Acceso seguro al perfil tras tipado estricto
+ 
   const userData = user?.usuario;
   const nombre = userData?.nombreCompleto || 'Operador';
 

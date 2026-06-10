@@ -3,6 +3,7 @@ import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { reportesService, type FlujoGroupBy } from '../../services/reportes.service';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Input } from '../../components/ui/Input';
 
 const formatBucket = (iso: string) => {
   const d = new Date(iso);
@@ -57,45 +58,39 @@ export const GraficosPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Gráficos</h1>
-          <p className="text-gray-500 text-sm font-medium uppercase tracking-widest">RF21 • Flujo de vehículos</p>
-        </div>
+      <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="info">LIVE</Badge>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>Refrescar</Button>
         </div>
       </header>
 
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-        <div className="flex flex-col lg:flex-row gap-3 lg:items-end">
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Agrupar</label>
+      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
+        <div className="flex flex-col lg:flex-row gap-6 lg:items-end">
+          <div className="flex flex-col gap-2 flex-1">
+            <label className="text-xs font-black text-gray-500 uppercase tracking-widest ml-1">Agrupar</label>
             <div className="flex gap-2">
-              <Button variant={groupBy === 'dia' ? 'primary' : 'outline'} size="sm" onClick={() => setGroupBy('dia')}>Día</Button>
-              <Button variant={groupBy === 'semana' ? 'primary' : 'outline'} size="sm" onClick={() => setGroupBy('semana')}>Semana</Button>
-              <Button variant={groupBy === 'mes' ? 'primary' : 'outline'} size="sm" onClick={() => setGroupBy('mes')}>Mes</Button>
+              <Button variant={groupBy === 'dia' ? 'primary' : 'outline'} size="sm" onClick={() => setGroupBy('dia')} className="flex-1 lg:flex-none">Día</Button>
+              <Button variant={groupBy === 'semana' ? 'primary' : 'outline'} size="sm" onClick={() => setGroupBy('semana')} className="flex-1 lg:flex-none">Semana</Button>
+              <Button variant={groupBy === 'mes' ? 'primary' : 'outline'} size="sm" onClick={() => setGroupBy('mes')} className="flex-1 lg:flex-none">Mes</Button>
             </div>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Desde</label>
-            <input
+          <div className="flex-1">
+            <Input
+              label="Desde"
               type="date"
               value={desde}
               onChange={(e) => setDesde(e.target.value)}
-              className="bg-slate-50 border-2 border-transparent focus:border-slate-900 focus:bg-white outline-none rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200"
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Hasta</label>
-            <input
+          <div className="flex-1">
+            <Input
+              label="Hasta"
               type="date"
               value={hasta}
               onChange={(e) => setHasta(e.target.value)}
-              className="bg-slate-50 border-2 border-transparent focus:border-slate-900 focus:bg-white outline-none rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200"
             />
           </div>
 

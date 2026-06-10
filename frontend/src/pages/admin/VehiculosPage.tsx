@@ -317,19 +317,16 @@ export const VehiculosPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Gestión de Vehículos</h1>
-          <p className="text-slate-500 text-sm font-medium uppercase tracking-widest">Control de flota</p>
-        </div>
+      {/* Cabecera de Acciones - Alineada al Layout superior */}
+      <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4 -mt-20 mb-10 relative z-50">
         <div className="flex flex-wrap gap-2">
-          <Button variant="primary" size="sm" onClick={abrirCrear} className="bg-[#39A900] hover:bg-[#2F8A00]">
-            <Plus size={16} className="mr-2" /> Agregar Vehículo
+          <Button variant="primary" size="md" onClick={abrirCrear} className="bg-[#39A900] hover:bg-[#2F8A00] shadow-[0_8px_20px_rgba(57,169,0,0.3)]">
+            <Plus size={16} className="mr-2" /> AGREGAR VEHÍCULO
           </Button>
-          <Button variant={soloAdentro ? 'primary' : 'outline'} size="sm" onClick={() => setSoloAdentro((v) => !v)}>
+          <Button variant={soloAdentro ? 'primary' : 'outline'} size="md" onClick={() => setSoloAdentro((v) => !v)} className={soloAdentro ? '' : 'bg-white'}>
             {soloAdentro ? 'Solo ADENTRO' : 'Todos'}
           </Button>
-          <Button variant="outline" size="sm" onClick={fetchVehiculos}>Refrescar</Button>
+          <Button variant="outline" size="md" onClick={fetchVehiculos} className="bg-white">Refrescar</Button>
         </div>
       </header>
 

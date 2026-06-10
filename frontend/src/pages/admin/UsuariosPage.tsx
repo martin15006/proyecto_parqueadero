@@ -36,18 +36,6 @@ const FORM_INICIAL: FormUsuario = {
   idFormacion: '',
 };
 
-const rolIdToNombre: Record<number, string> = {
-  1: 'APRENDIZ',
-  2: 'ADMIN',
-  3: 'OPERATIVO',
-};
-
-const rolNombreToId: Record<string, number> = {
-  APRENDIZ: 1,
-  ADMIN: 2,
-  OPERATIVO: 3,
-};
-
 export const UsuariosPage: React.FC = () => {
   const { showNotification } = useNotification();
   const [usuarios, setUsuarios] = useState<AdminUsuarioItem[]>([]);
@@ -281,23 +269,18 @@ export const UsuariosPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-[#232323] tracking-tight">Usuarios</h1>
-          <p className="text-slate-500 text-sm font-medium uppercase tracking-widest">Administración de cuentas</p>
-        </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={abrirCrear}
-            className="bg-[#39A900] hover:bg-[#2F8A00] shadow-sm"
-          >
-            <Plus size={16} className="mr-2" />
-            Crear Usuario
-          </Button>
-        </div>
+      {/* Cabecera de Acciones - Alineada al Layout superior */}
+      <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4 -mt-20 mb-10 relative z-50">
+        <Button
+          type="button"
+          variant="primary"
+          size="md"
+          onClick={abrirCrear}
+          className="bg-[#39A900] hover:bg-[#2F8A00] shadow-[0_8px_20px_rgba(57,169,0,0.3)] w-full md:w-auto"
+        >
+          <Plus size={16} className="mr-2" />
+          CREAR USUARIO
+        </Button>
       </header>
 
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">

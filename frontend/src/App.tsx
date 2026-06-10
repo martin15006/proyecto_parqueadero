@@ -5,7 +5,6 @@ import Registro from './registro';
 import ProtectedRoute from './ProtectedRoute';
 import { AuthProvider, useAuth } from './AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
-import { OperativoDashboard } from './pages/OperativoDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminLayout } from './layouts/AdminLayout';
 import { UsuariosPage } from './pages/admin/UsuariosPage';
@@ -19,6 +18,12 @@ import { ConfiguracionAdminPage } from './pages/admin/ConfiguracionAdminPage';
 import { VisitantesPage } from './pages/admin/VisitantesPage';
 import { InformesPage } from './pages/admin/InformesPage';
 import { GraficosPage } from './pages/admin/GraficosPage';
+import { OperativoLayout } from './layouts/OperativoLayout';
+import { ControlAccesoView } from './pages/operativo/ControlAccesoView';
+import { EstadoBahiasView } from './pages/operativo/EstadoBahiasView';
+import { MovimientosView } from './pages/operativo/MovimientosView';
+import { AlertasView } from './pages/operativo/AlertasView';
+import { ConfiguracionView } from './pages/operativo/ConfiguracionView';
 import { UserRole } from './constants/enums';
 
 class AppErrorBoundary extends React.Component<
@@ -177,7 +182,21 @@ function App() {
                 element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><Navigate to="/appadmin/configuracion" replace /></ProtectedRoute>}
               />
 
-              <Route path="/appperop" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OPERATIVO]}><OperativoDashboard /></ProtectedRoute>} />
+              {/* Rutas Operativo con Layout */}
+              <Route path="/appperop" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OPERATIVO]}><OperativoLayout /></ProtectedRoute>}>
+                <Route index element={<ControlAccesoView />} />
+                <Route path="bahias" element={<EstadoBahiasView />} />
+                <Route path="movimientos" element={<MovimientosView />} />
+                <Route path="alertas" element={<AlertasView />} />
+                <Route path="configuracion" element={<ConfiguracionView />} />
+              </Route>
+
+              {/* Alias para rutas operativo solicitadas */}
+              <Route path="/control-acceso" element={<Navigate to="/appperop" replace />} />
+              <Route path="/estado-salidas" element={<Navigate to="/appperop/bahias" replace />} />
+              <Route path="/movimientos" element={<Navigate to="/appperop/movimientos" replace />} />
+              <Route path="/alertas" element={<Navigate to="/appperop/alertas" replace />} />
+              <Route path="/configuracion" element={<Navigate to="/appperop/configuracion" replace />} />
               <Route path="/app" element={<ProtectedRoute allowedRoles={[UserRole.APRENDIZ]}><PanelAprendiz /></ProtectedRoute>} />
 
               <Route path="*" element={<Navigate to="/" replace />} />

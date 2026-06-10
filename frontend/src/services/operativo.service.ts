@@ -77,6 +77,11 @@ export const dashboardService = {
   getHeatmap: async () => {
     const response = await api.get('/dashboard/heatmap');
     return response.data.data;
+  },
+  /** Historial de movimientos paginado (vista Movimientos del panel operativo). */
+  getHistorial: async (page = 1, limit = 20) => {
+    const response = await api.get('/dashboard/historial', { params: { page, limit } });
+    return (response.data && response.data.data) ? response.data.data : response.data;
   }
 };
 

@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import {
-  Users, MapPin, Activity, TrendingUp,
-  AlertTriangle, RefreshCcw,
+  MapPin, Activity, TrendingUp,
+  AlertTriangle, RefreshCcw, Percent
 } from 'lucide-react';
 import { useAdmin } from '../hooks/useAdmin';
 import { StatCard } from '../components/common/StatCard';
@@ -12,11 +12,23 @@ import { ChartHeader } from '../components/common/ChartHeader';
 import { ExportButton } from '../components/admin/ExportButton';
 
 /**
- * Dashboard Administrativo simplificado.
- * Quitados: Mapa de Intensidad, Segmentación, Flujo de Tráfico, Ingresos Mes, Alertas.
+ * Dashboard Administrativo (Business Intelligence).
+ * Proporciona una visión gerencial del estado del parqueadero mediante
+ * visualizaciones de datos y KPIs.
  */
 export const AdminDashboard: React.FC = () => {
-  const { resumen, tendencia, loading, error, refresh } = useAdmin();
+  const {
+    resumen,
+    tendencia,
+    loading,
+    error,
+    refresh
+  } = useAdmin();
+
+  const porcentajeOcupacion = useMemo(() => {
+    if (!resumen?.ocupacion?.total) return 0;
+    return Math.round((resumen.ocupacion.ocupados / resumen.ocupacion.total) * 100);
+  }, [resumen]);
 
   if (loading && !resumen) return <DashboardSkeleton />;
   if (error) return <DashboardError message={error} retry={refresh} />;
@@ -26,31 +38,22 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Encabezado Gerencial */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></div>
-            <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">System Analytics</span>
-          </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Consola Administrativa</h1>
-          <p className="text-slate-500 text-sm font-medium uppercase tracking-widest">Gestión Estratégica de Infraestructura</p>
-        </div>
-
+      {/* Botones de Acción alineados con el título del Layout superior */}
+      <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4 -mt-20 mb-10 relative z-50">
         <div className="flex flex-wrap gap-3">
-          <ExportButton
-            label="EXCEL"
-            url={`${API_URL}/api/v1/dashboard/exportar/excel`}
-            color="hover:text-emerald-700 hover:border-emerald-400"
+          <ExportButton 
+            label="EXCEL" 
+            url={`${API_URL}/api/v1/dashboard/exportar/excel`} 
+            color="hover:text-emerald-700 hover:border-emerald-400 bg-white shadow-sm"
           />
-          <ExportButton
-            label="PDF"
-            url={`${API_URL}/api/v1/dashboard/exportar/pdf`}
-            color="hover:text-rose-700 hover:border-rose-400"
+          <ExportButton 
+            label="PDF" 
+            url={`${API_URL}/api/v1/dashboard/exportar/pdf`} 
+            color="hover:text-rose-700 hover:border-rose-400 bg-white shadow-sm"
           />
-          <button
+          <button 
             onClick={refresh}
-            className="p-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-950 transition-all duration-200 shadow-sm"
+            className="p-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-950 transition-all duration-200 shadow-[0_8px_20px_rgba(15,23,42,0.2)]"
             title="Refrescar Analíticas"
           >
             <RefreshCcw size={18} />
@@ -90,8 +93,7 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* KPIs principales */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
         <StatCard
           icon={<MapPin className="text-slate-700" />}
           label="Total Espacios"
@@ -108,45 +110,33 @@ export const AdminDashboard: React.FC = () => {
           value={resumen?.ocupacion?.disponibles}
         />
         <StatCard
-          icon={<AlertTriangle className={resumen?.estadoParqueadero === 'DISPONIBLE' ? 'text-emerald-600' : 'text-amber-600'} />}
-          label="Estado Parqueadero"
-          value={resumen?.estadoParqueadero || 'DISPONIBLE'}
-          trend={resumen?.estadoParqueadero === 'DESHABILITADO' ? 'Deshabilitado' : resumen?.estadoParqueadero === 'LLENO' ? 'Lleno' : 'Disponible'}
-          isCritical={resumen?.estadoParqueadero !== 'DISPONIBLE'}
-        />
-      </div>
-
-      {/* KPIs secundarios — sin "Ingresos Mes" ni "Alertas 24h" */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-        <StatCard icon={<Users className="text-slate-700" />} label="Usuarios" value={resumen?.totalUsuarios} />
-        <StatCard
-          icon={<MapPin className="text-amber-600" />}
+          icon={<Percent className="text-blue-600" />}
           label="Ocupación"
-          value={`${resumen?.ocupacion ? ((resumen.ocupacion.ocupados / resumen.ocupacion.total) * 100 || 0).toFixed(1) : 0}%`}
-          subValue={resumen?.ocupacion ? `${resumen.ocupacion.ocupados}/${resumen.ocupacion.total} Bahías` : '0/0 Bahías'}
+          value={`${porcentajeOcupacion}%`}
         />
-        <StatCard icon={<Activity className="text-emerald-600" />} label="Ingresos Hoy" value={resumen?.ingresosHoy} />
       </div>
 
-      {/* Rendimiento Semanal */}
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
-        <ChartHeader title="Rendimiento Semanal" subtitle="Tendencia de los últimos 7 días" icon={<TrendingUp className="text-slate-700" />} />
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={tendenciaSafe}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-              <XAxis
-                dataKey="fecha"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }}
-                tickFormatter={(val) => new Date(val).toLocaleDateString('es-ES', { weekday: 'short' })}
-              />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} />
-              <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '16px', border: 'none' }} />
-              <Bar dataKey="cantidad" fill="#059669" radius={[10, 10, 0, 0]} barSize={40} />
-            </BarChart>
-          </ResponsiveContainer>
+      <div className="grid grid-cols-1 gap-8 mb-12">
+        {/* Rendimiento Semanal */}
+        <div className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+          <ChartHeader title="Rendimiento Semanal" subtitle="Tendencia de los últimos 7 días" icon={<TrendingUp className="text-slate-700" />} />
+          <div className="h-[300px] md:h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={tendenciaSafe}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis 
+                  dataKey="fecha" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fontSize: 10, fontWeight: 'bold', fill: '#94a3b8'}}
+                  tickFormatter={(val) => new Date(val).toLocaleDateString('es-ES', {weekday: 'short'})}
+                />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#94a3b8'}} />
+                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '16px', border: 'none'}} />
+                <Bar dataKey="cantidad" fill="#059669" radius={[10, 10, 0, 0]} barSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>
@@ -157,9 +147,9 @@ export const AdminDashboard: React.FC = () => {
 
 const DashboardSkeleton = () => (
   <div className="p-8 space-y-8 animate-pulse">
-    <div className="h-20 bg-slate-200 rounded-xl w-1/3"></div>
-    <div className="grid grid-cols-4 gap-4">
-      {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-slate-200 rounded-xl"></div>)}
+    <div className="h-10 bg-slate-200 rounded-xl w-1/4 mb-10 ml-auto"></div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {[1,2,3,4].map(i => <div key={i} className="h-32 bg-slate-200 rounded-xl"></div>)}
     </div>
     <div className="h-96 bg-slate-200 rounded-xl"></div>
   </div>

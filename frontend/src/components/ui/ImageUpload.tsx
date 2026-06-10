@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, X, ImageIcon, Loader2 } from 'lucide-react';
+import { Upload, X, Loader2 } from 'lucide-react';
 import { subirImagen } from '../../services/upload.service';
 
 interface Props {

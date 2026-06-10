@@ -127,41 +127,33 @@ export const AuditoriaPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Auditoría Operativa</h1>
-          <p className="text-slate-500 text-sm font-medium uppercase tracking-widest">RF37 • Historial del personal operativo</p>
-        </div>
-        <Button variant="primary" size="md" onClick={fetchLogs} isLoading={loading}>
+      {/* Botón Sincronizar alineado con el título vía Portal o Layout superior */}
+      <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4 -mt-20 mb-10 relative z-50">
+        <Button variant="primary" size="md" onClick={fetchLogs} isLoading={loading} className="bg-[#39A900] hover:bg-[#2F8A00] shadow-[0_8px_20px_rgba(57,169,0,0.3)]">
           <Activity size={18} className="mr-2" /> SINCRONIZAR
         </Button>
       </header>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
         <Input
+          label="Búsqueda"
           icon={<Search size={20} />}
           placeholder="Documento operativo (opcional)"
           value={operativo}
           onChange={(e) => setOperativo(e.target.value)}
         />
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Desde</label>
-          <input
-            type="date"
-            value={desde}
-            onChange={(e) => setDesde(e.target.value)}
-            className="bg-slate-50 border-2 border-transparent focus:border-slate-900 focus:bg-white outline-none rounded-xl px-5 py-4 text-sm font-medium transition-all duration-200"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Hasta</label>
-          <input
-            type="date"
-            value={hasta}
-            onChange={(e) => setHasta(e.target.value)}
-            className="bg-slate-50 border-2 border-transparent focus:border-slate-900 focus:bg-white outline-none rounded-xl px-5 py-4 text-sm font-medium transition-all duration-200"
-          />
-        </div>
+        <Input
+          label="Desde"
+          type="date"
+          value={desde}
+          onChange={(e) => setDesde(e.target.value)}
+        />
+        <Input
+          label="Hasta"
+          type="date"
+          value={hasta}
+          onChange={(e) => setHasta(e.target.value)}
+        />
       </div>
 
       <Table 

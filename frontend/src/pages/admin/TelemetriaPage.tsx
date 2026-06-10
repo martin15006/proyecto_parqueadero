@@ -228,17 +228,12 @@ export const TelemetriaPage: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Telemetría IoT</h1>
-          <p className="text-gray-500 text-sm font-medium uppercase tracking-widest">Salud de Infraestructura y Sensores</p>
-        </div>
-
+      <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4 -mt-20 mb-10 relative z-50">
         <div className="flex gap-3">
-          <Button variant="outline" size="md" onClick={refresh}>
+          <Button variant="outline" size="md" onClick={refresh} className="bg-white">
             <RefreshCw size={14} className="mr-2" /> Actualizar
           </Button>
-          <Button variant="primary" size="md" onClick={forceCheck}>
+          <Button variant="primary" size="md" onClick={forceCheck} className="bg-[#39A900] hover:bg-[#2F8A00] shadow-[0_8px_20px_rgba(57,169,0,0.3)]">
             <Activity size={14} className="mr-2" /> Forzar Diagnóstico
           </Button>
         </div>

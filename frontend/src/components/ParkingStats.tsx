@@ -7,7 +7,7 @@ interface StatsProps {
   vehiculosActivos: number;
 }
 
-// FIX: ParkingStats - Visualización de métricas reales con colores semánticos
+
 export const ParkingStats: React.FC<StatsProps> = ({ total, ocupados, disponibles, vehiculosActivos }) => {
   const stats = [
     { label: 'Capacidad Total', value: total, color: 'text-white', bg: 'bg-gray-800' },

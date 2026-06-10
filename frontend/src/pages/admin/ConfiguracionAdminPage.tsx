@@ -62,11 +62,7 @@ export const ConfiguracionAdminPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Configuración Administrativa</h1>
-          <p className="text-slate-500 text-sm font-medium uppercase tracking-widest">RF28 • Seguridad de la cuenta</p>
-        </div>
+      <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4">
       </header>
 
       <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
