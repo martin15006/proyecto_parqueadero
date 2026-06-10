@@ -34,17 +34,21 @@ const REQUISITOS_CONTRASENA: Array<{ id: string; label: string; falta: string; t
 ];
 
 /**
- * Extrae el mensaje real de un error del backend. Cuando falla la validación
- * de un DTO (class-validator), `message` llega como ARRAY de strings; si se
- * muestra tal cual o se ignora, el usuario ve un error genérico sin la razón.
+ * Extrae el mensaje real de un error del backend.
+ * OJO: el interceptor de api/axios.ts NO propaga el error de axios, sino un
+ * objeto plano { statusCode, message, ... } — por eso el mensaje puede venir
+ * en error.message y no en error.response.data.message. Además, cuando falla
+ * la validación de un DTO (class-validator), `message` puede ser un ARRAY.
  */
 const extraerMensajeError = (error: any, fallback: string): string => {
-  const raw = error?.response?.data?.message;
-  if (Array.isArray(raw)) {
-    const textos = raw.filter((m) => typeof m === 'string' && m.trim());
-    if (textos.length) return textos.join(' • ');
+  const candidatos = [error?.response?.data?.message, error?.message, error?.mensaje];
+  for (const raw of candidatos) {
+    if (Array.isArray(raw)) {
+      const textos = raw.filter((m: any) => typeof m === 'string' && m.trim());
+      if (textos.length) return textos.join(' • ');
+    }
+    if (typeof raw === 'string' && raw.trim()) return raw;
   }
-  if (typeof raw === 'string' && raw.trim()) return raw;
   return fallback;
 };
 
@@ -207,7 +211,7 @@ function Login() {
     } catch (error: any) {
       console.error('Error en el login:', error);
 
-      const backendMsg: string = error.response?.data?.message || '';
+      const backendMsg = extraerMensajeError(error, '');
 
       // Cuenta sin verificar: el backend ya reenvió el código, así que
       // pasamos a la pantalla de código en modo verificación en lugar de
@@ -220,12 +224,7 @@ function Login() {
         return;
       }
 
-      // Manejo robusto de errores de red/CORS
-      if (error.code === 'ERR_NETWORK' || (!error.response && !error.message)) {
-        setStatus('Error de conexión con el servidor. Verifica que el backend esté corriendo.');
-      } else {
-        setStatus(backendMsg || error.message || 'Credenciales incorrectas');
-      }
+      setStatus(backendMsg || 'Credenciales incorrectas. Verifica tus datos o que el backend esté corriendo.');
       setStatusType('error');
     } finally {
       setLoading(false);
@@ -267,7 +266,7 @@ function Login() {
       }
     } catch (error: any) {
       console.error('FIX: Error al verificar OTP:', error);
-      setStatus(error.response?.data?.message || error.message || 'Código incorrecto o expirado');
+      setStatus(extraerMensajeError(error, 'Código incorrecto o expirado'));
       setStatusType('error');
     } finally {
       setLoading(false);
@@ -286,7 +285,7 @@ function Login() {
       setStatusType('success');
     } catch (error: any) {
       console.error('Error al reenviar OTP:', error);
-      setStatus(error.response?.data?.message || 'No se pudo reenviar el código');
+      setStatus(extraerMensajeError(error, 'No se pudo reenviar el código'));
       setStatusType('error');
     } finally {
       setLoading(false);
