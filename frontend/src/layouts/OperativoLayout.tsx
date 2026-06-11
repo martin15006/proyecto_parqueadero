@@ -150,17 +150,22 @@ export const OperativoLayout: React.FC = () => {
 
           {/* Info Usuario Reducida */}
           <div className="mt-auto px-3 pt-6 border-t border-white/5">
-            <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} mb-4`}>
+            <button
+              type="button"
+              onClick={() => { navigate('/appperop/configuracion', { state: { section: 'perfil' } }); setIsMobileOpen(false); }}
+              title="Perfil de usuario"
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} mb-4 py-2 rounded-xl hover:bg-white/5 transition-all duration-200`}
+            >
               <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white font-bold text-xs shrink-0 border border-white/10">
                 {operadorNombre.substring(0, 2)}
               </div>
               {!isCollapsed && (
-                <div className="overflow-hidden">
+                <div className="overflow-hidden text-left">
                   <p className="text-xs font-bold text-white truncate">{operadorNombre}</p>
                   <p className="text-[9px] font-bold text-[#39B000] uppercase tracking-widest">En línea</p>
                 </div>
               )}
-            </div>
+            </button>
             
             <button 
               onClick={logout}

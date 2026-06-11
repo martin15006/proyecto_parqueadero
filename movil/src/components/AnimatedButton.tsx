@@ -71,7 +71,10 @@ export default function AnimatedButton({
             borderWidth: variante === 'secundario' ? 1.5 : 0,
             transform: [{ scale }],
             shadowColor: colores.verde,
-            shadowOpacity: esOscuro ? 0.5 : 0.3,
+            // La variante secundaria es transparente: sin sombra ni elevation,
+            // para que Android no dibuje el recuadro blanco detrás del texto.
+            shadowOpacity: variante === 'secundario' ? 0 : esOscuro ? 0.5 : 0.3,
+            elevation: variante === 'secundario' ? 0 : 4,
           },
         ]}
       >

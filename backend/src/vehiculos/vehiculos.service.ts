@@ -64,6 +64,20 @@ export class VehiculosService {
     const tipo = await this.tipoVehiculoRepository.findOne({ where: { idTipoV: dto.idTipoVehiculo } });
     if (!tipo) throw new BadRequestException('Tipo de vehículo no válido');
 
+    // Límite de negocio: máximo 3 vehículos por usuario. Se cuentan los ya
+    // registrados + las solicitudes pendientes para que no superen el tope
+    // acumulando solicitudes sin aprobar.
+    const MAX_VEHICULOS_POR_USUARIO = 3;
+    const [registrados, pendientes] = await Promise.all([
+      this.registroRepository.count({ where: { idUsuario: documento } }),
+      this.solicitudRepository.count({ where: { documento, estado: EstadoSolicitud.PENDIENTE } }),
+    ]);
+    if (registrados + pendientes >= MAX_VEHICULOS_POR_USUARIO) {
+      throw new ConflictException(
+        `Has alcanzado el máximo de ${MAX_VEHICULOS_POR_USUARIO} vehículos registrados. Elimina uno para poder registrar otro.`,
+      );
+    }
+
     const placaNormalizada = this.normalizarPlaca(dto.placa);
 
     // Verificar que la placa no esté ya registrada en el sistema

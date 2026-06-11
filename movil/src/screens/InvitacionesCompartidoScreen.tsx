@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { Inbox } from 'lucide-react-native';
 import {
   View,
   Text,
@@ -107,16 +108,16 @@ export default function InvitacionesCompartidoScreen({ navigation }: any) {
             <View style={styles.cabeceraFila}>
               <Text style={[styles.placa, { color: colores.textoPrimario }]}>{item.placa}</Text>
               <View style={[styles.estadoChip, { backgroundColor: '#FFC107' }]}>
-                <Text style={styles.estadoTexto}>⏳ PENDIENTE</Text>
+                <Text style={styles.estadoTexto}>PENDIENTE</Text>
               </View>
             </View>
-            <Text style={[styles.linea, { color: colores.textoSecundario }]}>🎨 {item.color}</Text>
-            <Text style={[styles.linea, { color: colores.textoSecundario }]}>🚙 {item.tipoVehiculo}</Text>
+            <Text style={[styles.linea, { color: colores.textoSecundario }]}>{item.color}</Text>
+            <Text style={[styles.linea, { color: colores.textoSecundario }]}>{item.tipoVehiculo}</Text>
             <Text style={[styles.linea, { color: colores.textoSecundario }]}>
-              👤 De: {item.propietario}
+              De: {item.propietario}
             </Text>
             <Text style={[styles.fecha, { color: colores.textoTenue }]}>
-              📅 {new Date(item.recibidaEn).toLocaleDateString()}
+              {new Date(item.recibidaEn).toLocaleDateString()}
             </Text>
 
             <View style={styles.botonesFila}>
@@ -181,14 +182,14 @@ export default function InvitacionesCompartidoScreen({ navigation }: any) {
         ListHeaderComponent={
           <View style={[styles.banner, { backgroundColor: esOscuro ? 'rgba(255,193,7,0.10)' : '#FFF8E1', borderColor: '#FFC107' }]}>
             <Text style={[styles.bannerTexto, { color: esOscuro ? '#FFD54F' : '#856404' }]}>
-              📩 Aquí ves los vehículos que otros usuarios quieren compartir contigo.
+              Aquí ves los vehículos que otros usuarios quieren compartir contigo.
               Acéptalos para usarlos en el parqueadero, o recházalos.
             </Text>
           </View>
         }
         ListEmptyComponent={
           <View style={styles.vacio}>
-            <Text style={styles.emoji}>📭</Text>
+            <Inbox size={56} color="#9CA3AF" />
             <Text style={[styles.vacioTitulo, { color: colores.textoPrimario }]}>
               Sin invitaciones pendientes
             </Text>

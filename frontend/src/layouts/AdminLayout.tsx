@@ -3,7 +3,7 @@ import { Link, useLocation, Outlet } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Car,
   LogOut,
-  Database, FileText, Inbox, Sun, Moon, ChevronLeft, ChevronRight
+  FileText, Inbox, Sun, Moon, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -27,7 +27,6 @@ export const AdminLayout: React.FC = () => {
     { path: '/appadmin/usuarios', label: 'Usuarios', icon: Users },
     { path: '/appadmin/vehiculos', label: 'Vehículos', icon: Car },
     { path: '/appadmin/solicitudes', label: 'Solicitudes', icon: Inbox },
-    { path: '/appadmin/auditoria', label: 'Auditoría', icon: Database },
     { path: '/appadmin/informes', label: 'Reportes', icon: FileText },
   ];
 
@@ -46,7 +45,6 @@ export const AdminLayout: React.FC = () => {
       usuarios: { title: 'Usuarios', subtitle: 'Administración de cuentas institucionales' },
       vehiculos: { title: 'Vehículos', subtitle: 'Control de flota y contingencias' },
       solicitudes: { title: 'Solicitudes', subtitle: 'Aprobación de registros de vehículos' },
-      auditoria: { title: 'Auditoría', subtitle: 'Trazabilidad de operaciones críticas' },
       informes: { title: 'Reportes', subtitle: 'Exportación institucional' },
     };
 
@@ -99,12 +97,8 @@ export const AdminLayout: React.FC = () => {
               >
                 <item.icon className={`w-5 h-5 flex-shrink-0 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:text-[#39A900]'}`} />
                 {isSidebarOpen && <span className="font-black text-[13px] tracking-tight whitespace-nowrap">{item.label}</span>}
-                {isActive && (
-                  <div className={`absolute bg-white/40 rounded-full transition-all duration-500 ${
-                    isSidebarOpen 
-                      ? 'right-4 w-1 h-6' 
-                      : 'inset-y-3 left-1 w-1 rounded-r-full'
-                  }`} />
+                {isActive && isSidebarOpen && (
+                  <div className="absolute right-4 w-1 h-6 bg-white/40 rounded-full transition-all duration-500" />
                 )}
               </Link>
             );
@@ -149,7 +143,7 @@ export const AdminLayout: React.FC = () => {
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           aria-label={isSidebarOpen ? 'Contraer menú' : 'Expandir menú'}
           title={isSidebarOpen ? 'Contraer menú' : 'Expandir menú'}
-          className="absolute left-0 top-6 z-[80] w-6 h-12 rounded-r-xl bg-[#007832] text-white shadow-lg border border-l-0 border-white/10 flex items-center justify-center hover:w-7 transition-all duration-200"
+          className="absolute left-0 top-6 z-[80] w-6 h-12 rounded-r-xl bg-[#232323] dark:bg-[#121212] text-white shadow-lg border border-l-0 border-white/10 flex items-center justify-center hover:w-7 transition-all duration-200"
         >
           {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
         </button>

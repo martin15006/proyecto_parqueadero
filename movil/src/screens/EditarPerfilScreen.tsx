@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Pencil } from 'lucide-react-native';
 import {
   View, Text, Alert, StyleSheet, TouchableOpacity, Image,
 } from 'react-native';
@@ -142,7 +143,7 @@ export default function EditarPerfilScreen({ navigation }: any) {
                 />
               )}
               <View style={[styles.editIcon, { backgroundColor: colores.verde }]}>
-                <Text style={styles.editIconText}>📷</Text>
+                <Pencil size={14} color="#ffffff" />
               </View>
             </TouchableOpacity>
             <Text style={[styles.fotoHelp, { color: colores.textoTenue }]}>

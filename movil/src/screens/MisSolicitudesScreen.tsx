@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { ClipboardList } from 'lucide-react-native';
 import {
   View,
   Text,
@@ -38,7 +39,7 @@ const colorEstado = (estado: EstadoSolicitud) => {
 
 const iconoEstado = (estado: EstadoSolicitud) => {
   switch (estado) {
-    case 'PENDIENTE': return '⏳';
+    case 'PENDIENTE': return '◷';
     case 'APROBADO':  return '✓';
     case 'RECHAZADO': return '✕';
   }
@@ -87,9 +88,9 @@ export default function MisSolicitudesScreen({ navigation }: any) {
                 </Text>
               </View>
             </View>
-            <Text style={[styles.color, { color: colores.textoSecundario }]}>🎨 {item.color}</Text>
+            <Text style={[styles.color, { color: colores.textoSecundario }]}>{item.color}</Text>
             <Text style={[styles.fecha, { color: colores.textoTenue }]}>
-              📅 {new Date(item.creadoEn).toLocaleDateString()}
+              {new Date(item.creadoEn).toLocaleDateString()}
             </Text>
             {item.estado === 'RECHAZADO' &&
             (item.motivoRechazo || (item.camposRechazados?.length ?? 0) > 0) ? (
@@ -123,7 +124,7 @@ export default function MisSolicitudesScreen({ navigation }: any) {
                     onPress={() => navigation.navigate('CorregirSolicitud', { solicitud: item })}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.botonCorregirTexto}>✏ Corregir y reenviar</Text>
+                    <Text style={styles.botonCorregirTexto}>Corregir y reenviar</Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -163,7 +164,7 @@ export default function MisSolicitudesScreen({ navigation }: any) {
         }
         ListEmptyComponent={
           <View style={styles.vacio}>
-            <Text style={styles.emoji}>📋</Text>
+            <ClipboardList size={56} color="#9CA3AF" />
             <Text style={[styles.vacioTitulo, { color: colores.textoPrimario }]}>
               No tienes solicitudes
             </Text>

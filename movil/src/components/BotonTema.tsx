@@ -3,10 +3,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
-  Text,
   Platform,
   StatusBar,
 } from 'react-native';
+import { Moon, Sun } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 
 export default function BotonTema() {
@@ -59,11 +59,13 @@ export default function BotonTema() {
         activeOpacity={0.7}
         style={[styles.boton, esOscuro ? styles.botonOscuro : styles.botonClaro]}
       >
-        <Animated.Text
-          style={[styles.emoji, { transform: [{ rotate: rotacionInterpolada }] }]}
-        >
-          {esOscuro ? '🌙' : '☀️'}
-        </Animated.Text>
+        <Animated.View style={{ transform: [{ rotate: rotacionInterpolada }] }}>
+          {esOscuro ? (
+            <Moon size={22} color="#5fd924" />
+          ) : (
+            <Sun size={22} color="#FDC300" />
+          )}
+        </Animated.View>
       </TouchableOpacity>
     </Animated.View>
   );

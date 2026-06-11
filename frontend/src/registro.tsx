@@ -81,7 +81,7 @@ const Registro: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F7F6] flex items-center justify-center p-6 font-sans selection:bg-[#39A900]/20">
+    <div className="auth-screen min-h-screen bg-[#F4F7F6] flex items-center justify-center p-6 font-sans selection:bg-[#39A900]/20">
       <div className="max-w-2xl w-full space-y-8 bg-white p-10 rounded-2xl border border-black/5 shadow-xl relative overflow-hidden">
         {/* Decoración de fondo */}
         <div className="absolute -top-28 -right-24 w-72 h-72 bg-[#39A900]/16 rounded-full blur-3xl"></div>

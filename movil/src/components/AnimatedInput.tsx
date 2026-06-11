@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { fonts, espacios } from '../theme/senaTheme';
+import { Eye, EyeOff } from 'lucide-react-native';
 
 interface Props extends TextInputProps {
   label: string;
@@ -56,7 +57,11 @@ export default function AnimatedInput({
         onPress={() => setMostrarContrasena(!mostrarContrasena)}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Text style={styles.ojitoEmoji}>{mostrarContrasena ? '🫣' : '🙈'}</Text>
+        {mostrarContrasena ? (
+          <EyeOff size={20} color={colores.textoTenue} />
+        ) : (
+          <Eye size={20} color={colores.textoTenue} />
+        )}
       </TouchableOpacity>
     );
   };
@@ -85,7 +90,7 @@ export default function AnimatedInput({
             styles.input,
             {
               color: colores.textoPrimario,
-              paddingRight: esContrasena ? 44 : espacios.normal,
+              paddingRight: esContrasena ? 48 : espacios.normal,
             },
           ]}
         />
@@ -118,15 +123,17 @@ const styles = StyleSheet.create({
   },
   ojitoBoton: {
     position: 'absolute',
-    right: 12,
+    right: 10,
     top: 0,
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    width: 32,
+    width: 36,
   },
-  ojitoEmoji: {
-    fontSize: 20,
+  ojitoTexto: {
+    fontSize: fonts.pequeno - 1,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   error: {
     fontSize: fonts.pequeno,

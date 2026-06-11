@@ -53,7 +53,7 @@ const extraerMensajeError = (error: any, fallback: string): string => {
 };
 
 function Login() {
-  const { login, isAuthenticated, user } = useAuth();
+  const { login, logout, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -105,7 +105,11 @@ function Login() {
       } else if (idRol === 3) {
         navigate('/appperop');
       } else if (idRol === 1) {
-        navigate('/app');
+        // La plataforma web es para personal administrativo/operativo; los
+        // aprendices usan la app móvil. Cerramos la sesión web e informamos.
+        logout();
+        setStatus('Esta plataforma web es para personal administrativo y operativo. Usa la app móvil.');
+        setStatusType('error');
       } else {
         console.warn('SECURITY: Acceso denegado - Usuario sin rol válido', { idRol });
         setStatus('Tu cuenta no tiene un rol asignado. Contacta al administrador.');
@@ -293,7 +297,7 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden font-sans">
+    <div className="auth-screen min-h-screen bg-[#F8F9FA] flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden font-sans">
       {/* Panel Izquierdo - Informativo (Diseño SENA) */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden min-h-[600px] lg:min-h-screen shadow-2xl">
         <div
@@ -317,7 +321,7 @@ function Login() {
         </div>
 
         {/* Contenido Central Izquierdo (Alineado a la Izquierda) */}
-        <div className="relative z-30 px-12 xl:px-20 flex-1 flex flex-col justify-center items-start text-left">
+        <div className="relative z-30 px-12 xl:px-20 pt-24 flex-1 flex flex-col justify-center items-start text-left">
           <div className="space-y-1 mb-8">
             <h1 className="text-5xl xl:text-6xl font-black text-white tracking-tight leading-none">
               Bienvenido
@@ -380,20 +384,10 @@ function Login() {
             />
           </svg>
         </div>
-
-        <div className="absolute bottom-8 left-12 z-30 flex items-center gap-4 text-white">
-          <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/10 backdrop-blur-md">
-            <Lock className="text-white w-4 h-4" />
-          </div>
-          <div className="text-left">
-            <p className="text-white font-bold text-xs">Conexión segura</p>
-            <p className="text-white/60 text-[10px] mt-0.5">Infraestructura institucional protegida.</p>
-          </div>
-        </div>
       </div>
 
       {/* Panel Derecho - Formulario (Tarjeta Flotante) */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8 lg:p-12 relative z-30 bg-[#F8F9FA]">
+      <div className="flex-1 flex flex-col items-center justify-center p-5 lg:p-8 relative z-30 bg-[#F8F9FA]">
 
         {/* Mobile Logo */}
         <div className="lg:hidden flex flex-col items-center gap-5 mb-14">
@@ -412,19 +406,19 @@ function Login() {
         </div>
 
         {/* Tarjeta de Login Principal */}
-        <div className="w-full max-w-[500px] bg-white rounded-[48px] shadow-[0_40px_80px_-15px_rgba(0,0,0,0.1)] p-10 lg:p-12 xl:p-14 border border-gray-50 flex flex-col items-center transition-all hover:shadow-[0_50px_100px_-20px_rgba(0,0,0,0.12)] duration-700">
+        <div className="w-full max-w-[500px] bg-white rounded-[40px] shadow-[0_40px_80px_-15px_rgba(0,0,0,0.1)] p-7 lg:p-9 border border-gray-50 flex flex-col items-center transition-all hover:shadow-[0_50px_100px_-20px_rgba(0,0,0,0.12)] duration-700">
 
-          <div className="w-20 h-20 bg-green-50 rounded-[28px] flex items-center justify-center mb-8 border border-green-100 shadow-inner">
+          <div className="w-16 h-16 bg-green-50 rounded-[24px] flex items-center justify-center mb-5 border border-green-100 shadow-inner">
             <Lock className="w-8 h-8 text-[#39A900]" />
           </div>
 
-          <div className="text-center space-y-2 mb-10">
-            <h2 className="text-3xl font-black text-gray-900 tracking-tight">Iniciar sesión</h2>
+          <div className="text-center space-y-1 mb-6">
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Iniciar sesión</h2>
             <p className="text-sm font-medium text-gray-400">Ingresa tus credenciales para acceder al sistema</p>
           </div>
 
           {!mostrarOtp ? (
-            <form onSubmit={handleSubmitLogin} className="w-full space-y-6">
+            <form onSubmit={handleSubmitLogin} className="w-full space-y-4">
               <div className="space-y-2">
                 <label className="text-[13px] font-bold text-gray-700 ml-1">Correo electrónico</label>
                 <div className="relative group">
@@ -438,7 +432,7 @@ function Login() {
                     placeholder="ejemplo@correo.com"
                     value={formData.correo}
                     onChange={handleChange}
-                    className="w-full pl-14 pr-5 py-4.5 rounded-2xl bg-gray-50 border border-transparent focus:bg-white focus:border-[#39A900] focus:ring-4 focus:ring-green-500/5 outline-none transition-all text-sm font-semibold text-gray-800 placeholder:text-gray-300"
+                    className="w-full pl-14 pr-5 py-3.5 rounded-2xl bg-gray-50 border border-transparent focus:bg-white focus:border-[#39A900] focus:ring-4 focus:ring-green-500/5 outline-none transition-all text-sm font-semibold text-gray-800 placeholder:text-gray-300"
                   />
                 </div>
               </div>
@@ -456,7 +450,7 @@ function Login() {
                     placeholder="••••••••••••"
                     value={formData.contra}
                     onChange={handleChange}
-                    className="w-full pl-14 pr-14 py-4.5 rounded-2xl bg-gray-50 border border-transparent focus:bg-white focus:border-[#39A900] focus:ring-4 focus:ring-green-500/5 outline-none transition-all text-sm font-semibold text-gray-800 placeholder:text-gray-300"
+                    className="w-full pl-14 pr-14 py-3.5 rounded-2xl bg-gray-50 border border-transparent focus:bg-white focus:border-[#39A900] focus:ring-4 focus:ring-green-500/5 outline-none transition-all text-sm font-semibold text-gray-800 placeholder:text-gray-300"
                   />
                   <button
                     type="button"
@@ -495,7 +489,7 @@ function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#39A900] hover:bg-[#007832] text-white py-5 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl shadow-green-900/10 hover:shadow-green-900/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 mt-4"
+                className="w-full bg-[#39A900] hover:bg-[#007832] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl shadow-green-900/10 hover:shadow-green-900/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 mt-2"
               >
                 {loading ? (
                   <RefreshCw className="w-6 h-6 animate-spin" />

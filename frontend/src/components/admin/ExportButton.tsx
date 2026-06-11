@@ -1,5 +1,6 @@
-import React from 'react';
-import { Download } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, Loader2 } from 'lucide-react';
+import { useNotification } from '../../contexts/NotificationContext';
 
 interface ExportButtonProps {
   label: string;
@@ -13,41 +14,68 @@ interface ExportButtonProps {
  * FEATURE: Descarga de reportes administrativos (Excel/PDF).
  * API: Consume endpoints de exportación del DashboardController.
  */
-export const ExportButton: React.FC<ExportButtonProps> = ({ label, url, color }) => {
-  const handleExport = () => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const token = user.access_token || user.token;
-    
-    // FEATURE: Inyectar token en la URL para descargas seguras si es necesario, 
-    // o usar fetch con blob si el backend requiere cabeceras.
-    // Por simplicidad en este flujo, usamos window.open con el token como query param si el backend lo soporta,
-    // pero lo ideal es un fetch con cabeceras de autorización.
-    
-    fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${token}`
+export const ExportButton: React.FC<ExportButtonProps> = ({ label, url, color, filename }) => {
+  const { showNotification } = useNotification();
+  const [loading, setLoading] = useState(false);
+
+  const handleExport = async () => {
+    if (loading) return;
+
+    // El token de sesión se guarda como `accessToken` (camelCase). Contemplamos
+    // todas las variantes usadas en el frontend para no enviar "Bearer undefined"
+    // (lo que provocaba un 401 cuyo cuerpo JSON se guardaba como .xlsx/.pdf corrupto).
+    let token: string | undefined;
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      token = user.accessToken || user.access_token || user.token;
+    } catch {
+      token = undefined;
+    }
+
+    if (!token) {
+      showNotification('Tu sesión expiró. Inicia sesión nuevamente para exportar.', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // CRÍTICO: si el backend respondió con error, el cuerpo es JSON (no un binario).
+      // Guardarlo como archivo producía el .xlsx/.pdf "corrupto". Abortamos con aviso.
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
-    })
-    .then(response => response.blob())
-    .then(blob => {
+
+      const blob = await response.blob();
+      const extension = label === 'EXCEL' ? 'xlsx' : label === 'CSV' ? 'csv' : 'pdf';
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      const extension = label === 'EXCEL' ? 'xlsx' : label === 'CSV' ? 'csv' : 'pdf';
-      link.setAttribute('download', `reporte_${label.toLowerCase()}_${Date.now()}.${extension}`);
+      link.setAttribute(
+        'download',
+        filename || `reporte_${label.toLowerCase()}_${Date.now()}.${extension}`,
+      );
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
-    })
-    .catch(() => {});
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch {
+      showNotification('No se pudo generar el reporte. Intenta de nuevo.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <button 
+    <button
       onClick={handleExport}
-      className={`flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all duration-200 shadow-sm hover:bg-slate-50 active:scale-[0.99] ${color}`}
+      disabled={loading}
+      className={`flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all duration-200 shadow-sm hover:bg-slate-50 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed ${color}`}
     >
-      <Download size={14} /> {label}
+      {loading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} {label}
     </button>
   );
 };

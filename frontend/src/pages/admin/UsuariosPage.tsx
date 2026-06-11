@@ -53,6 +53,9 @@ export const UsuariosPage: React.FC = () => {
   // Eliminar
   const [confirmDeleteDoc, setConfirmDeleteDoc] = useState<string | null>(null);
 
+  // Ver vehículos registrados de un usuario (al hacer clic en la fila)
+  const [viewUser, setViewUser] = useState<AdminUsuarioItem | null>(null);
+
   const getErrorMessage = (error: unknown, fallback: string) => {
     if (!error || typeof error !== 'object') return fallback;
     const e = error as Record<string, unknown>;
@@ -248,7 +251,7 @@ export const UsuariosPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => abrirEditar(u)}
+            onClick={(e) => { e.stopPropagation(); abrirEditar(u); }}
             className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
             title="Editar"
           >
@@ -256,7 +259,7 @@ export const UsuariosPage: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setConfirmDeleteDoc(u.documento)}
+            onClick={(e) => { e.stopPropagation(); setConfirmDeleteDoc(u.documento); }}
             className="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700"
             title="Eliminar"
           >
@@ -308,6 +311,7 @@ export const UsuariosPage: React.FC = () => {
       <Table
         columns={columns}
         data={usuarios}
+        onRowClick={(u) => setViewUser(u)}
         isLoading={loading}
         emptyMessage="No se encontraron usuarios"
       />
@@ -457,6 +461,56 @@ export const UsuariosPage: React.FC = () => {
           ¿Estás seguro de eliminar al usuario <b>{confirmDeleteDoc}</b>? Esta acción no se puede deshacer y
           eliminará todos sus datos asociados.
         </p>
+      </Modal>
+
+      {/* Vehículos registrados del usuario (al hacer clic en la fila) */}
+      <Modal
+        isOpen={!!viewUser}
+        onClose={() => setViewUser(null)}
+        title={viewUser ? `Vehículos de ${viewUser.nombreCompleto}` : 'Vehículos'}
+        footer={<Button type="button" variant="outline" onClick={() => setViewUser(null)}>Cerrar</Button>}
+      >
+        {viewUser && ((viewUser.vehiculos?.length ?? 0) === 0 ? (
+          <div className="py-10 text-center">
+            <Car size={32} className="mx-auto text-slate-300" />
+            <p className="mt-3 text-sm font-bold text-slate-500">
+              Este usuario no tiene vehículos registrados.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+              {viewUser.vehiculos.length} vehículo{viewUser.vehiculos.length === 1 ? '' : 's'} registrado{viewUser.vehiculos.length === 1 ? '' : 's'}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {viewUser.vehiculos.map((v) => {
+                const tipo = typeof v.tipoVehiculo === 'string'
+                  ? v.tipoVehiculo
+                  : (v.tipoVehiculo as { tipoVehiculo?: string; nombre?: string } | undefined)?.tipoVehiculo
+                    || (v.tipoVehiculo as { tipoVehiculo?: string; nombre?: string } | undefined)?.nombre
+                    || '';
+                const detalle = [tipo, v.color].filter(Boolean).join(' • ');
+                return (
+                  <div key={v.placa} className="flex gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50">
+                    <div className="w-20 h-20 rounded-lg overflow-hidden bg-white border border-slate-200 flex items-center justify-center shrink-0">
+                      {v.fotoVehiculo ? (
+                        <img src={v.fotoVehiculo} alt={v.placa} className="w-full h-full object-cover" />
+                      ) : (
+                        <Car size={28} className="text-slate-300" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex flex-col justify-center">
+                      <p className="text-base font-black text-slate-900 tracking-wide truncate">{v.placa}</p>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">
+                        {detalle || 'Sin detalles'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </Modal>
     </div>
   );

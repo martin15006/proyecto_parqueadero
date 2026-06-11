@@ -550,7 +550,8 @@ export class UsuarioService {
     const qb = this.usuarioRepository
       .createQueryBuilder('u')
       .leftJoinAndSelect('u.registrosVehiculos', 'rv')
-      .leftJoinAndSelect('rv.vehiculo', 'vehiculo');
+      .leftJoinAndSelect('rv.vehiculo', 'vehiculo')
+      .leftJoinAndSelect('vehiculo.tipoVehiculo', 'tipoVehiculo');
 
     // Filtro por rol
     if (rol === 'APRENDIZ') {

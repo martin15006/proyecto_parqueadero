@@ -121,7 +121,7 @@ export default function DetalleVehiculoScreen({ navigation, route }: any) {
                 </Text>
               </View>
               <Text style={[styles.colorTexto, { color: colores.textoSecundario }]}>
-                🎨 {vehiculo.color}
+                {vehiculo.color}
               </Text>
             </View>
           </View>
@@ -180,7 +180,7 @@ export default function DetalleVehiculoScreen({ navigation, route }: any) {
           )}
 
           <Text style={[styles.tip, { color: colores.textoTenue }]}>
-            💡 Toca las fotos para verlas en grande
+            Toca las fotos para verlas en grande
           </Text>
 
           {/* Botones de acción */}

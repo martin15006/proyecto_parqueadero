@@ -1,8 +1,9 @@
 import React from 'react';
-import { Text, StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { User, Car, Users } from 'lucide-react-native';
 
 import HomeScreen from '../screens/HomeScreen';
 import VehiculosScreen from '../screens/VehiculosScreen';
@@ -85,7 +86,7 @@ export default function BottomTabNavigator() {
         component={HomeScreen}
         options={{
           tabBarLabel: 'Mi Perfil',
-          tabBarIcon: ({ color }) => <Text style={[styles.icono, { color }]}>👤</Text>,
+          tabBarIcon: ({ color }) => <User color={color} size={22} />,
         }}
       />
       <Tab.Screen
@@ -98,7 +99,7 @@ export default function BottomTabNavigator() {
             { backgroundColor: colores.fondo, borderTopColor: colores.borde },
             getTabBarStyle(route),
           ],
-          tabBarIcon: ({ color }) => <Text style={[styles.icono, { color }]}>🚗</Text>,
+          tabBarIcon: ({ color }) => <Car color={color} size={22} />,
         })}
       />
       <Tab.Screen
@@ -111,7 +112,7 @@ export default function BottomTabNavigator() {
             { backgroundColor: colores.fondo, borderTopColor: colores.borde },
             getTabBarStyle(route),
           ],
-          tabBarIcon: ({ color }) => <Text style={[styles.icono, { color }]}>🤝</Text>,
+          tabBarIcon: ({ color }) => <Users color={color} size={22} />,
         })}
       />
     </Tab.Navigator>

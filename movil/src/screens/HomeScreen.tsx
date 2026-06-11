@@ -8,6 +8,7 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -15,6 +16,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
+import { AlertTriangle, CheckCircle2, XCircle, ClipboardList, Lock, UserMinus, Users, Car, Pencil, Bell, ChevronDown } from 'lucide-react-native';
 import AvatarIniciales from '../components/AvatarIniciales';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -212,7 +214,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     return () => { activo = false; };
   }, [usuario, esAprendiz, cargarLiveData]);
 
-  // 🔴 Refresco en TIEMPO REAL mientras la pantalla está visible.
+  // Refresco en TIEMPO REAL mientras la pantalla está visible.
   // Polling cada 10s + refresco al recibir foco.
   useFocusEffect(
     useCallback(() => {
@@ -265,26 +267,26 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     return d.toLocaleString('es-CO', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }); // RF25: formato claro en español Colombia.
   }; // RF25: fin formatFecha.
 
-  const iconoNotificacion = (tipo: string) => { // RF25: iconografía ligera sin librerías externas (estabilidad Expo).
-    const t = String(tipo ?? '').toUpperCase(); // RF25: normaliza para comparar.
-    if (t.includes('SALIDA_EMERGENCIA')) return '⛔'; // RF25: icono semántico para emergencia.
-    if (t.includes('DESHABILITADO')) return '🚫'; // RF25: icono semántico para bloqueo.
-    if (t.includes('SOLICITUD_VEHICULO_APROBADA')) return '✅';
-    if (t.includes('SOLICITUD_VEHICULO_RECHAZADA')) return '❌';
-    if (t.includes('SOLICITUD_VEHICULO')) return '📋';
-    if (t.includes('COMPARTIDO_VEHICULO_ELIMINADO')) return '🗑️';
-    if (t.includes('COMPARTIDO_REVOCADO')) return '🔒';
-    if (t.includes('COMPARTIDO_RENUNCIADO')) return '👋';
-    if (t.includes('COMPARTIDO_ACEPTADO')) return '🤝';
-    if (t.includes('COMPARTIDO_RECHAZADO')) return '✖️';
-    if (t.includes('COMPARTIDO')) return '🤝';
-    if (t.includes('VEHICULO_REGISTRADO_POR_ADMIN')) return '🚗';
-    if (t.includes('VEHICULO_EDITADO_POR_ADMIN')) return '✏️';
-    if (t.includes('VEHICULO_ELIMINADO_POR_ADMIN')) return '🗑️';
-    if (t.includes('PARQUEADERO_LLENO')) return '🚫';
-    if (t.includes('PARQUEADERO_UMBRAL_80')) return '⚠️';
-    return '🔔'; // RF25: icono general de notificación.
-  }; // RF25: fin iconoNotificacion.
+  const iconoNotificacion = (tipo: string): React.ComponentType<{ size?: number; color?: string }> => {
+    const t = String(tipo ?? '').toUpperCase();
+    if (t.includes('SALIDA_EMERGENCIA')) return AlertTriangle;
+    if (t.includes('DESHABILITADO')) return AlertTriangle;
+    if (t.includes('SOLICITUD_VEHICULO_APROBADA')) return CheckCircle2;
+    if (t.includes('SOLICITUD_VEHICULO_RECHAZADA')) return XCircle;
+    if (t.includes('SOLICITUD_VEHICULO')) return ClipboardList;
+    if (t.includes('COMPARTIDO_VEHICULO_ELIMINADO')) return XCircle;
+    if (t.includes('COMPARTIDO_REVOCADO')) return Lock;
+    if (t.includes('COMPARTIDO_RENUNCIADO')) return UserMinus;
+    if (t.includes('COMPARTIDO_ACEPTADO')) return Users;
+    if (t.includes('COMPARTIDO_RECHAZADO')) return XCircle;
+    if (t.includes('COMPARTIDO')) return Users;
+    if (t.includes('VEHICULO_REGISTRADO_POR_ADMIN')) return Car;
+    if (t.includes('VEHICULO_EDITADO_POR_ADMIN')) return Pencil;
+    if (t.includes('VEHICULO_ELIMINADO_POR_ADMIN')) return XCircle;
+    if (t.includes('PARQUEADERO_LLENO')) return AlertTriangle;
+    if (t.includes('PARQUEADERO_UMBRAL_80')) return AlertTriangle;
+    return Bell;
+  };
 
   const colorNotificacion = (tipo: string) => { // RF25: color por severidad para escaneo visual.
     const t = String(tipo ?? '').toUpperCase(); // RF25: normaliza.
@@ -298,7 +300,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const codigoAccesoBarras = String(codigoAcceso ?? '').trim();
   const codigoAccesoQrSeguro = String(codigoAccesoQr ?? '').trim();
   const tieneCodigoAcceso = Boolean(esAprendiz && (codigoAccesoBarras || codigoAccesoQrSeguro));
-  const sincronizado = Boolean(tieneCodigoAcceso && !cargando);
   const pulseOpacity = animPulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }); // UX: opacidad pulsante sutil.
 
   return (
@@ -346,21 +347,19 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </View>
         </View>
 
-        <View style={[styles.card, { backgroundColor: T.superficie, borderColor: T.borde }]}>
-          <View style={[styles.capacidadBanner, { backgroundColor: colorEstado }]}>
-            <Text style={styles.capacidadTitulo}>ESTADO PARQUEADERO SENA</Text>
-            <View style={styles.capacidadRow}>
-              <Text style={styles.capacidadEstado}>{estado?.indicadorGlobal ?? 'SIN_DATOS'}</Text>
-              <View style={styles.capacidadDivider} />
-              <Text style={styles.capacidadCupos}>{Number(estado?.espaciosDisponibles ?? 0)}</Text>
-              <Text style={styles.capacidadCuposLabel}>CUPOS LIBRES</Text>
-            </View>
+        <View style={[styles.capacidadBanner, { backgroundColor: colorEstado }]}>
+          <Text style={styles.capacidadTitulo}>ESTADO PARQUEADERO SENA</Text>
+          <View style={styles.capacidadRow}>
+            <Text style={styles.capacidadEstado}>{estado?.indicadorGlobal ?? 'SIN_DATOS'}</Text>
+            <View style={styles.capacidadDivider} />
+            <Text style={styles.capacidadCupos}>{Number(estado?.espaciosDisponibles ?? 0)}</Text>
+            <Text style={styles.capacidadCuposLabel}>CUPOS LIBRES</Text>
           </View>
 
           {cargando ? (
             <View style={styles.loadingRow}>
-              <ActivityIndicator color={COLORS.verdeActivo} />
-              <Text style={[styles.loadingText, { color: T.textoSecundario }]}>Sincronizando datos institucionales...</Text>
+              <ActivityIndicator color={COLORS.blanco} />
+              <Text style={[styles.loadingText, { color: 'rgba(255,255,255,0.9)' }]}>Sincronizando datos institucionales...</Text>
             </View>
           ) : null}
         </View>
@@ -368,10 +367,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         <View style={[styles.card, { backgroundColor: T.superficie, borderColor: T.borde }]}>
           <View style={styles.cardHeaderRow}>
             <Text style={[styles.cardTitle, { color: esOscuro ? '#7FE34F' : COLORS.verdeOscuro }]}>CREDENCIAL VEHICULAR</Text>
-            <View style={styles.syncRow}>
-              <View style={[styles.syncDot, { backgroundColor: sincronizado ? COLORS.verdeActivo : COLORS.alertaOcupacion }]} />
-              <Text style={[styles.syncText, { color: T.textoSecundario }]}>{sincronizado ? 'Lector de Portería Sincronizado' : 'Sincronizando...'}</Text>
-            </View>
           </View>
 
           <View style={styles.credencialBody}>
@@ -427,7 +422,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                       ]}
                     >
                       <View style={[styles.notifIcon, { backgroundColor: colorNotificacion(n.tipo) }]}>
-                        <Text style={styles.notifIconText}>{iconoNotificacion(n.tipo)}</Text>
+                        {(() => { const IconoNotif = iconoNotificacion(n.tipo); return <IconoNotif size={18} color="#ffffff" />; })()}
                       </View>
 
                       <View style={styles.notifContent}>
@@ -472,15 +467,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                           ? `Mostrar solo las últimas 2`
                           : `Ver todas (${notificaciones.length})`}
                       </Text>
-                      <Text
-                        style={[
-                          styles.verMasFlecha,
-                          { color: esOscuro ? '#7FE34F' : COLORS.verdeOscuro },
-                          verTodasNotif && styles.verMasFlechaUp,
-                        ]}
-                      >
-                        ⌄
-                      </Text>
+                      <ChevronDown
+                        size={18}
+                        color={esOscuro ? '#7FE34F' : COLORS.verdeOscuro}
+                        style={{ transform: [{ rotate: verTodasNotif ? '180deg' : '0deg' }] }}
+                      />
                     </TouchableOpacity>
                   ) : null}
                 </View>
@@ -504,15 +495,14 @@ const styles = StyleSheet.create({ // UI: StyleSheet nativo para rendimiento y c
     padding: 16, // UX: 16px = 2*8 (espaciado institucional).
     paddingBottom: 28, // UX: aire inferior para scroll cómodo.
   }, // UX: fin content.
-  header: { // RF7: encabezado institucional.
+  header: { // RF7: encabezado institucional (a sangre: sin márgenes, llega a los bordes).
     backgroundColor: COLORS.verdeOscuro, // RF7: verde oscuro requerido para cabeceras.
-    borderRadius: 12, // UI: bordes elegantes exigidos.
-    padding: 16, // UX: padding consistente.
-    marginBottom: 16, // UX: separación con la siguiente tarjeta.
-    ...Platform.select({ // UI: sombras suaves (iOS) y elevation (Android).
-      ios: { shadowColor: COLORS.sombra, shadowOpacity: 1, shadowRadius: 14, shadowOffset: { width: 0, height: 10 } }, // UI: sombra premium.
-      android: { elevation: 6 }, // UI: elevación suave.
-    }), // UI: fin select sombras.
+    paddingHorizontal: 16, // UX: padding lateral del contenido.
+    paddingBottom: 16, // UX: padding inferior.
+    paddingTop: (Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44) + 12, // UX: deja libre la barra de estado.
+    marginHorizontal: -16, // UI: cancela el padding del contenedor -> llega a los laterales.
+    marginTop: -16, // UI: cancela el padding superior -> llega hasta arriba.
+    marginBottom: 0, // UI: pegado al banner verde claro (sin separación).
   }, // RF7: fin header.
   menuButton: { // UX: botón para abrir el drawer.
     alignSelf: 'flex-start', // UX: ancla arriba a la izquierda.
@@ -530,6 +520,7 @@ const styles = StyleSheet.create({ // UI: StyleSheet nativo para rendimiento y c
   headerRow: { // UI: fila avatar + textos.
     flexDirection: 'row', // UI: layout horizontal.
     alignItems: 'center', // UI: centra verticalmente.
+    gap: 6, // UX: margen estrecho entre el avatar y el texto.
   }, // UI: fin headerRow.
   avatar: { // RF7: avatar minimalista.
     width: 56, // UI: tamaño estable.
@@ -597,9 +588,15 @@ const styles = StyleSheet.create({ // UI: StyleSheet nativo para rendimiento y c
       android: { elevation: 4 }, // UI: elevación discreta.
     }), // UI: fin select.
   }, // UI: fin card.
-  capacidadBanner: { // RF16: banner dinámico.
-    borderRadius: 12, // UI: coherencia con tarjetas.
+  capacidadBanner: { // RF16: banner dinámico (recuadro verde con esquinas redondeadas, sin tarjeta blanca).
     padding: 16, // UX: padding cómodo.
+    borderRadius: 16, // UI: puntas redondeadas.
+    marginTop: 16, // UX: separación del header.
+    marginBottom: 16, // UX: separación de la siguiente tarjeta.
+    ...Platform.select({ // UI: sombra suave (coherente con las demás tarjetas).
+      ios: { shadowColor: COLORS.sombra, shadowOpacity: 1, shadowRadius: 16, shadowOffset: { width: 0, height: 10 } },
+      android: { elevation: 4 },
+    }),
   }, // RF16: fin banner.
   capacidadTitulo: { // RF16: título.
     color: COLORS.blanco, // UI: contraste sobre fondo dinámico.

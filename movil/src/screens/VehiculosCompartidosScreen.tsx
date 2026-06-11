@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { Users, Inbox } from 'lucide-react-native';
 import {
   View,
   Text,
@@ -102,9 +103,9 @@ export default function VehiculosCompartidosScreen({ navigation }: any) {
               {item.tipoVehiculo}
             </Text>
           </View>
-          <Text style={[styles.linea, { color: colores.textoSecundario }]}>🎨 {item.color}</Text>
+          <Text style={[styles.linea, { color: colores.textoSecundario }]}>{item.color}</Text>
           <Text style={[styles.linea, { color: colores.textoSecundario }]}>
-            👤 Propietario: {item.propietario}
+            Propietario: {item.propietario}
           </Text>
           <Text style={[styles.fecha, { color: colores.textoTenue }]}>
             Compartido el {new Date(item.compartidoDesde).toLocaleDateString()}
@@ -116,7 +117,7 @@ export default function VehiculosCompartidosScreen({ navigation }: any) {
             activeOpacity={0.7}
           >
             <Text style={[styles.btnEliminarFullTexto, { color: colores.error }]}>
-              🗑 Eliminar acceso
+              Eliminar acceso
             </Text>
           </TouchableOpacity>
         </View>
@@ -159,7 +160,7 @@ export default function VehiculosCompartidosScreen({ navigation }: any) {
                 onPress={() => navigation.navigate('InvitacionesCompartido')}
                 activeOpacity={0.7}
               >
-                <Text style={{ fontSize: 24, marginRight: 12 }}>📩</Text>
+                <Inbox size={22} color="#39A900" style={{ marginRight: 12 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.bannerPendienteTitulo, { color: esOscuro ? '#FFD54F' : '#856404' }]}>
                     Tienes {pendientes} {pendientes === 1 ? 'invitación pendiente' : 'invitaciones pendientes'}
@@ -173,7 +174,7 @@ export default function VehiculosCompartidosScreen({ navigation }: any) {
             )}
             <View style={[styles.banner, { backgroundColor: esOscuro ? 'rgba(95,217,36,0.10)' : colores.verdeMuyClaro, borderColor: colores.verde }]}>
               <Text style={[styles.bannerTexto, { color: colores.verde }]}>
-                🤝 Vehículos que otros usuarios han compartido contigo y que ya aceptaste.
+                Vehículos que otros usuarios han compartido contigo y que ya aceptaste.
                 Puedes usarlos para ingresar al parqueadero. Máximo 2 vehículos.
               </Text>
             </View>
@@ -181,7 +182,7 @@ export default function VehiculosCompartidosScreen({ navigation }: any) {
         }
         ListEmptyComponent={
           <View style={styles.vacio}>
-            <Text style={styles.emoji}>🤝</Text>
+            <Users size={56} color="#9CA3AF" />
             <Text style={[styles.vacioTitulo, { color: colores.textoPrimario }]}>
               Sin vehículos compartidos
             </Text>

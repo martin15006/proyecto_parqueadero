@@ -1,4 +1,5 @@
 import React from 'react';
+import { Construction } from 'lucide-react-native';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { fonts, espacios } from '../theme/senaTheme';
@@ -18,7 +19,7 @@ export default function ProximamenteScreen({ navigation, route }: Props) {
       <SenaHeader titulo={titulo} onMenuPress={() => navigation.openDrawer()} />
       {esOscuro && <View style={styles.aurora} />}
       <View style={styles.contenido}>
-        <Text style={styles.emoji}>🚧</Text>
+        <Construction size={56} color="#9CA3AF" />
         <Text style={[styles.titulo, { color: colores.textoPrimario }]}>Próximamente</Text>
         <Text style={[styles.subtitulo, { color: colores.textoSecundario }]}>
           Esta sección está en desarrollo.{'\n'}Estará disponible pronto.

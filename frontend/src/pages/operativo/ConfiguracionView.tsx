@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { 
-  User, Shield, Bell, Smartphone, 
-  ChevronRight, Save, RotateCcw, Headphones,
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import {
+  User, Shield, Bell,
+  ChevronRight, Save, RotateCcw,
   Key, Volume2, Eye, EyeOff
 } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
@@ -10,8 +11,19 @@ import { useNotification } from '../../contexts/NotificationContext';
 export const ConfiguracionView: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
-  const [activeSection, setActiveSection] = useState('perfil');
+  const location = useLocation();
+  const [activeSection, setActiveSection] = useState<string>(
+    (location.state as { section?: string } | null)?.section ?? 'perfil',
+  );
   const [saving, setSaving] = useState(false);
+
+  // Si se navega a esta vista solicitando una sección concreta (p. ej. desde el
+  // recuadro de usuario del sidebar → "Perfil de usuario"), forzamos esa pestaña,
+  // incluso si ya estábamos en Configuración con otra sección activa.
+  useEffect(() => {
+    const requested = (location.state as { section?: string } | null)?.section;
+    if (requested) setActiveSection(requested);
+  }, [location.key]);
   
   // Estado para Perfil
   const [profileData, setProfileData] = useState({
@@ -36,13 +48,6 @@ export const ConfiguracionView: React.FC = () => {
     autoRefresh: true
   });
 
-  // Estado para Periféricos
-  const [peripherals, setPeripherals] = useState({
-    scannerPort: 'COM3',
-    baudRate: '9600',
-    autoConnect: true
-  });
-
   const handleSave = () => {
     setSaving(true);
     // Simular guardado
@@ -63,7 +68,6 @@ export const ConfiguracionView: React.FC = () => {
     { id: 'perfil', label: 'Perfil de Usuario', icon: <User size={16} />, sub: 'Datos institucionales' },
     { id: 'seguridad', label: 'Seguridad', icon: <Shield size={16} />, sub: 'Claves y accesos' },
     { id: 'notificaciones', label: 'Preferencias', icon: <Bell size={16} />, sub: 'Alertas del sistema' },
-    { id: 'dispositivo', label: 'Periféricos', icon: <Smartphone size={16} />, sub: 'Lector de códigos' },
   ];
 
   const renderSectionContent = () => {
@@ -182,39 +186,6 @@ export const ConfiguracionView: React.FC = () => {
           </div>
         );
 
-      case 'dispositivo':
-        return (
-          <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-             <div className="bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 p-6 rounded-2xl text-center mb-6">
-               <div className="w-16 h-16 bg-[#39B000]/10 text-[#39B000] rounded-full flex items-center justify-center mx-auto mb-4 border border-[#39B000]/20">
-                 <Smartphone size={32} />
-               </div>
-               <p className="text-xs font-bold text-[#012E25] dark:text-white uppercase tracking-widest">Lector QR Institucional</p>
-               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Conectado vía USB • Puerto {peripherals.scannerPort}</p>
-             </div>
-             <div className="grid grid-cols-2 gap-4 max-w-md">
-                <InputGroup 
-                  label="Puerto COM" 
-                  value={peripherals.scannerPort} 
-                  onChange={(e) => setPeripherals({...peripherals, scannerPort: e.target.value})}
-                />
-                <InputGroup 
-                  label="Baud Rate" 
-                  value={peripherals.baudRate} 
-                  onChange={(e) => setPeripherals({...peripherals, baudRate: e.target.value})}
-                />
-             </div>
-             <div className="mt-4">
-               <ToggleGroup 
-                  label="Conexión Automática" 
-                  sub="Reconectar periférico al iniciar sesión" 
-                  active={peripherals.autoConnect} 
-                  onToggle={() => setPeripherals({...peripherals, autoConnect: !peripherals.autoConnect})}
-                />
-             </div>
-          </div>
-        );
-      
       default:
         return null;
     }
@@ -253,20 +224,6 @@ export const ConfiguracionView: React.FC = () => {
               <ChevronRight size={14} className={`transition-all ${activeSection === section.id ? 'translate-x-0.5 opacity-100' : 'opacity-0'}`} />
             </button>
           ))}
-        </div>
-
-        <div className="bg-[#012E25] rounded-xl p-6 text-white relative overflow-hidden shadow-lg shadow-[#012E25]/20">
-           <div className="absolute top-0 right-0 w-20 h-20 bg-[#39B000]/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-           <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest mb-3">Asistencia</p>
-           <div className="flex items-center gap-3 relative z-10">
-              <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10">
-                <Headphones className="w-4 h-4 text-[#39B000]" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold">Soporte Técnico</p>
-                <p className="text-[9px] text-white/50">Lunes a Viernes</p>
-              </div>
-           </div>
         </div>
       </div>
 

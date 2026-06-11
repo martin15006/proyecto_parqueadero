@@ -122,7 +122,7 @@ export default function CompartirVehiculoScreen({ route, navigation }: any) {
             <FadeInView delay={150}>
               {info.estado === 'PENDIENTE' ? (
                 <View style={[styles.estadoBox, { backgroundColor: esOscuro ? 'rgba(255,193,7,0.10)' : '#FFF8E1', borderColor: '#FFC107' }]}>
-                  <Text style={[styles.estadoTitulo, { color: esOscuro ? '#FFD54F' : '#856404' }]}>⏳ Invitación pendiente de respuesta</Text>
+                  <Text style={[styles.estadoTitulo, { color: esOscuro ? '#FFD54F' : '#856404' }]}>Invitación pendiente de respuesta</Text>
                   <View style={styles.fila}>
                     <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Enviada a:</Text>
                     <Text style={[styles.valor, { color: colores.textoPrimario }]}>{info.receptor.nombre}</Text>
@@ -173,7 +173,7 @@ export default function CompartirVehiculoScreen({ route, navigation }: any) {
             <FadeInView delay={150}>
               <View style={[styles.aviso, { backgroundColor: esOscuro ? 'rgba(33,150,243,0.10)' : '#E3F2FD', borderColor: '#2196F3' }]}>
                 <Text style={[styles.avisoTexto, { color: esOscuro ? '#90CAF9' : '#0D47A1' }]}>
-                  ℹ Ingresa el documento del usuario al que quieres invitar a usar
+                  Ingresa el documento del usuario al que quieres invitar a usar
                   este vehículo. La invitación quedará PENDIENTE hasta que la otra
                   persona la acepte.{'\n\n'}
                   Reglas:{'\n'}

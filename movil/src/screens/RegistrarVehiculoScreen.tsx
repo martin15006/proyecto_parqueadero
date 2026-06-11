@@ -153,7 +153,10 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
         );
       }, 1500);
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      const msg = error?.message || 'No se pudo registrar el vehículo. Intenta de nuevo.';
+      // Si el backend rechazó por el tope de vehículos, usamos un título claro.
+      const esLimite = /m[áa]ximo|alcanzado/i.test(msg);
+      Alert.alert(esLimite ? 'Límite alcanzado' : 'Error', msg);
     } finally {
       setCargando(false);
       setMensajeCargando('');
@@ -196,7 +199,7 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
               <Text
                 style={[styles.fotoPlaceholder, { color: colores.textoTenue }]}
               >
-                📷 Toca para agregar
+                Toca para agregar
               </Text>
             )}
           </TouchableOpacity>
@@ -225,7 +228,7 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
               <Text
                 style={[styles.fotoPlaceholder, { color: colores.textoTenue }]}
               >
-                📷 Toca para agregar
+                Toca para agregar
               </Text>
             )}
           </TouchableOpacity>
@@ -254,7 +257,7 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
               <Text
                 style={[styles.fotoPlaceholder, { color: colores.textoTenue }]}
               >
-                📷 Toca para agregar
+                Toca para agregar
               </Text>
             )}
           </TouchableOpacity>
@@ -371,7 +374,7 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
           <View style={{ marginTop: espacios.medio }}>
             <View style={[styles.aviso, { backgroundColor: esOscuro ? 'rgba(255,193,7,0.10)' : '#FFF8E1', borderColor: '#FFC107' }]}>
               <Text style={[styles.avisoTexto, { color: esOscuro ? '#FFD54F' : '#856404' }]}>
-                ⚠ Tu solicitud será revisada por un administrador. El vehículo solo
+                Tu solicitud será revisada por un administrador. El vehículo solo
                 quedará registrado cuando sea aprobado.
               </Text>
             </View>

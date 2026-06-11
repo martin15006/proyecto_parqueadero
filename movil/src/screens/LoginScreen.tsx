@@ -17,7 +17,6 @@ import AnimatedLogo from '../components/AnimatedLogo';
 import AnimatedButton from '../components/AnimatedButton';
 import AnimatedInput from '../components/AnimatedInput';
 import FadeInView from '../components/FadeInView';
-import Footer from '../components/Footer';
 import OtpModal from '../components/OtpModal';
 import { Usuario } from '../types/usuario';
 import BotonTema from '../components/BotonTema';
@@ -135,20 +134,6 @@ export default function LoginScreen({ navigation, route }: any) {
             </FadeInView>
 
             <FadeInView delay={200}>
-              <View style={styles.badgeContainer}>
-                <View style={[styles.badge, esOscuro && styles.badgeGlass]}>
-                  <View style={styles.badgeDot} />
-                  <Text
-                    style={[
-                      styles.badgeText,
-                      { color: esOscuro ? '#b0f08a' : colores.verdeOscuro },
-                    ]}
-                  >
-                    Sistema Activo
-                  </Text>
-                </View>
-              </View>
-
               <Text style={[styles.titulo, { color: tituloColor }]}>
                 Bienvenido
               </Text>
@@ -230,7 +215,6 @@ export default function LoginScreen({ navigation, route }: any) {
               </View>
             </FadeInView>
           </ScrollView>
-          <Footer />
         </KeyboardAvoidingView>
       </View>
 
@@ -326,41 +310,6 @@ const styles = StyleSheet.create({
     shadowRadius: 25,
     shadowOffset: { width: 0, height: 0 },
     elevation: 15,
-  },
-
-  // ─── BADGE "Sistema Activo" ───
-  badgeContainer: {
-    alignItems: 'center',
-    marginBottom: espacios.medio,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 99,
-    backgroundColor: 'rgba(57,169,0,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(57,169,0,0.30)',
-  },
-  badgeGlass: {
-    backgroundColor: 'rgba(57,169,0,0.20)',
-  },
-  badgeDot: {
-    width: 7,
-    height: 7,
-    backgroundColor: '#5fd924',
-    borderRadius: 3.5,
-    marginRight: 6,
-    shadowColor: '#5fd924',
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  badgeText: {
-    fontSize: fonts.pequeno,
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
 
   // ─── TÍTULOS ───

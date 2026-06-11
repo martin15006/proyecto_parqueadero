@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { Car, ClipboardList } from 'lucide-react-native';
 import {
   View,
   Text,
@@ -17,24 +18,43 @@ import SenaHeader from '../components/SenaHeader';
 import AnimatedButton from '../components/AnimatedButton';
 import FadeInView from '../components/FadeInView';
 import { vehiculoService } from '../services/vehiculoService';
-import { VehiculoUsuario } from '../types/vehiculo';
+import { VehiculoUsuario, SolicitudVehiculo } from '../types/vehiculo';
+
+const MAX_VEHICULOS = 3;
 
 export default function VehiculosScreen({ navigation }: any) {
   const { colores, esOscuro } = useTheme();
   const [vehiculos, setVehiculos] = useState<VehiculoUsuario[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
+  const [pendientes, setPendientes] = useState(0);
 
   const cargar = async () => {
     try {
-      const datos = await vehiculoService.listarMios();
+      const [datos, solicitudes] = await Promise.all([
+        vehiculoService.listarMios(),
+        vehiculoService.listarMisSolicitudes().catch((): SolicitudVehiculo[] => []),
+      ]);
       setVehiculos(datos);
+      setPendientes(solicitudes.filter((s) => s.estado === 'PENDIENTE').length);
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
       setCargando(false);
       setRefrescando(false);
     }
+  };
+
+  // Verificación proactiva: avisamos del límite ANTES de abrir el formulario.
+  const irARegistrar = () => {
+    if (vehiculos.length + pendientes >= MAX_VEHICULOS) {
+      Alert.alert(
+        'Límite alcanzado',
+        `Has alcanzado el máximo de ${MAX_VEHICULOS} vehículos registrados. Elimina uno para poder registrar otro.`,
+      );
+      return;
+    }
+    navigation.navigate('RegistrarVehiculo');
   };
 
   useFocusEffect(
@@ -82,7 +102,7 @@ export default function VehiculosScreen({ navigation }: any) {
             </Text>
           </View>
           <Text style={[styles.color, { color: colores.textoSecundario }]}>
-            🎨 {item.color}
+            {item.color}
           </Text>
           <Text style={[styles.verDetalle, { color: colores.textoTenue }]}>
             Toca para ver detalles ›
@@ -142,7 +162,7 @@ export default function VehiculosScreen({ navigation }: any) {
             onPress={() => navigation.navigate('MisSolicitudes')}
             activeOpacity={0.7}
           >
-            <Text style={[styles.bannerEmoji]}>📋</Text>
+            <ClipboardList size={22} color="#39A900" style={{ marginRight: 12 }} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.bannerTitulo, { color: colores.verde }]}>
                 Ver mis solicitudes
@@ -156,7 +176,7 @@ export default function VehiculosScreen({ navigation }: any) {
         }
         ListEmptyComponent={
           <View style={styles.vacioContainer}>
-            <Text style={styles.vacioEmoji}>🚗</Text>
+            <Car size={56} color="#9CA3AF" />
             <Text style={[styles.vacioTitulo, { color: colores.textoPrimario }]}>
               Sin vehículos registrados
             </Text>
@@ -170,7 +190,7 @@ export default function VehiculosScreen({ navigation }: any) {
       <View style={styles.fab}>
         <AnimatedButton
           texto="+ Solicitar Registro de Vehículo"
-          onPress={() => navigation.navigate('RegistrarVehiculo')}
+          onPress={irARegistrar}
         />
       </View>
     </View>

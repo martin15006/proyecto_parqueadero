@@ -57,7 +57,7 @@ export default function ConfiguracionScreen({ navigation }: any) {
                         >
                             <View style={styles.temaCentro}>
                                 <Text style={styles.icono}>
-                                    {esOscuro ? '🌙' : '☀️'}
+                                    {esOscuro ? '☾' : '☼'}
                                 </Text>
                             </View>
                         </View>
@@ -82,7 +82,7 @@ export default function ConfiguracionScreen({ navigation }: any) {
                                 </View>
                                 <View style={[styles.previewLineaCorta, { backgroundColor: '#e0e0e0' }]} />
                                 <View style={[styles.previewLineaCorta, { backgroundColor: '#e0e0e0', width: '60%' }]} />
-                                <Text style={styles.previewLabel}>☀️ Claro</Text>
+                                <Text style={styles.previewLabel}>☼ Claro</Text>
                                 {!esOscuro && (
                                     <View style={[styles.previewCheck, { backgroundColor: colores.verde }]}>
                                         <Text style={styles.previewCheckText}>✓</Text>
@@ -108,7 +108,7 @@ export default function ConfiguracionScreen({ navigation }: any) {
                                 </View>
                                 <View style={[styles.previewLineaCorta, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
                                 <View style={[styles.previewLineaCorta, { backgroundColor: 'rgba(255,255,255,0.15)', width: '60%' }]} />
-                                <Text style={[styles.previewLabel, { color: '#ffffff' }]}>🌙 Oscuro</Text>
+                                <Text style={[styles.previewLabel, { color: '#ffffff' }]}>☾ Oscuro</Text>
                                 {esOscuro && (
                                     <View style={[styles.previewCheck, { backgroundColor: colores.verde }]}>
                                         <Text style={styles.previewCheckText}>✓</Text>

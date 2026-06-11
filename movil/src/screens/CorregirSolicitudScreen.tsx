@@ -191,7 +191,7 @@ export default function CorregirSolicitudScreen({ navigation, route }: any) {
           <Image source={{ uri }} style={styles.fotoImg} />
         ) : (
           <Text style={[styles.fotoPlaceholder, { color: colores.textoTenue }]}>
-            📷 Toca para agregar
+            Toca para agregar
           </Text>
         )}
       </TouchableOpacity>

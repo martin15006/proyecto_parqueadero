@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useOperativo } from '../../hooks/useOperativo';
-import { WifiOff, Car, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Car, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 import type { BahiaSensorizada } from '../../types';
 
 /**
@@ -32,10 +32,9 @@ export const EstadoBahiasView: React.FC = () => {
   return (
     <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in duration-500">
       {/* Resumen de Bahías Superior */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <StatCard label="Libres" value={stats.libres} icon={<CheckCircle2 size={16} />} color="text-[#39B000]" bg="bg-green-50 dark:bg-[#39B000]/10" />
         <StatCard label="Ocupadas" value={stats.ocupadas} icon={<Car size={16} />} color="text-red-600 dark:text-red-400" bg="bg-red-50 dark:bg-red-900/20" />
-        <StatCard label="Offline" value={stats.offline} icon={<WifiOff size={16} />} color="text-gray-400 dark:text-gray-500" bg="bg-gray-50 dark:bg-white/5" />
       </div>
 
       {/* Grid de Bahías Sensorizadas */}
@@ -58,7 +57,6 @@ export const EstadoBahiasView: React.FC = () => {
           <div className="flex items-center gap-4 flex-wrap justify-center">
             <LegendDot color="bg-[#39B000]" label="Libre" />
             <LegendDot color="bg-red-500" label="Ocupada" />
-            <LegendDot color="bg-amber-500" label="Salida pendiente" />
             <LegendDot color="bg-gray-300 dark:bg-gray-600" label="Offline" />
           </div>
           <p>Total de plazas: {stats.total}</p>

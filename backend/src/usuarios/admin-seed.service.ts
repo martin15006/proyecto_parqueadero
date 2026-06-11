@@ -22,7 +22,7 @@ export class AdminSeedService implements OnModuleInit {
     // antes de intentar crear el admin, que depende de la FK id_tipo_usr.
     await this.catalogosSeed.ensureSeeded();
 
-    const correoAdmin = 'admin@sistema.com';
+    const correoAdmin = 'ymgg231@gmail.com';
     const documentoAdmin = '123456789';
     const contraAdmin = 'Admin123*';
     const saltRounds = 10;

@@ -13,19 +13,20 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import AvatarIniciales from '../components/AvatarIniciales';
 import { fonts, espacios } from '../theme/senaTheme';
+import { User, Car, Users, Lock, Settings } from 'lucide-react-native';
 
 interface ItemMenu {
   nombre: string;
   ruta: string;
-  icono: string;
+  Icono: React.ComponentType<{ size?: number; color?: string }>;
 }
 
 const ITEMS: ItemMenu[] = [
-  { nombre: 'Mi Perfil', ruta: 'MiPerfil', icono: '👤' },
-  { nombre: 'Mis Vehículos', ruta: 'MisVehiculos', icono: '🚗' },
-  { nombre: 'Compartidos Conmigo', ruta: 'CompartidosTab', icono: '🤝' },
-  { nombre: 'Cambiar Contraseña', ruta: 'CambiarContrasena', icono: '🔒' },
-  { nombre: 'Configuración', ruta: 'ConfiguracionStack', icono: '⚙️' },
+  { nombre: 'Mi Perfil', ruta: 'MiPerfil', Icono: User },
+  { nombre: 'Mis Vehículos', ruta: 'MisVehiculos', Icono: Car },
+  { nombre: 'Compartidos Conmigo', ruta: 'CompartidosTab', Icono: Users },
+  { nombre: 'Cambiar Contraseña', ruta: 'CambiarContrasena', Icono: Lock },
+  { nombre: 'Configuración', ruta: 'ConfiguracionStack', Icono: Settings },
 ];
 
 export default function DrawerContent(props: any) {
@@ -143,7 +144,12 @@ export default function DrawerContent(props: any) {
                       style={[styles.indicadorActivo, { backgroundColor: colores.verde }]}
                     />
                   ) : null}
-                  <Text style={styles.iconoItem}>{item.icono}</Text>
+                  <View style={{ marginRight: espacios.normal }}>
+                    <item.Icono
+                      size={22}
+                      color={activo ? colores.verde : colores.textoPrimario}
+                    />
+                  </View>
                   <Text
                     style={[
                       styles.textoItem,
@@ -211,7 +217,7 @@ const styles = StyleSheet.create({
     borderRadius: 90,
     backgroundColor: 'rgba(0,120,50,0.12)',
   },
-  scroll: { paddingTop: 0 },
+  scroll: { paddingTop: 0, paddingHorizontal: 0, paddingStart: 0, paddingEnd: 0 },
   header: {
     padding: espacios.medio,
     paddingTop: espacios.grande * 2,
@@ -276,7 +282,7 @@ const styles = StyleSheet.create({
   },
   itemsContainer: {
     paddingTop: espacios.medio,
-    paddingHorizontal: espacios.pequeno,
+    paddingHorizontal: espacios.micro,
   },
   item: {
     flexDirection: 'row',

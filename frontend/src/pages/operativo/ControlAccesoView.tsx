@@ -1,18 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ShieldAlert, ShieldCheck, ClipboardList,
-  Car, Users, LayoutGrid, Info, LogOut
+  ShieldAlert, ShieldCheck,
+  Car, LayoutGrid, Info, LogOut
 } from 'lucide-react';
 import { useOperativo } from '../../hooks/useOperativo';
 import { useNotification } from '../../contexts/NotificationContext';
 import { MovementForm } from '../../components/MovementForm';
-import type { MovementFormHandle } from '../../components/MovementForm';
 import { operativoService } from '../../services/operativo.service';
 
 export const ControlAccesoView: React.FC = () => {
   const { stats, alerts, vehiculos, loading, refresh, handleQuickSalida } = useOperativo();
   const { showNotification } = useNotification();
-  const formRef = useRef<MovementFormHandle>(null);
 
   // El spinner a pantalla completa solo debe salir en la carga inicial. En refrescos
   // posteriores (p. ej. tras registrar un movimiento) mantenemos el MovementForm montado
@@ -29,10 +27,6 @@ export const ControlAccesoView: React.FC = () => {
     } catch (err: any) {
       showNotification(err.response?.data?.mensaje || err.response?.data?.message || 'Error al activar emergencia', 'error');
     }
-  };
-
-  const handleIngresoManual = () => {
-    formRef.current?.activateManualMode();
   };
 
   const estadoGlobal = useMemo(() => {
@@ -89,7 +83,6 @@ export const ControlAccesoView: React.FC = () => {
             </div>
             <div className="p-8">
               <MovementForm
-                ref={formRef}
                 onSuccess={(msg) => { showNotification(msg, 'success'); refresh(); }}
                 onError={(msg) => { showNotification(msg, 'error'); }}
               />
@@ -101,19 +94,6 @@ export const ControlAccesoView: React.FC = () => {
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 p-6 space-y-4 transition-colors duration-300">
             <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Protocolos Especiales</h3>
-
-            <button
-              onClick={handleIngresoManual}
-              className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-left group"
-            >
-              <div className="w-10 h-10 rounded-lg bg-gray-50 dark:bg-white/5 flex items-center justify-center text-gray-400 group-hover:bg-[#39B000] group-hover:text-white transition-all">
-                <ClipboardList size={18} />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-[#012E25] dark:text-white">Ingreso Manual</p>
-                <p className="text-[9px] text-gray-400 uppercase">Sin código QR</p>
-              </div>
-            </button>
 
             <button
               onClick={handleSalidaEmergencia}
@@ -159,20 +139,6 @@ export const ControlAccesoView: React.FC = () => {
                 ))
               )}
             </div>
-          </div>
-
-          <div className="bg-[#012E25] rounded-2xl p-6 text-white relative overflow-hidden shadow-lg shadow-[#012E25]/20">
-             <div className="absolute top-0 right-0 w-24 h-24 bg-[#39B000]/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-             <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest mb-3">Soporte Técnico</p>
-             <div className="flex items-center gap-3 relative z-10">
-                <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center border border-white/10">
-                  <Users className="w-5 h-5 text-[#39B000]" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold">Mesa de Ayuda</p>
-                  <p className="text-[10px] text-white/50">Ext: 22536</p>
-                </div>
-             </div>
           </div>
         </div>
       </div>

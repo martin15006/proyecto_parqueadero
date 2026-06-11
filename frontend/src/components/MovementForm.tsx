@@ -1,15 +1,11 @@
-import { useEffect, useMemo, useRef, useState, useImperativeHandle, forwardRef } from 'react';
-import { AlertCircle, Car, CheckCircle2, FileText, Hash, ScanLine, ShieldAlert, XCircle } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Car, CheckCircle2, FileText, Hash, ScanLine, ShieldAlert, XCircle } from 'lucide-react';
 import { operativoService } from '../services/operativo.service'; // RF10/RF14: integración real con backend operativo (entrada/salida/contingencia).
 import { socketService } from '../services/socket.service';
 
 interface MovementFormProps {
   onSuccess: (msg: string) => void;
   onError: (msg: string) => void;
-}
-
-export interface MovementFormHandle {
-  activateManualMode: () => void;
 }
 
 interface FeedbackState {
@@ -99,10 +95,8 @@ type InfoPlacaResponse = {
  * UI alineada a la estética institucional compacta (paleta #012E25 / #39B000 con modo oscuro);
  * conserva intactos los flujos del backend: info-placa, multivehículo, contingencia y evidencias.
  */
-export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({ onSuccess, onError }, ref) => {
+export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
   const [inputValue, setInputValue] = useState<string>(''); // RF10/RF11/RF14: entrada única (placa o token escaneado) para flujo operativo.
-  const [motivo, setMotivo] = useState<string>(''); // RF34: motivo requerido en registro manual (contingencia).
-  const [showContingencia, setShowContingencia] = useState<boolean>(false); // RF34: UI para habilitar/deshabilitar contingencia.
   const [feedback, setFeedback] = useState<FeedbackState>({ type: null, message: '' }); // RF14/RF39: feedback semántico (permitido/denegado/bloqueado).
   const [multiVehiculos, setMultiVehiculos] = useState<VehiculoSeleccionable[] | null>(null); // RF31: lista para selección si el aprendiz tiene múltiples vehículos.
   const [codigoPendiente, setCodigoPendiente] = useState<string>(''); // RF31: token escaneado a reenviar en confirmación secundaria.
@@ -116,17 +110,9 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
   const [infoPlaca, setInfoPlaca] = useState<InfoPlacaResponse | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null); // RF33: foco permanente en el input (lector emula teclado).
-  const motivoRef = useRef<HTMLInputElement>(null); // RF34: referencia para el input de motivo (contingencia).
   const scannerBufferRef = useRef<string>(''); // RF33: buffer local para capturar ráfagas del lector (keyboard wedge) cuando el foco se pierde.
   const lastScanKeyAtRef = useRef<number>(0); // RF33: timestamp del último carácter recibido; permite detectar ráfagas y reconstruir el código completo.
   const lastInputChangeAtRef = useRef<number>(0); // RF33: timestamp del último onChange del input para detectar nueva ráfaga del lector.
-
-  useImperativeHandle(ref, () => ({
-    activateManualMode: () => {
-      setShowContingencia(true);
-      setTimeout(() => motivoRef.current?.focus(), 100);
-    },
-  }));
 
   async function loadTurnoIngresos() {
     try {
@@ -160,7 +146,6 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
    */
   useEffect(() => {
     const focusScanInput = () => { // RF33: función central para forzar foco "mouse-free".
-      if (showContingencia) return; // RF34: si el operador está escribiendo motivo, no robamos el foco.
       inputRef.current?.focus(); // RF33: enfoque directo al input de lectura (lector físico).
     };
 
@@ -191,7 +176,7 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
         return;
       }
 
-      if (showContingencia || multiVehiculos || infoPlaca || feedback.type === 'loading') {
+      if (multiVehiculos || infoPlaca || feedback.type === 'loading') {
         scannerBufferRef.current = '';
         lastScanKeyAtRef.current = 0;
         return;
@@ -249,12 +234,10 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
       window.removeEventListener('focus', handleWindowFocus);
       window.removeEventListener('keydown', handleGlobalKeys);
     };
-  }, [feedback.type, lastResponse, showContingencia, multiVehiculos, infoPlaca, handleAction]);
+  }, [feedback.type, lastResponse, multiVehiculos, infoPlaca, handleAction]);
 
   const clearState = () => {
     setInputValue('');
-    setMotivo('');
-    setShowContingencia(false);
     setMultiVehiculos(null);
     setCodigoPendiente('');
     setAprendizPendiente('');
@@ -277,9 +260,8 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
    * Orquestador de acciones operativas.
    * Conecta con los endpoints reales del backend.
    */
-  async function handleAction(action: 'entrada' | 'salida' | 'manual' | 'codigo', value?: string) {
+  async function handleAction(action: 'entrada' | 'salida' | 'codigo', value?: string) {
     const targetValue = String(value ?? inputValue).trim(); // RF33: normaliza string proveniente del lector o del teclado.
-    const identificacionLimpia = targetValue.replace(/[- ]/g, '').toUpperCase();
 
     if (!targetValue && action !== 'codigo') { // RF33: validación de entrada mínima.
       setFeedback({ type: 'error', message: 'LA PLACA O CÓDIGO ES OBLIGATORIO' });
@@ -315,8 +297,6 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
           onSuccess(`Ingreso: ${targetValue}`);
           loadTurnoIngresos();
           setInputValue('');
-          setMotivo('');
-          setShowContingencia(false);
           break;
         }
 
@@ -328,24 +308,6 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
           onSuccess(`Salida: ${targetValue}`);
           loadTurnoIngresos();
           setInputValue('');
-          setMotivo('');
-          setShowContingencia(false);
-          break;
-        }
-
-        case 'manual': {
-          if (!motivo || motivo.length < 10) {
-            throw new Error('EL MOTIVO DEBE TENER AL MENOS 10 CARACTERES');
-          }
-          const resManual: OperativoResponse = await operativoService.registrarIngresoManual(identificacionLimpia, motivo); // RF34: registro manual con motivo.
-          setFeedback({ type: 'success', message: resManual.mensaje });
-          setLastResponse(resManual);
-          setFeedbackOverlayOpen(true); // RF33: overlay para confirmación.
-          onSuccess(`Manual: ${targetValue} -> ${resManual.bahia}`);
-          loadTurnoIngresos();
-          setInputValue('');
-          setMotivo('');
-          setShowContingencia(false);
           break;
         }
 
@@ -359,8 +321,6 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
             onSuccess(resCodigo.mensaje);
             loadTurnoIngresos();
             setInputValue('');
-            setMotivo('');
-            setShowContingencia(false);
           } else { // RF31: múltiples vehículos => abre modal de selección.
             setMultiVehiculos(resCodigo.vehiculos);
             setCodigoPendiente(resCodigo.codigo);
@@ -416,8 +376,6 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
       onSuccess(`Ingreso: ${placa}`);
       loadTurnoIngresos();
       setInputValue('');
-      setMotivo('');
-      setShowContingencia(false);
     } catch (error: any) {
       const msg = error.message || error.response?.data?.message || 'ERROR EN INGRESO';
       setFeedback({ type: 'error', message: msg.toUpperCase() });
@@ -454,8 +412,6 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
       onSuccess(res.mensaje);
       loadTurnoIngresos();
       setInputValue('');
-      setMotivo('');
-      setShowContingencia(false);
     } catch (error: any) {
       const msg = error.message || error.response?.data?.message || 'ERROR EN CONFIRMACIÓN';
       setFeedback({ type: 'error', message: msg.toUpperCase() });
@@ -484,7 +440,7 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
   }, []);
 
   return (
-    <div className="space-y-6 relative" onClick={() => !showContingencia && !infoPlaca && !multiVehiculos && inputRef.current?.focus()}>
+    <div className="space-y-6 relative" onClick={() => !infoPlaca && !multiVehiculos && inputRef.current?.focus()}>
       {/* Overlay de Error o Carga — lectura a distancia */}
       {feedbackOverlayOpen && feedback.type && feedback.type !== 'success' && (
         <div
@@ -593,10 +549,11 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
         </button>
       </div>
 
-      {/* Actividad reciente — movimientos (ingresos/salidas) del turno */}
-      <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-white/5">
+      {/* Actividad reciente — movimientos (ingresos/salidas). Solo informativo:
+          detenemos la propagación del clic para que no se reenfoque el input de escaneo. */}
+      <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-white/5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Movimientos de tu turno</h4>
+          <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Movimientos recientes</h4>
           <span className={`text-[9px] font-bold uppercase tracking-widest ${turnoLoading ? 'text-orange-400 animate-pulse' : 'text-[#39B000] animate-pulse'}`}>
             {turnoLoading ? 'Cargando' : 'En vivo'}
           </span>
@@ -612,11 +569,11 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
             turnoIngresos.slice(0, 6).map((ingreso, i) => {
               const esSalida = ingreso.tipo === 'SALIDA';
               return (
-              <div key={`${ingreso.placa}-${i}`} className="flex items-center gap-3 p-3 bg-white dark:bg-[#121212] border border-gray-100 dark:border-white/5 rounded-xl hover:border-gray-200 dark:hover:border-white/10 transition-all group">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[10px] transition-all ${
+              <div key={`${ingreso.placa}-${i}`} className="flex items-center gap-3 p-3 bg-white dark:bg-[#121212] border border-gray-100 dark:border-white/5 rounded-xl">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[10px] ${
                   esSalida
-                    ? 'bg-orange-50 text-orange-500 dark:bg-orange-900/20 dark:text-orange-400 group-hover:bg-orange-500 group-hover:text-white'
-                    : 'bg-gray-50 dark:bg-white/5 text-[#39B000] group-hover:bg-[#39B000] group-hover:text-white'
+                    ? 'bg-orange-50 text-orange-500 dark:bg-orange-900/20 dark:text-orange-400'
+                    : 'bg-gray-50 dark:bg-white/5 text-[#39B000]'
                 }`}>
                   {ingreso.placa.substring(0, 2)}
                 </div>
@@ -637,61 +594,6 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
               );
             })
           )}
-        </div>
-      </div>
-
-      {/* Registro Manual (Contingencia) */}
-      <div className={`
-        overflow-hidden transition-all duration-300 rounded-xl
-        ${showContingencia ? 'max-h-[400px] border border-[#39B000]/20 bg-green-50/20 dark:bg-[#39B000]/5 p-6' : 'max-h-0'}
-      `}>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold text-[#012E25] dark:text-white uppercase tracking-widest flex items-center gap-2">
-              <AlertCircle size={14} /> Contingencia Manual
-            </p>
-            <span className="text-[8px] font-bold text-[#39B000] uppercase">Uso exclusivo sin lector QR</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Placa o Documento</label>
-              <input
-                type="text"
-                placeholder="Identificación..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value.toUpperCase())}
-                className="w-full px-4 py-3 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 focus:border-[#39B000] rounded-lg outline-none text-xs font-bold transition-all dark:text-white"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Motivo (mínimo 10 caracteres)</label>
-              <input
-                ref={motivoRef}
-                type="text"
-                placeholder="Ej: Falla del lector, visitante..."
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-                className="w-full px-4 py-3 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 focus:border-[#39B000] rounded-lg outline-none text-xs font-bold transition-all dark:text-white"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              onClick={() => { setShowContingencia(false); setMotivo(''); }}
-              className="px-4 py-2 text-[10px] font-bold uppercase text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={() => handleAction('manual')}
-              disabled={feedback.type === 'loading'}
-              className="px-8 py-2 bg-[#39B000] text-white rounded-lg text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-green-900/10 active:scale-95 transition-all disabled:opacity-60"
-            >
-              Confirmar Registro
-            </button>
-          </div>
         </div>
       </div>
 
@@ -1003,9 +905,7 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
       )}
     </div>
   );
-});
-
-MovementForm.displayName = 'MovementForm';
+};
 
 /** Tarjeta pequeña de foto del vehículo para el modal de registro manual */
 const FotoCard = ({ label, url }: { label: string; url: string | null }) => (

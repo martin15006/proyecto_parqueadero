@@ -19,7 +19,6 @@ import AnimatedButton from '../components/AnimatedButton';
 import AnimatedInput from '../components/AnimatedInput';
 import AnimatedLogo from '../components/AnimatedLogo';
 import FadeInView from '../components/FadeInView';
-import Footer from '../components/Footer';
 import SuccessCheck from '../components/SuccessCheck';
 import BotonTema from '../components/BotonTema';
 import MedidorContrasena from '../components/MedidorContrasena';
@@ -194,6 +193,23 @@ export default function RegisterScreen({ navigation }: any) {
         )}
         <BotonTema />
 
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Volver al inicio de sesión"
+          style={[
+            styles.botonVolver,
+            {
+              top: paddingTopSeguro,
+              backgroundColor: esOscuro ? 'rgba(95,217,36,0.15)' : '#ffffff',
+              borderColor: esOscuro ? 'rgba(95,217,36,0.50)' : 'rgba(57,169,0,0.25)',
+            },
+          ]}
+        >
+          <Text style={[styles.botonVolverTexto, { color: esOscuro ? colores.verde : verdeSena }]}>‹</Text>
+        </TouchableOpacity>
+
         <KeyboardAwareScrollView
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled"
@@ -351,7 +367,6 @@ export default function RegisterScreen({ navigation }: any) {
               </View>
             </FadeInView>
           </View>
-          <Footer />
         </KeyboardAwareScrollView>
       </View>
       <SuccessCheck visible={exitoVisible} mensaje="¡Cuenta verificada!" />
@@ -368,6 +383,28 @@ export default function RegisterScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   relative: { position: 'relative' },
+  botonVolver: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 100,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  botonVolverTexto: {
+    fontSize: 30,
+    fontWeight: '700',
+    lineHeight: 32,
+    marginTop: -3,
+  },
   auroraTop: {
     position: 'absolute',
     top: -80,

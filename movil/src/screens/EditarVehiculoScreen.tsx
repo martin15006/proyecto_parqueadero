@@ -185,7 +185,7 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
           {/* Aviso de cooldown */}
           {bloqueado ? (
             <View style={[styles.aviso, { backgroundColor: esOscuro ? 'rgba(229,57,53,0.10)' : '#FFEBEE', borderColor: '#E53935' }]}>
-              <Text style={[styles.avisoTitulo, { color: '#E53935' }]}>⛔ Edición bloqueada</Text>
+              <Text style={[styles.avisoTitulo, { color: '#E53935' }]}>Edición bloqueada</Text>
               <Text style={[styles.avisoTexto, { color: colores.textoPrimario }]}>
                 Solo puedes editar este vehículo cada 15 días.{'\n'}
                 Faltan <Text style={{ fontWeight: '900' }}>{estadoEdicion!.diasRestantes} día(s)</Text> para tu próxima edición.
@@ -198,7 +198,7 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
             </View>
           ) : (
             <View style={[styles.aviso, { backgroundColor: esOscuro ? 'rgba(255,193,7,0.10)' : '#FFF8E1', borderColor: '#FFC107' }]}>
-              <Text style={[styles.avisoTitulo, { color: esOscuro ? '#FFD54F' : '#856404' }]}>ℹ Edición restringida</Text>
+              <Text style={[styles.avisoTitulo, { color: esOscuro ? '#FFD54F' : '#856404' }]}>Edición restringida</Text>
               <Text style={[styles.avisoTexto, { color: esOscuro ? '#FFD54F' : '#856404' }]}>
                 Solo puedes editar la foto y el color del vehículo.{'\n'}
                 Después de guardar, deberás esperar 15 días para poder editar de nuevo.
@@ -223,7 +223,7 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
             <Image source={{ uri: fotoVehiculoLocal || vehiculo.fotoVehiculo }} style={styles.fotoImg} />
             {!bloqueado && (
               <View style={[styles.cambiarOverlay, { backgroundColor: colores.verde }]}>
-                <Text style={styles.cambiarTexto}>📷 Cambiar foto</Text>
+                <Text style={styles.cambiarTexto}>Cambiar foto</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -243,7 +243,7 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
 
           {/* Bloque de campos NO editables (solo informativo) */}
           <View style={[styles.bloqueadoBox, { backgroundColor: esOscuro ? 'rgba(255,255,255,0.04)' : '#F5F5F5', borderColor: colores.borde }]}>
-            <Text style={[styles.bloqueadoTitulo, { color: colores.textoSecundario }]}>🔒 Datos no editables</Text>
+            <Text style={[styles.bloqueadoTitulo, { color: colores.textoSecundario }]}>Datos no editables</Text>
             <View style={styles.bloqueadoFila}>
               <Text style={[styles.bloqueadoEtiqueta, { color: colores.textoTenue }]}>Tipo:</Text>
               <Text style={[styles.bloqueadoValor, { color: colores.textoPrimario }]}>{vehiculo.tipoVehiculo}</Text>
