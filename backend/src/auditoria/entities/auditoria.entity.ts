@@ -25,15 +25,15 @@ export class Auditoria {
   @PrimaryGeneratedColumn()
   idAuditoria: number;
 
-  @Index() // PERFORMANCE: Acelera el filtrado por tipo de acción administrativa
+  @Index()
   @Column({ length: 100 })
   accion: string;
 
-  @Index() // PERFORMANCE: Acelera el filtrado por tabla/módulo afectado
+  @Index()
   @Column({ length: 100 })
   entidad: string;
 
-  @Index() // PERFORMANCE: Permite rastrear cambios en un registro específico rápidamente
+  @Index()
   @Column({ type: 'varchar', length: 50, nullable: true })
   idEntidad: string;
 
@@ -43,7 +43,7 @@ export class Auditoria {
   @Column({ type: 'json', nullable: true })
   datosNuevos: Record<string, unknown>;
 
-  @Index() // PERFORMANCE: Acelera la búsqueda de acciones realizadas por un usuario
+  @Index()
   @Column({ length: 10 })
   idUsuario: string;
 
@@ -53,7 +53,8 @@ export class Auditoria {
   @Column({ length: 255, nullable: true })
   userAgent: string;
 
-  @Index() // PERFORMANCE: Crucial para reportes de auditoría por rango de fechas
-  @CreateDateColumn({ type: 'timestamptz' }) // INMUTABILIDAD: único timestamp permitido (momento de inserción); no existe updatedAt/deletedAt.
+  @Index()
+  // INMUTABILIDAD: único timestamp permitido (momento de inserción); no existe updatedAt/deletedAt.
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

@@ -17,17 +17,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [cargandoSesion, setCargandoSesion] = useState(true);
 
-  // Configurar manejo de sesión inválida (token expirado, FK error, etc.)
   useEffect(() => {
     configurarManejoSesionInvalida(() => {
-      // Cuando el api detecta sesión inválida, cerrar sesión
       setUsuario(null);
       setInMemoryAuthToken(null);
     });
   }, []);
 
-  // Al iniciar la app, intentar recuperar la sesión guardada
-  // Y verificar con el backend que el JWT siga válido.
   useEffect(() => {
     (async () => {
       try {
@@ -41,14 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setInMemoryAuthToken(token);
 
-        // Verificar con el backend que el JWT siga siendo válido
         try {
           const usuarioActualizado = await authService.verificarSesion();
           setUsuario(usuarioActualizado);
-          // Actualizar datos locales por si cambiaron en el backend
           await sessionService.guardarSesion(usuarioActualizado, token);
         } catch (error: any) {
-          // Token inválido o expirado → cerrar sesión silenciosamente
           if (error.statusCode === 401) {
             await sessionService.cerrarSesion();
             setUsuario(null);

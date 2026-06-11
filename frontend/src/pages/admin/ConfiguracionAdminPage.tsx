@@ -88,8 +88,7 @@ export const ConfiguracionAdminPage: React.FC = () => {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-        
-        {/* Columna de Información del Perfil */}
+
         <div className="xl:col-span-4 space-y-6">
           <div className="bg-[#232323] dark:bg-[#121212] rounded-[2.5rem] p-8 text-white dark:text-gray-100 shadow-2xl relative overflow-hidden group transition-colors duration-500">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#39A900] opacity-10 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
@@ -132,7 +131,6 @@ export const ConfiguracionAdminPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Columna del Formulario */}
         <div className="xl:col-span-8">
           <div className="bg-white dark:bg-[#121212] rounded-[2.5rem] p-10 shadow-sm border border-slate-100 dark:border-white/5 relative overflow-hidden transition-colors duration-500">
             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#39A900] to-[#007832]" />

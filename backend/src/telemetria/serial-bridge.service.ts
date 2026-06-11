@@ -108,8 +108,6 @@ export class SerialBridgeService implements OnModuleInit, OnModuleDestroy {
     this.freeMaxCm     = Number(process.env.SERIAL_FREE_MAX_CM     ?? 60.0);
   }
 
-  // ── Lifecycle ────────────────────────────────────────────────────────────────
-
   async onModuleInit(): Promise<void> {
     if (!this.enabled) {
       this.logger.log(
@@ -123,8 +121,6 @@ export class SerialBridgeService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     await this.closePort();
   }
-
-  // ── Gestión del puerto ───────────────────────────────────────────────────────
 
   private async openPort(): Promise<void> {
     try {
@@ -149,7 +145,6 @@ export class SerialBridgeService implements OnModuleInit, OnModuleDestroy {
       );
 
       parser.on('data', (data: string) => void this.handleLine(data.trim()));
-
       this.serialPort.open((openErr: Error | null) => {
         if (openErr) {
           console.warn(
@@ -196,8 +191,6 @@ export class SerialBridgeService implements OnModuleInit, OnModuleDestroy {
       // No es crítico durante el shutdown; se ignora intencionalmente.
     }
   }
-
-  // ── Pipeline de datos ────────────────────────────────────────────────────────
 
   /**
    * Parsea una trama CSV del Arduino y despacha una lectura por sensor

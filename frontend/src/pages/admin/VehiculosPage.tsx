@@ -38,23 +38,19 @@ export const VehiculosPage: React.FC = () => {
   const [soloAdentro, setSoloAdentro] = useState(false);
   const [tipos, setTipos] = useState<TipoVehiculo[]>([]);
 
-  // Detalle
   const [detalleOpen, setDetalleOpen] = useState(false);
   const [detalle, setDetalle] = useState<any>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
   const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null);
 
-  // Editar / Crear
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<'crear' | 'editar'>('crear');
   const [form, setForm] = useState<FormVehiculo>(FORM_INICIAL);
   const [errores, setErrores] = useState<Partial<Record<keyof FormVehiculo, string>>>({});
   const [saving, setSaving] = useState(false);
 
-  // Confirmar eliminación
   const [confirmEliminarPlaca, setConfirmEliminarPlaca] = useState<string | null>(null);
 
-  // Salida emergencia (mantengo)
   const [isEmergenciaOpen, setIsEmergenciaOpen] = useState(false);
   const [placaSeleccionada, setPlacaSeleccionada] = useState<string>('');
   const [motivo, setMotivo] = useState('');
@@ -317,7 +313,6 @@ export const VehiculosPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Cabecera de Acciones - Alineada al Layout superior */}
       <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4 -mt-20 mb-10 relative z-50">
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" size="md" onClick={abrirCrear} className="bg-[#39A900] hover:bg-[#2F8A00] shadow-[0_8px_20px_rgba(57,169,0,0.3)]">
@@ -346,7 +341,6 @@ export const VehiculosPage: React.FC = () => {
         emptyMessage="No se encontraron vehículos"
       />
 
-      {/* Modal DETALLE */}
       <Modal
         isOpen={detalleOpen}
         onClose={() => setDetalleOpen(false)}
@@ -369,7 +363,6 @@ export const VehiculosPage: React.FC = () => {
           <p className="text-sm text-slate-500">Cargando información...</p>
         ) : (
           <div className="space-y-5">
-            {/* Datos del vehículo */}
             <section>
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Datos del vehículo</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -412,7 +405,6 @@ export const VehiculosPage: React.FC = () => {
               </div>
             </section>
 
-            {/* Propietario */}
             {detalle.propietario && (
               <section>
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Propietario</h3>
@@ -440,7 +432,6 @@ export const VehiculosPage: React.FC = () => {
         )}
       </Modal>
 
-      {/* Modal CREAR / EDITAR */}
       <Modal
         isOpen={editorOpen}
         onClose={() => setEditorOpen(false)}
@@ -519,7 +510,6 @@ export const VehiculosPage: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Confirmar eliminación */}
       <Modal
         isOpen={!!confirmEliminarPlaca}
         onClose={() => setConfirmEliminarPlaca(null)}
@@ -537,7 +527,6 @@ export const VehiculosPage: React.FC = () => {
         </p>
       </Modal>
 
-      {/* Salida de emergencia */}
       <Modal
         isOpen={isEmergenciaOpen}
         onClose={() => setIsEmergenciaOpen(false)}
@@ -577,7 +566,6 @@ export const VehiculosPage: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Foto ampliada */}
       {fotoAmpliada && (
         <div
           className="fixed inset-0 bg-black/90 z-[150] flex items-center justify-center p-6 cursor-pointer"

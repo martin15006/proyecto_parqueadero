@@ -5,11 +5,6 @@ import { MapaBahias } from '../components/MapaBahias';
 import { TablaMovimientos } from '../components/TablaMovimientos';
 import { socketService } from '../services/socket.service';
 
-/**
- * Panel Operativo de Control.
- * FEATURE: Centraliza la gestión de ingresos, salidas y monitoreo de infraestructura.
- * SOCKET: Sincronizado en tiempo real con el estado de las bahías.
- */
 export const PanelOperativo: React.FC = () => {
   const { 
     stats, 
@@ -26,10 +21,6 @@ export const PanelOperativo: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const isConnected = socketService.isConnected;
 
-  /**
-   * Procesa el registro de entrada de un vehículo.
-   * API: POST /operativo/registrar-entrada.
-   */
   const handleEntrada = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!placa) return;
@@ -46,10 +37,6 @@ export const PanelOperativo: React.FC = () => {
     }
   };
 
-  /**
-   * Procesa el registro de salida de un vehículo.
-   * API: POST /operativo/registrar-salida.
-   */
   const handleSalida = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!placa) return;
@@ -66,10 +53,6 @@ export const PanelOperativo: React.FC = () => {
     }
   };
 
-  /**
-   * Activa el protocolo de liberación masiva de bahías.
-   * SECURITY: Requiere confirmación explícita del operador.
-   */
   const handleEmergencia = async () => {
     if (!window.confirm('¿ESTÁ SEGURO DE ACTIVAR LA SALIDA DE EMERGENCIA?')) return;
     try {

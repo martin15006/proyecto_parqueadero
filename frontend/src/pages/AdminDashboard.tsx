@@ -38,7 +38,6 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      {/* Botones de Acción alineados con el título del Layout superior */}
       <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4 -mt-20 mb-10 relative z-50">
         <div className="flex flex-wrap gap-3">
           <ExportButton 
@@ -89,7 +88,6 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-8 mb-12">
-        {/* Rendimiento Semanal */}
         <div className="bg-white dark:bg-[#121212] p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-white/5 transition-all duration-500 hover:dark:shadow-[0_0_40px_rgba(0,0,0,0.3)]">
           <ChartHeader 
             title="Rendimiento Semanal" 
@@ -118,8 +116,6 @@ export const AdminDashboard: React.FC = () => {
     </div>
   );
 };
-
-// --- SUBCOMPONENTES DE UI ---
 
 const DashboardSkeleton = () => (
   <div className="p-8 space-y-8 animate-pulse">

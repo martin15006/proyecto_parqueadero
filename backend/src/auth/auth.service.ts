@@ -28,10 +28,6 @@ import { MailService } from '../mail/mail.service';
 import { AuthMantenimientoService } from './auth-mantenimiento.service';
 import { IJwtPayload } from '../common/interfaces/auth.interface';
 
-/**
- * Servicio centralizado de Autenticación y Autorización.
- * REFACTOR: Implementa lógica modular para gestión de sesiones, OTP y seguridad.
- */
 @Injectable()
 export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
@@ -53,10 +49,6 @@ export class AuthService implements OnModuleInit {
     private readonly mantenimientoService: AuthMantenimientoService,
   ) { }
 
-  /**
-   * Inicialización del módulo.
-   * PERFORMANCE: Inicia tareas de limpieza periódica de tokens y OTPs.
-   */
   async onModuleInit() {
     this.iniciarTareasMantenimiento();
   }
@@ -72,20 +64,12 @@ export class AuthService implements OnModuleInit {
     return message === AuthService.OTP_RATE_LIMIT_MSG;
   }
 
-  /**
-   * Configura intervalos de limpieza automática.
-   */
   private iniciarTareasMantenimiento() {
     setInterval(async () => {
       await this.mantenimientoService.ejecutarLimpieza();
     }, 3600000); // 1 hora
   }
 
-  /**
-   * Paso 1: Validación de credenciales primarias.
-   * SECURITY: Valida identidad y genera desafío OTP de 2do factor.
-   * @param loginDto Credenciales de acceso
-   */
   async loginPaso1(loginDto: LoginDto): Promise<{ mensaje: string; correo: string }> {
     const correoNormalizado = String(loginDto?.correo ?? '').trim().toLowerCase();
     const usuario = await this.usuarioRepository
@@ -128,16 +112,10 @@ export class AuthService implements OnModuleInit {
     };
   }
 
-  /**
-   * Paso 2: Verificación de OTP y emisión de tokens.
-   * SECURITY: Implementa límites de intentos y validación temporal.
-   * PERFORMANCE: Usa bloqueo pesimista para evitar condiciones de carrera en verificaciones simultáneas.
-   * @param dto Datos de verificación
-   */
-  async verificarOtp(dto: VerificarOtpDto): Promise<{ 
-    access_token: string; 
-    refresh_token: string; 
-    usuario: Omit<Usuario, 'contra'> & { rol: string } 
+  async verificarOtp(dto: VerificarOtpDto): Promise<{
+    access_token: string;
+    refresh_token: string;
+    usuario: Omit<Usuario, 'contra'> & { rol: string }
   }> {
     return await this.otpRepository.manager.transaction(async (manager) => {
       const correoNormalizado = String(dto?.correo ?? '').trim().toLowerCase();
@@ -150,7 +128,7 @@ export class AuthService implements OnModuleInit {
         throw new NotFoundException('Usuario no encontrado');
       }
 
-      // SECURITY: Bloqueo pesimista para evitar que dos hilos procesen el mismo OTP simultáneamente
+      // Bloqueo pesimista para evitar que dos hilos procesen el mismo OTP simultáneamente
       const otp = await manager.findOne(CodigoOtp, {
         where: { documento: usuario.documento, usado: false },
         order: { createdAt: 'DESC' },
@@ -158,8 +136,8 @@ export class AuthService implements OnModuleInit {
       });
 
       if (!otp) {
-        // REFACTOR: Si no hay OTP activo, verificamos si se usó uno hace menos de 3 segundos
-        // para mitigar el error 400 en peticiones duplicadas del frontend.
+        // Si no hay OTP activo, verificamos si se usó uno hace menos de 3 segundos
+        // para mitigar el error 400 en peticiones duplicadas del frontend (doble submit).
         const otpReciente = await manager.findOne(CodigoOtp, {
           where: { documento: usuario.documento, usado: true },
           order: { updatedAt: 'DESC' },
@@ -168,10 +146,6 @@ export class AuthService implements OnModuleInit {
         if (otpReciente && (new Date().getTime() - otpReciente.updatedAt.getTime() < 3000)) {
           // RNF2 (Privacidad): prohibido loguear documento/cédula (PII). Registramos solo el evento técnico.
           this.logger.warn('Petición de verificación OTP duplicada detectada (posible doble submit).');
-          // En lugar de lanzar error, podríamos intentar recuperar la última sesión, 
-          // pero por seguridad y simplicidad, el frontend debe manejar la redirección.
-          // Lanzamos un error específico que el frontend pueda identificar si fuera necesario,
-          // o simplemente mantenemos el 400 pero con un mensaje más claro.
           throw new BadRequestException('Petición duplicada procesada exitosamente.');
         }
 
@@ -197,45 +171,34 @@ export class AuthService implements OnModuleInit {
         throw new UnauthorizedException(`Código incorrecto. Intentos restantes: ${maxIntentos - otp.intentos}`);
       }
 
-      // Marcamos como usado dentro de la transacción bloqueada
       otp.usado = true;
       await manager.save(otp);
 
       const tokens = await this.generarTokens(usuario, manager);
-      
-      // SERIALIZATION: Aseguramos que el objeto enviado al cliente tenga los campos 
-      // con los nombres esperados por el frontend y que idTipoUsr esté presente.
+
       const rolNombre = TipoUsuarioEnum[usuario.idTipoUsr] || 'APRENDIZ';
 
       const { contra, ...usuarioSinContrasena } = usuario;
 
-      return { 
-        ...tokens, 
+      return {
+        ...tokens,
         usuario: {
           ...usuarioSinContrasena,
           idTipoUsr: usuario.idTipoUsr,
           rol: rolNombre
-        } 
+        }
       };
     });
   }
 
-  /**
-   * Genera un par de Access Token (JWT) y Refresh Token (Opaque).
-   * MOBILE_API: Emite tokens optimizados. El payload JWT es ligero para ahorrar datos.
-   * SERIALIZATION: El Refresh Token es opaco y persistido para seguridad del hardware/mobile.
-   * @param usuario Usuario para el que se generan tokens
-   * @param manager Opcional: EntityManager para ejecutar dentro de una transacción
-   */
   async generarTokens(usuario: Usuario, manager?: EntityManager) {
-    // MOBILE_API: Payload mínimo para reducir el tamaño del header Authorization
     const payload: IJwtPayload = {
       sub: usuario.documento,
       idTipoUsr: usuario.idTipoUsr,
     };
 
     const access_token = await this.jwtService.signAsync(payload);
-    // MOBILE_API: Refresh token largo y seguro para almacenamiento en Keychain/SecureStorage
+    // Refresh token opaco, largo y seguro para almacenamiento en Keychain/SecureStorage
     const refresh_token = crypto.randomBytes(64).toString('hex');
 
     const expiraEn = new Date();
@@ -253,11 +216,6 @@ export class AuthService implements OnModuleInit {
     return { access_token, refresh_token };
   }
 
-  /**
-   * Renueva el Access Token mediante Refresh Token Rotation.
-   * MOBILE_API: Permite mantener la sesión activa sin pedir login al usuario.
-   * SECURITY: Implementa revocación automática de tokens usados.
-   */
   async renovarToken(refreshToken: string) {
     const sesion = await this.sesionRepository.findOne({
       where: { refreshToken, revocado: false },
@@ -272,7 +230,7 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Sesión expirada o inválida');
     }
 
-    // SECURITY: Marcamos el token anterior como usado para evitar ataques de repetición
+    // Marcamos el token anterior como usado para evitar ataques de repetición
     sesion.revocado = true;
     await this.sesionRepository.save(sesion);
 
@@ -290,9 +248,6 @@ export class AuthService implements OnModuleInit {
     };
   }
 
-  /**
-   * Cierra la sesión activa.
-   */
   async logout(refreshToken: string) {
     const sesion = await this.sesionRepository.findOne({ where: { refreshToken } });
 
@@ -304,14 +259,10 @@ export class AuthService implements OnModuleInit {
     return { ok: true, mensaje: 'Sesión cerrada correctamente' };
   }
 
-  /**
-   * Agrega un Access Token a la lista negra.
-   * SECURITY: Previene el uso de tokens robados o de sesiones cerradas.
-   */
   async revocarAccessToken(token: string): Promise<void> {
     const payload = this.jwtService.decode(token) as IJwtPayload;
     if (payload?.exp) {
-      // PERFORMANCE: Se guarda solo si el token no ha expirado naturalmente
+      // Se guarda solo si el token no ha expirado naturalmente
       await this.blacklistRepository.save({
         token,
         expiraEn: new Date(payload.exp * 1000),
@@ -319,17 +270,11 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-  /**
-   * Verifica si un token está revocado.
-   */
   async isTokenRevocado(token: string): Promise<boolean> {
     const existe = await this.blacklistRepository.findOne({ where: { token } });
     return !!existe;
   }
 
-  /**
-   * Reenvía código OTP.
-   */
   async reenviarOtp(dto: ReenviarOtpDto): Promise<{ mensaje: string }> {
     const correoNormalizado = String(dto?.correo ?? '').trim().toLowerCase();
     const usuario = await this.usuarioRepository
@@ -352,9 +297,6 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-  /**
-   * Recuperación de contraseña - Paso 1.
-   */
   async solicitarRecuperacion(correo: string): Promise<{ mensaje: string }> {
     const correoNormalizado = String(correo ?? '').trim().toLowerCase();
     const usuario = await this.usuarioRepository
@@ -378,9 +320,6 @@ export class AuthService implements OnModuleInit {
     return { mensaje: 'Si el correo está registrado, recibirás un código de verificación.' };
   }
 
-  /**
-   * Recuperación de contraseña - Paso 2.
-   */
   async verificarRecuperacion(correo: string, codigo: string): Promise<{ mensaje: string; valido: boolean }> {
     const correoNormalizado = String(correo ?? '').trim().toLowerCase();
     const usuario = await this.usuarioRepository
@@ -418,9 +357,6 @@ export class AuthService implements OnModuleInit {
     return { mensaje: 'Código verificado correctamente', valido: true };
   }
 
-  /**
-   * Recuperación de contraseña - Paso 3.
-   */
   async restablecerContrasena(correo: string, codigo: string, contraNueva: string): Promise<{ mensaje: string }> {
     const correoNormalizado = String(correo ?? '').trim().toLowerCase();
     const usuario = await this.usuarioRepository
@@ -459,12 +395,6 @@ export class AuthService implements OnModuleInit {
     return { mensaje: 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.' };
   }
 
-  // --- MÉTODOS PRIVADOS ---
-
-  /**
-   * Genera un código OTP y lo envía.
-   * SECURITY: Implementa protección contra ráfagas (burst) y condiciones de carrera.
-   */
   private get isDevEmailDisabled(): boolean {
     return (
       this.configService.get<string>('NODE_ENV') !== 'production' &&
@@ -472,9 +402,6 @@ export class AuthService implements OnModuleInit {
     );
   }
 
-  /**
-   * Versión pública de generarYEnviarOtp para uso externo (ej: registro de usuario).
-   */
   async generarYEnviarOtpPublico(usuario: Usuario): Promise<void> {
     return this.generarYEnviarOtp(usuario);
   }
@@ -531,7 +458,6 @@ export class AuthService implements OnModuleInit {
       otp.usado = true;
       await manager.save(otp);
 
-      // Activar cuenta
       usuario.correoVerificado = true;
       await manager.save(usuario);
 
@@ -615,9 +541,6 @@ export class AuthService implements OnModuleInit {
     await this.otpRepository.save(otp);
   }
 
-  /**
-   * Invalida un OTP.
-   */
   private async marcarOtpComoUsado(otp: CodigoOtp): Promise<void> {
     otp.usado = true;
     await this.otpRepository.save(otp);

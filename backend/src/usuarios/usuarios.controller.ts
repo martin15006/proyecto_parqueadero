@@ -23,7 +23,6 @@ import { ConfirmarCambioCorreoDto } from './dto/confirmar-cambio-correo.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Usuario } from './entities/usuario.entity';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 import type { IJwtPayload } from '../common/interfaces/auth.interface';
@@ -36,36 +35,36 @@ export class UsuariosController {
     private readonly authService: AuthService,
   ) {}
 
-  @UseGuards(JwtAuthGuard, RolesGuard) // RNF2: fuerza autenticación y autorización antes de emitir cualquier token de acceso.
-  @Roles(TipoUsuarioEnum.APRENDIZ) // RF7/RF8: este código de acceso es para el usuario final (Aprendiz) y no debe exponerse a otros roles por defecto.
-  @ApiBearerAuth() // RNF2: documenta que el endpoint requiere JWT (evita consumo anónimo).
-  @Get('codigo-acceso') // RF8: endpoint dedicado para obtener el string base que se codificará como código de barras (y opcionalmente QR).
-  @ApiOperation({ summary: 'Obtener código de acceso vehicular (Base para Code128/QR) - RF8' }) // RF8: trazabilidad explícita al requerimiento.
-  async obtenerCodigoAccesoVehicular(@CurrentUser() usuario: IJwtPayload) { // RNF2: solo usamos el identificador interno del token (sub) y evitamos exponer documento en respuesta.
-    const perfil = await this.usuarioService.findOneByDocumento(usuario.sub); // RNF2: recupera desde BD el QR seed sin devolver PII adicional; se usa como token opaco.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(TipoUsuarioEnum.APRENDIZ)
+  @ApiBearerAuth()
+  @Get('codigo-acceso')
+  @ApiOperation({ summary: 'Obtener código de acceso vehicular (Base para Code128/QR) - RF8' })
+  async obtenerCodigoAccesoVehicular(@CurrentUser() usuario: IJwtPayload) {
+    const perfil = await this.usuarioService.findOneByDocumento(usuario.sub);
 
-    if (!perfil) { // SECURITY: fail-closed si el token es válido pero el usuario ya no existe (cuenta desactivada/eliminada).
-      return { // SECURITY: respuesta mínima, sin PII; evita filtrar si existe o no un documento específico mediante detalles.
-        tokenAccesoVehicular: null, // RF8: se indica ausencia de token sin inventar valores.
-        formatoRecomendadoBase: 'BARCODE_CODE128', // RF8: el documento menciona código de barras; Code128 soporta el alfanumérico del token opaco.
-        timestamp: new Date().toISOString(), // RNF2: trazabilidad técnica sin identidad.
+    if (!perfil) {
+      return {
+        tokenAccesoVehicular: null,
+        formatoRecomendadoBase: 'BARCODE_CODE128',
+        timestamp: new Date().toISOString(),
       };
     }
 
-    const rawSeed = perfil.qr // RNF2: se usa un valor opaco (UUID) en lugar de documento/cédula.
-      ? perfil.qr // RF8: el QR existente es una semilla válida para generar un código de barras (mismo string).
-      : (await this.usuarioService.regenerarQr(usuario.sub)).qr; // RF8/RNF2: garantiza disponibilidad del token sin revelar PII; reutiliza flujo existente (no altera lógica de negocio).
+    const rawSeed = perfil.qr
+      ? perfil.qr
+      : (await this.usuarioService.regenerarQr(usuario.sub)).qr;
 
-    const tokenAccesoVehicular = String(rawSeed) // RF8: garantizamos string estándar para codificación.
-      .trim() // RNF2: evitamos espacios invisibles que rompen lectores físicos.
-      .replace(/-/g, '') // RF8 (Code128): el lector físico puede fallar con separadores; convertimos UUID a 32 hex puros.
-      .toUpperCase(); // RF8: normalizamos a alfanumérico puro (A-F/0-9), más estable para hardware.
+    const tokenAccesoVehicular = String(rawSeed)
+      .trim()
+      .replace(/-/g, '')
+      .toUpperCase();
 
-    return { // RF8: respuesta explícita con el token y el formato recomendado para el hardware lector.
-      tokenAccesoVehicular, // RNF2: token opaco sin documento/cédula/PII; compatible con codificación Code128 y QR.
-      formatoRecomendadoBase: 'BARCODE_CODE128', // RF8: recomendación base para lectores de código de barras (Code128 es estándar para strings alfanuméricos).
-      alternativas: ['QR'], // RF8: el mismo token puede presentarse como QR (contingencia), sin cambiar el valor base.
-      timestamp: new Date().toISOString(), // RNF2: marcador temporal para debug y sincronización sin exponer identidad.
+    return {
+      tokenAccesoVehicular,
+      formatoRecomendadoBase: 'BARCODE_CODE128',
+      alternativas: ['QR'],
+      timestamp: new Date().toISOString(),
     };
   }
 

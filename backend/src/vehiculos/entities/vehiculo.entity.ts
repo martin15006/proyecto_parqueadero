@@ -36,7 +36,6 @@ export class Vehiculo {
   @Column({ type: 'smallint' })
   idTipoVehiculo: number;
 
-  // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

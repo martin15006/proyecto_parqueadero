@@ -159,7 +159,6 @@ export default function RegisterScreen({ navigation }: any) {
         idFormacion: form.idFormacion,
       });
 
-      // Abrir el modal de verificación OTP de registro
       setCorreoParaOtp(respuesta.correo);
       setOtpVisible(true);
     } catch (error: any) {
@@ -173,7 +172,6 @@ export default function RegisterScreen({ navigation }: any) {
   const handleOtpRegistroExito = async (token: string, usuarioData: Usuario) => {
     setOtpVisible(false);
     setExitoVisible(true);
-    // Pequeña pausa para mostrar el check y luego iniciar sesión
     setTimeout(async () => {
       setExitoVisible(false);
       setForm(FORM_INICIAL);
@@ -325,7 +323,6 @@ export default function RegisterScreen({ navigation }: any) {
                   onChangeText={(v) => actualizarCampo('idFormacion', v)}
                 />
 
-                {/* ─── CONTRASEÑAS AL FINAL ─── */}
                 <AnimatedInput
                   label="Contraseña"
                   placeholder="Crea una contraseña segura"
@@ -335,7 +332,6 @@ export default function RegisterScreen({ navigation }: any) {
                   onChangeText={(v) => actualizarCampo('contra', v)}
                 />
 
-                {/* Medidor de fortaleza - solo aparece al escribir */}
                 <MedidorContrasena contrasena={form.contra} />
 
                 <AnimatedInput

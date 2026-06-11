@@ -24,7 +24,7 @@ export class Sensor {
   activo: boolean;
 
   @Column({
-    name: 'estado_actual', // EXPLÍCITO: Mapeo exacto con la base de datos (RF33)
+    name: 'estado_actual',
     type: 'enum',
     enum: IotStatusEnum,
     default: IotStatusEnum.OFFLINE,
@@ -40,7 +40,6 @@ export class Sensor {
   @Column({ name: 'metadata', type: 'json', nullable: true })
   metadata: Record<string, any>;
 
-  // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

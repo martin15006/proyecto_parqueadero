@@ -13,7 +13,6 @@ interface ParkingGridProps {
   bahias: Bahia[];
 }
 
-// FIX: ParkingGrid - Renderizado de bahías con estados visuales y datos realtime
 export const ParkingGrid: React.FC<ParkingGridProps> = ({ bahias }) => {
   return (
     <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl h-full">
@@ -80,7 +79,6 @@ export const ParkingGrid: React.FC<ParkingGridProps> = ({ bahias }) => {
                 </span>
               )}
 
-              {/* Tooltip simple al hover */}
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[8px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap border border-gray-700 font-bold uppercase">
                 {bahia.tipoBahia?.tipoBahia || 'Bahía Estándar'}
               </div>

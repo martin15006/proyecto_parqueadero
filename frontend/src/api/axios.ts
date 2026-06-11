@@ -8,7 +8,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // REFACTOR: Asegura que las credenciales (cookies/auth) se envíen correctamente en CORS
+  withCredentials: true,
 });
 
 api.interceptors.request.use((config) => {

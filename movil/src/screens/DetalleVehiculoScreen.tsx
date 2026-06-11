@@ -90,7 +90,6 @@ export default function DetalleVehiculoScreen({ navigation, route }: any) {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <FadeInView>
-          {/* Placa destacada */}
           <View
             style={[
               styles.placaCard,
@@ -126,7 +125,6 @@ export default function DetalleVehiculoScreen({ navigation, route }: any) {
             </View>
           </View>
 
-          {/* Foto del vehículo */}
           <Text style={[styles.seccion, { color: colores.textoTenue }]}>
             FOTO DEL VEHÍCULO
           </Text>
@@ -141,7 +139,6 @@ export default function DetalleVehiculoScreen({ navigation, route }: any) {
             />
           </TouchableOpacity>
 
-          {/* Foto de la tarjeta */}
           <Text style={[styles.seccion, { color: colores.textoTenue, marginTop: espacios.medio }]}>
             TARJETA DE PROPIEDAD
           </Text>
@@ -156,7 +153,6 @@ export default function DetalleVehiculoScreen({ navigation, route }: any) {
             />
           </TouchableOpacity>
 
-          {/* Foto de la placa */}
           <Text style={[styles.seccion, { color: colores.textoTenue, marginTop: espacios.medio }]}>
             FOTO DE LA PLACA
           </Text>
@@ -183,7 +179,6 @@ export default function DetalleVehiculoScreen({ navigation, route }: any) {
             Toca las fotos para verlas en grande
           </Text>
 
-          {/* Botones de acción */}
           <View style={{ marginTop: espacios.grande, gap: espacios.normal }}>
             <AnimatedButton
               texto="Editar Vehículo"
@@ -207,7 +202,6 @@ export default function DetalleVehiculoScreen({ navigation, route }: any) {
         </FadeInView>
       </ScrollView>
 
-      {/* Modal de foto ampliada */}
       {fotoAmpliada && (
         <TouchableOpacity
           style={styles.modalFoto}

@@ -24,20 +24,20 @@ export class BahiasAdminController {
   @ApiOperation({ summary: 'Cambiar estado general del parqueadero (deshabilitado/habilitado)' })
   @ApiResponse({ status: 200, description: 'Estado actualizado' })
   async actualizarEstadoParqueadero(@Body() dto: UpdateParqueaderoEstadoDto, @Req() req: AuthenticatedRequest) {
-    const documentoActor = req.user?.sub || 'SISTEMA'; // RF25: actor para auditoría y notificación (se usa para resolver nombre).
-    const actor = await this.usuarioService.findOneByDocumento(documentoActor); // RF25: obtenemos nombre del administrador que ejecuta el cambio.
+    const documentoActor = req.user?.sub || 'SISTEMA';
+    const actor = await this.usuarioService.findOneByDocumento(documentoActor);
 
     return await this.bahiasService.actualizarEstadoParqueadero(
       {
-        deshabilitado: dto.deshabilitado, // RF14: estado solicitado.
-        motivo: dto.motivo, // RF14: motivo obligatorio si deshabilita.
-        duracionEstimada: dto.duracionEstimada, // RF14: duración estimada opcional.
+        deshabilitado: dto.deshabilitado,
+        motivo: dto.motivo,
+        duracionEstimada: dto.duracionEstimada,
       },
       {
-        idUsuario: documentoActor, // RF37: se registra en auditoría.
-        nombre: actor?.nombreCompleto || null, // RF25: nombre del administrador para historial visible al usuario.
-        ip: req.ip, // Auditoría técnica.
-        userAgent: req.headers['user-agent'], // Auditoría técnica.
+        idUsuario: documentoActor,
+        nombre: actor?.nombreCompleto || null,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
       },
     );
   }

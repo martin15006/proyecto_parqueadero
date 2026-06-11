@@ -294,7 +294,6 @@ export default function RegistrarVehiculoScreen({ navigation }: any) {
             Tipo de Vehículo
           </Text>
 
-          {/* ─── Lista de tipos con manejo de estados ─── */}
           {cargandoTipos ? (
             <View style={styles.tiposEstado}>
               <ActivityIndicator size="small" color={colores.verde} />

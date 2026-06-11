@@ -165,7 +165,6 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
 
       <KeyboardAwareScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" enableOnAndroid>
         <FadeInView>
-          {/* Placa solo informativa */}
           <View
             style={[
               styles.placaInfo,
@@ -182,7 +181,6 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
             </Text>
           </View>
 
-          {/* Aviso de cooldown */}
           {bloqueado ? (
             <View style={[styles.aviso, { backgroundColor: esOscuro ? 'rgba(229,57,53,0.10)' : '#FFEBEE', borderColor: '#E53935' }]}>
               <Text style={[styles.avisoTitulo, { color: '#E53935' }]}>Edición bloqueada</Text>
@@ -206,7 +204,6 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
             </View>
           )}
 
-          {/* Foto del vehículo (editable) */}
           <Text style={[styles.label, { color: colores.verde }]}>Foto del Vehículo</Text>
           <TouchableOpacity
             style={[
@@ -228,7 +225,6 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
             )}
           </TouchableOpacity>
 
-          {/* Color (editable) */}
           <AnimatedInput
             label="Color"
             placeholder="Rojo, Negro, Blanco..."
@@ -241,7 +237,6 @@ export default function EditarVehiculoScreen({ navigation, route }: any) {
             editable={!bloqueado}
           />
 
-          {/* Bloque de campos NO editables (solo informativo) */}
           <View style={[styles.bloqueadoBox, { backgroundColor: esOscuro ? 'rgba(255,255,255,0.04)' : '#F5F5F5', borderColor: colores.borde }]}>
             <Text style={[styles.bloqueadoTitulo, { color: colores.textoSecundario }]}>Datos no editables</Text>
             <View style={styles.bloqueadoFila}>

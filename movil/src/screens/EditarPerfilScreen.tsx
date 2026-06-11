@@ -94,7 +94,6 @@ export default function EditarPerfilScreen({ navigation }: any) {
 
       const usuarioActualizado = await usuarioService.actualizarPerfil(datos);
 
-      // Actualizar la sesión local
       const token = await sessionService.obtenerToken();
       if (token) await iniciarSesion(usuarioActualizado, token);
 
@@ -130,7 +129,6 @@ export default function EditarPerfilScreen({ navigation }: any) {
         extraScrollHeight={20}
       >
         <FadeInView>
-          {/* Foto */}
           <View style={styles.fotoSection}>
             <TouchableOpacity onPress={seleccionarFoto} activeOpacity={0.7}>
               {fotoLocal ? (
@@ -151,7 +149,6 @@ export default function EditarPerfilScreen({ navigation }: any) {
             </Text>
           </View>
 
-          {/* Datos NO editables */}
           <Text style={[styles.seccion, { color: colores.textoTenue }]}>
             DATOS PERSONALES (no editables)
           </Text>
@@ -171,7 +168,6 @@ export default function EditarPerfilScreen({ navigation }: any) {
             <DatoFijo label="Ficha" valor={usuario.idFormacion || 'Sin asignar'} colores={colores} />
           </View>
 
-          {/* Correo con botón cambiar */}
           <Text style={[styles.seccion, { color: colores.textoTenue, marginTop: espacios.medio }]}>
             CORREO ELECTRÓNICO
           </Text>
@@ -199,7 +195,6 @@ export default function EditarPerfilScreen({ navigation }: any) {
             </View>
           </TouchableOpacity>
 
-          {/* Datos editables */}
           <Text style={[styles.seccion, { color: colores.textoTenue, marginTop: espacios.medio }]}>
             DATOS DE CONTACTO
           </Text>

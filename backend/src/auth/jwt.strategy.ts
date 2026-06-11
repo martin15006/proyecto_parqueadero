@@ -10,14 +10,14 @@ export interface JwtPayload {
   sub: string;        // documento del usuario
   correo: string;
   idTipoUsr: number;
-  iat?: number;       // issued at (lo agrega JWT)
-  exp?: number;       // expiration (lo agrega JWT)
+  iat?: number;
+  exp?: number;
 }
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
-    private readonly configService: ConfigService,
+    configService: ConfigService,
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
   ) {
@@ -46,7 +46,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Token inválido: usuario no encontrado');
     }
 
-    // Devolver el usuario sin la contraseña
     const { contra, ...usuarioSinContrasena } = usuario;
     return {
       ...usuarioSinContrasena,

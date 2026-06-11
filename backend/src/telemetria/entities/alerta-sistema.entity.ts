@@ -13,7 +13,7 @@ export class AlertaSistema {
   idAlerta: number;
 
   @Column({ length: 30 })
-  tipo: string; // CAPACIDAD_80, LLENO, DESHABILITADO, SENSOR_SIN_DATOS
+  tipo: string;
 
   @Column({ type: 'text' })
   mensaje: string;

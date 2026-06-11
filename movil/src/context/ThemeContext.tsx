@@ -19,23 +19,19 @@ const TEMA_KEY = '@parqueadero_sena:tema';
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Detectar el modo del sistema operativo (como fallback inicial)
-  const temaSistema = useColorScheme(); // 'light' | 'dark' | null
+  const temaSistema = useColorScheme();
 
-  // Inicializar con el tema del sistema (evita parpadeo al inicio)
+  // Inicializar con el tema del sistema evita el parpadeo al inicio
   const [modo, setModo] = useState<ThemeMode>(temaSistema === 'dark' ? 'dark' : 'light');
   const [cargandoTema, setCargandoTema] = useState(true);
 
-  // Al iniciar, cargar el tema guardado (si existe)
   useEffect(() => {
     (async () => {
       try {
         const guardado = await AsyncStorage.getItem(TEMA_KEY);
         if (guardado === 'dark' || guardado === 'light') {
-          // Si el usuario eligió un tema, usar ese
           setModo(guardado);
         }
-        // Si no hay guardado, mantener el del sistema que ya inicializamos
       } catch (error) {
         console.warn('Error al cargar tema:', error);
       } finally {

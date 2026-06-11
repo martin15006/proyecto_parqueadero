@@ -1,9 +1,5 @@
 import type { Movement } from '../types';
 
-/**
- * Tabla de Movimientos Activos.
- * FEATURE: Visualización en tiempo real de vehículos dentro del parqueadero.
- */
 export const TablaMovimientos: React.FC<{ movimientos: Movement[] }> = ({ movimientos }) => {
   return (
     <div className="overflow-x-auto bg-gray-900 rounded-xl shadow-lg border border-gray-800">

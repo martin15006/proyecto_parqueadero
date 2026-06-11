@@ -1,8 +1,6 @@
 import React from 'react';
 import type { BahiaSensorizada, EstadoPanel } from '../types';
 
-// ── Paleta de color por estado ──────────────────────────────────────────────
-
 const ESTADO_STYLES: Record<
   EstadoPanel,
   { wrapper: string; text: string; badge?: string; label: string }
@@ -44,8 +42,6 @@ const ESTADO_STYLES: Record<
   },
 };
 
-// ── BahiaCard ────────────────────────────────────────────────────────────────
-
 interface BahiaCardProps {
   bahia: BahiaSensorizada;
 }
@@ -81,7 +77,6 @@ export const BahiaCard: React.FC<BahiaCardProps> = ({ bahia }) => {
         {bahia.nombreBahia}
       </span>
 
-      {/* Placa del vehículo activo */}
       {bahia.placa && !isInactive && (
         <div
           className={`
@@ -94,16 +89,14 @@ export const BahiaCard: React.FC<BahiaCardProps> = ({ bahia }) => {
         </div>
       )}
 
-      {/* Badge de estado para SALIDA_PENDIENTE */}
       {bahia.estadoPanel === 'SALIDA_PENDIENTE' && (
         <span className="mt-1 text-[8px] font-bold text-amber-400 uppercase tracking-tight">
           Confirmar salida
         </span>
       )}
 
-    
 
-      {/* Overlay para estados inactivos */}
+
       {isInactive && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
           <span className="text-[10px] font-black text-white uppercase tracking-tighter">
@@ -114,8 +107,6 @@ export const BahiaCard: React.FC<BahiaCardProps> = ({ bahia }) => {
     </div>
   );
 };
-
-// ── MapaBahias ───────────────────────────────────────────────────────────────
 
 interface MapaBahiasProps {
   /** Lista proveniente de `GET /api/bahias/sensorizadas` (solo bahías con sensor activo). */
@@ -136,7 +127,6 @@ interface MapaBahiasProps {
 export const MapaBahias: React.FC<MapaBahiasProps> = ({ bahias, enTransitoIngreso = 0 }) => {
   return (
     <div className="space-y-3">
-      {/* Banner de vehículos en tránsito de ingreso */}
       {enTransitoIngreso > 0 && (
         <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-sky-500/10 border border-sky-500/30">
           <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
@@ -146,7 +136,6 @@ export const MapaBahias: React.FC<MapaBahiasProps> = ({ bahias, enTransitoIngres
         </div>
       )}
 
-      {/* Grid de bahías */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-6 bg-gray-900/50 rounded-2xl border border-gray-800">
         {bahias.length === 0 ? (
           <div className="col-span-full py-12 text-center text-gray-600 uppercase text-xs font-black tracking-widest">

@@ -8,10 +8,6 @@ import {
 } from '../types/usuario';
 
 export const authService = {
-  /**
-   * Paso 1 del login: envía correo + contraseña.
-   * Si son correctas, el backend envía un OTP al correo.
-   */
   async loginPaso1(datos: LoginDto): Promise<LoginPaso1Response> {
     return apiRequest<LoginPaso1Response>('/auth/login', {
       method: 'POST',
@@ -19,10 +15,6 @@ export const authService = {
     });
   },
 
-  /**
-   * Paso 2 del login: envía el código OTP que llegó al correo.
-   * Si es correcto, recibe el JWT y los datos del usuario.
-   */
   async verificarOtp(datos: VerificarOtpDto): Promise<VerificarOtpResponse> {
     return apiRequest<VerificarOtpResponse>('/auth/verificar-otp', {
       method: 'POST',
@@ -30,10 +22,6 @@ export const authService = {
     });
   },
 
-  /**
-   * Verifica el OTP enviado al registrarse.
-   * Si es correcto, activa la cuenta y devuelve tokens (login automático).
-   */
   async verificarRegistro(datos: VerificarOtpDto): Promise<VerificarOtpResponse> {
     return apiRequest<VerificarOtpResponse>('/auth/verificar-registro', {
       method: 'POST',
@@ -41,9 +29,6 @@ export const authService = {
     });
   },
 
-  /**
-   * Solicita el reenvío de un nuevo código OTP.
-   */
   async reenviarOtp(correo: string): Promise<{ mensaje: string }> {
     return apiRequest<{ mensaje: string }>('/auth/reenviar-otp', {
       method: 'POST',
@@ -51,10 +36,6 @@ export const authService = {
     });
   },
 
-  /**
-   * Verifica si el JWT actual sigue siendo válido.
-   * Útil al abrir la app para saber si la sesión sigue activa.
-   */
   async verificarSesion(): Promise<Usuario> {
     return apiRequest<Usuario>('/auth/me', {
       method: 'GET',

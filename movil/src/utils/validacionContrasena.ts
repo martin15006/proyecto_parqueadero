@@ -19,5 +19,5 @@ export function validarContrasenaSegura(contrasena: string): string | null {
   if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?¿¡~`]/.test(contrasena))
     return 'La contraseña debe tener al menos un carácter especial (!@#$...)';
 
-  return null; // ¡Válida!
+  return null;
 }

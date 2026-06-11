@@ -5,10 +5,6 @@ import { SesionActiva } from './entities/sesion-activa.entity';
 import { TokenBloqueado } from './entities/token-bloqueado.entity';
 import { CodigoOtp } from '../usuarios/entities/codigo-otp.entity';
 
-/**
- * Servicio de mantenimiento para la limpieza de datos de autenticación expirados.
- * REFACTOR: Desacoplado de AuthService para seguir el principio de Responsabilidad Única.
- */
 @Injectable()
 export class AuthMantenimientoService {
   private readonly logger = new Logger(AuthMantenimientoService.name);
@@ -22,10 +18,7 @@ export class AuthMantenimientoService {
     private readonly otpRepository: Repository<CodigoOtp>,
   ) {}
 
-  /**
-   * Ejecuta la limpieza de registros expirados en la base de datos.
-   * OPTIMIZATION: Evita el crecimiento infinito de tablas de seguridad.
-   */
+  // Evita el crecimiento infinito de las tablas de seguridad eliminando registros expirados.
   async ejecutarLimpieza() {
     try {
       const ahora = new Date();

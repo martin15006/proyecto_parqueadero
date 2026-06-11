@@ -85,10 +85,8 @@ function Login() {
   const [recoveryStatusType, setRecoveryStatusType] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [showRecoveryPass, setShowRecoveryPass] = useState(false);
 
-  // Redirección automática al detectar la sesión activa con validación estricta
   useEffect(() => {
     if (isAuthenticated && user) {
-      // REFACTOR: Uso de tipado estricto y normalización de datos
       const perfil = user.usuario;
 
       if (!perfil) {
@@ -96,10 +94,8 @@ function Login() {
         return;
       }
 
-      // NORMALIZACIÓN: Priorizamos 'idTipoUsr' (camelCase tras interceptor)
       const idRol = parseInt(String(perfil.idTipoUsr || 0), 10);
 
-      // Lógica de redirección basada en roles definidos
       if (idRol === 2) {
         navigate('/appadmin');
       } else if (idRol === 3) {
@@ -252,16 +248,14 @@ function Login() {
         codigo: codigoOtp
       });
 
-      // Validar que la respuesta sea exitosa y contenga datos
       if (response.status === 200 && response.data) {
-        // NORMALIZACIÓN: El backend usa un ResponseInterceptor que envuelve la data en { success, data, ... }
+        // El backend usa un ResponseInterceptor que envuelve la data en { success, data, ... }
         const userData = response.data.data !== undefined ? response.data.data : response.data;
 
         setStatus('¡Verificación exitosa! Redirigiendo...');
         setStatusType('success');
 
-        // Pequeña pausa para que el usuario vea el éxito antes de la redirección
-        // (la redirección por rol la realiza el efecto de sesión activa)
+        // La redirección por rol la realiza el efecto de sesión activa
         setTimeout(() => {
           login(userData);
         }, 500);
@@ -298,7 +292,6 @@ function Login() {
 
   return (
     <div className="auth-screen min-h-screen bg-[#F8F9FA] flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden font-sans">
-      {/* Panel Izquierdo - Informativo (Diseño SENA) */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden min-h-[600px] lg:min-h-screen shadow-2xl">
         <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105"
@@ -308,10 +301,8 @@ function Login() {
           }}
         />
 
-        {/* Overlay gradiente */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90 z-10" />
 
-        {/* Logo SENA (Posición Institucional Superior Izquierda) */}
         <div className="absolute top-10 left-12 z-30 flex items-center gap-4">
           <img src="/logo.png" alt="SENA" className="w-14 h-14 object-contain brightness-0 invert drop-shadow-lg" />
           <div className="text-white border-l border-white/20 pl-4 py-1">
@@ -320,7 +311,6 @@ function Login() {
           </div>
         </div>
 
-        {/* Contenido Central Izquierdo (Alineado a la Izquierda) */}
         <div className="relative z-30 px-12 xl:px-20 pt-24 flex-1 flex flex-col justify-center items-start text-left">
           <div className="space-y-1 mb-8">
             <h1 className="text-5xl xl:text-6xl font-black text-white tracking-tight leading-none">
@@ -337,7 +327,6 @@ function Login() {
             Accede a la plataforma institucional y continúa tu experiencia académica.
           </p>
 
-          {/* Tarjetas de características (Glassmorphism - Alineadas a la izquierda) */}
           <div className="space-y-4 w-full max-w-[400px]">
             <div className="flex items-center gap-5 p-5 rounded-[24px] bg-white/5 backdrop-blur-xl border border-white/10 group hover:bg-white/10 transition-all duration-500">
               <div className="w-12 h-12 rounded-2xl bg-[#39A900]/20 flex items-center justify-center flex-shrink-0 border border-[#39A900]/30 shadow-lg">
@@ -371,7 +360,6 @@ function Login() {
           </div>
         </div>
 
-        {/* Footer Izquierdo - Onda Verde y Conexión Segura (Refinado) */}
         <div className="absolute bottom-0 left-0 w-full z-20 pointer-events-none overflow-hidden h-48">
           <svg
             viewBox="0 0 500 200"
@@ -386,10 +374,8 @@ function Login() {
         </div>
       </div>
 
-      {/* Panel Derecho - Formulario (Tarjeta Flotante) */}
       <div className="flex-1 flex flex-col items-center justify-center p-5 lg:p-8 relative z-30 bg-[#F8F9FA]">
 
-        {/* Mobile Logo */}
         <div className="lg:hidden flex flex-col items-center gap-5 mb-14">
           <img src="/logo.png" alt="SENA" className="h-16 object-contain drop-shadow-md" />
           <div className="text-center space-y-1">
@@ -398,14 +384,12 @@ function Login() {
           </div>
         </div>
 
-        {/* Badge superior derecho */}
         <div className="absolute top-10 right-10 hidden xl:flex items-center gap-3 bg-white px-5 py-2.5 rounded-full shadow-md border border-gray-100">
           <ShieldCheck className="w-4 h-4 text-[#39A900]" />
           <span className="text-[11px] font-bold text-gray-600">Acceso seguro</span>
           <div className="w-2 h-2 rounded-full bg-[#39A900] animate-pulse" />
         </div>
 
-        {/* Tarjeta de Login Principal */}
         <div className="w-full max-w-[500px] bg-white rounded-[40px] shadow-[0_40px_80px_-15px_rgba(0,0,0,0.1)] p-7 lg:p-9 border border-gray-50 flex flex-col items-center transition-all hover:shadow-[0_50px_100px_-20px_rgba(0,0,0,0.12)] duration-700">
 
           <div className="w-16 h-16 bg-green-50 rounded-[24px] flex items-center justify-center mb-5 border border-green-100 shadow-inner">
@@ -575,7 +559,6 @@ function Login() {
           )}
         </div>
 
-        {/* Footer Derecho Institucional */}
         <div className="mt-10 text-center space-y-4">
           <ShieldCheck className="w-6 h-6 text-[#39a900] mx-auto opacity-80" />
           <div className="space-y-1">
@@ -585,16 +568,13 @@ function Login() {
         </div>
       </div>
 
-      {/* Modal de Recuperación - Rediseño según referencia */}
       {showRecoveryModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-all" onClick={resetRecovery} />
           <div className="relative w-full max-w-[550px] bg-white rounded-[32px] shadow-2xl overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-300">
-            {/* Línea verde superior */}
             <div className="h-1.5 w-full bg-[#39A900]" />
 
             <div className="p-8 lg:p-10">
-              {/* Header del Modal: Logo y Botón de Cierre */}
               <div className="flex items-center justify-between mb-10">
                 <div className="flex items-center gap-3">
                   <img src="/logo.png" alt="SENA" className="w-10 h-10 object-contain" />
@@ -733,7 +713,6 @@ function Login() {
                       />
                     </div>
 
-                    {/* Checklist de condiciones en vivo — se pone verde a medida que se cumplen */}
                     <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 mt-2">
                       <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">La contraseña debe tener:</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

@@ -18,7 +18,6 @@ export class TelemetriaController {
 
   /**
    * En producción el simulador debe estar deshabilitado para evitar manipulación de telemetría/alertas.
-   * En desarrollo, habilita endpoints rápidos para demostraciones locales sin hardware.
    */
   private assertSimuladorHabilitado() {
     if ((process.env.NODE_ENV || '').toLowerCase() === 'production') {
@@ -34,12 +33,11 @@ export class TelemetriaController {
   }
 
   /**
-   * Endpoint Principal para Recepción de Telemetría.
    * IOT_CONTRACT: El hardware debe enviar un POST con 'x-iot-api-key' en el header.
    * Ejemplo de payload: {"sensorId": "SN-001", "status": "OCCUPIED", "battery": 85, "rssi": -65}
    */
   @Post('lectura')
-  @UseGuards(IotAuthGuard) // SECURITY: Validación de API Key dedicada para hardware
+  @UseGuards(IotAuthGuard)
   async recibirLectura(@Body() dto: TelemetryPayloadDto) {
     return await this.telemetriaService.procesarLectura(dto);
   }
@@ -52,13 +50,8 @@ export class TelemetriaController {
   }
 
   /**
-   * Simula un ingreso (QR escaneado) para la demo local:
-   * - Fuerza el estado de la bahía (ocupada) para reflejar el cambio en el mapa 2D.
-   * - Registra y emite una alerta de sistema (RF14) para evidenciar el canal de alertas.
-   *
-   * Restricciones:
-   * - Solo ADMIN
-   * - Solo ambientes no productivos
+   * Simula un ingreso (QR escaneado) para la demo local.
+   * Restricciones: solo ADMIN y solo ambientes no productivos.
    */
   @Post('simulador/qr-ingreso')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -95,8 +88,7 @@ export class TelemetriaController {
   }
 
   /**
-   * Crea una alerta manual para demo (RF14) y la emite por WebSocket.
-   * Solo se expone fuera de producción.
+   * Crea una alerta manual para demo y la emite por WebSocket. Solo fuera de producción.
    */
   @Post('simulador/alerta')
   @UseGuards(JwtAuthGuard, RolesGuard)

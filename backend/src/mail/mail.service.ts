@@ -64,9 +64,6 @@ export class MailService {
     this.transporter = nodemailer.createTransport(transportOptions);
   }
 
-  /**
-   * Envía el código OTP al correo del usuario.
-   */
   async enviarCodigoOtp(destinatario: string, codigo: string, nombreUsuario: string): Promise<void> {
     const remitenteNombre = this.configService.get<string>('MAIL_FROM_NAME') ?? 'Parqueadero SENA';
     const remitenteCorreo = this.configService.get<string>('MAIL_USER');
@@ -91,7 +88,6 @@ export class MailService {
       // RNF2 (Privacidad): no registramos el correo del destinatario (PII) en logs.
       this.logger.log('Correo OTP enviado');
     } catch (error) {
-      // RNF2 (Privacidad): no registramos el correo del destinatario (PII) en logs de error.
       this.logger.error('Error al enviar correo OTP', error);
       throw new InternalServerErrorException(
         'No se pudo enviar el código de verificación. Intenta de nuevo.',
@@ -120,8 +116,7 @@ export class MailService {
     `;
 
     if (this.disabled) {
-      // RNF2 (Privacidad): evitamos registrar correos/placas en logs de DEV para no exponer PII.
-      // En entornos sin SMTP, omitimos el envío sin imprimir datos del usuario.
+      // RNF2 (Privacidad): sin SMTP omitimos el envío sin imprimir correos/placas (PII).
       return;
     }
 
@@ -139,15 +134,11 @@ export class MailService {
       // RNF2 (Privacidad): no registramos correo (PII) en logs.
       this.logger.log('Notificación de salida de emergencia enviada');
     } catch (error) {
-      // RNF2 (Privacidad): no registramos correo (PII) en logs.
       this.logger.error('Error al enviar notificación de salida de emergencia', error);
       throw new InternalServerErrorException('No se pudo enviar la notificación de salida de emergencia.');
     }
   }
 
-  /**
-   * Plantilla HTML del correo con la identidad SENA.
-   */
   private plantillaHtml(codigo: string, nombreUsuario: string): string {
     return `
     <!DOCTYPE html>

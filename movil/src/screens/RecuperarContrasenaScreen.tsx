@@ -45,7 +45,7 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
 
     const tituloColor = esOscuro ? colores.textoPrimario : '#232323';
     const subtituloColor = esOscuro ? colores.textoSecundario : 'rgba(35,35,35,0.74)';
-    // PASO 1
+
     const handleEnviarCorreo = async () => {
         const e: any = {};
         if (!correo.trim()) e.correo = 'Obligatorio';
@@ -65,7 +65,6 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
         }
     };
 
-    // PASO 2
     const handleVerificarCodigo = async (codigoCompleto: string) => {
         setCargando(true);
         setErrorOtp(false);
@@ -87,7 +86,6 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
         }
     };
 
-    // PASO 3
     const handleRestablecer = async () => {
         const e: any = {};
         const errorContra = validarContrasenaSegura(contraNueva);
@@ -132,7 +130,6 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
-                {/* Botón volver con padding seguro arriba */}
                 <View style={[styles.headerVolver, { paddingTop: paddingTopSeguro }]}>
                     <TouchableOpacity
                         style={styles.botonVolver}
@@ -156,7 +153,6 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* LOGO CON WRAPPER PARA CENTRAR CORRECTAMENTE */}
                     <FadeInView style={styles.logoContainer}>
                         <View style={styles.logoWrapper}>
                             {esOscuro && <View style={styles.anilloLogo} />}
@@ -167,7 +163,6 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
                     </FadeInView>
 
                     <FadeInView delay={200}>
-                        {/* Indicador de progreso */}
                         <View style={styles.progresoContainer}>
                             <View
                                 style={[
@@ -213,7 +208,6 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
                             />
                         </View>
 
-                        {/* PASO 1 */}
                         {paso === 'correo' && (
                             <>
                                 <Text style={[styles.titulo, { color: tituloColor }]}>
@@ -248,7 +242,6 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
                             </>
                         )}
 
-                        {/* PASO 2 */}
                         {paso === 'codigo' && (
                             <>
                                 <Text style={[styles.titulo, { color: tituloColor }]}>
@@ -285,7 +278,6 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
                             </>
                         )}
 
-                        {/* PASO 3 */}
                         {paso === 'nueva' && (
                             <>
                                 <Text style={[styles.titulo, { color: tituloColor }]}>
@@ -308,7 +300,6 @@ export default function RecuperarContrasenaScreen({ navigation }: any) {
                                     }}
                                 />
 
-                                {/* Medidor visual de fortaleza */}
                                 <MedidorContrasena contrasena={contraNueva} />
 
                                 <AnimatedInput
@@ -389,7 +380,6 @@ const styles = StyleSheet.create({
         paddingBottom: espacios.grande,
     },
 
-    // ─── LOGO CENTRADO CORRECTAMENTE ───
     logoContainer: {
         alignItems: 'center',
         justifyContent: 'center',

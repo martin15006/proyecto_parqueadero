@@ -43,10 +43,6 @@ const mapEstadoWsToInfra = (estado?: string, ocupada?: boolean): InfraBahiaEstad
   return ocupada ? 'OCUPADO' : 'DISPONIBLE';
 };
 
-/**
- * Página de Telemetría (Admin).
- * Monitorea el estado de los sensores IoT y la salud de la infraestructura.
- */
 export const TelemetriaPage: React.FC = () => {
   const { sensores, loading, error, forceCheck, refresh } = useTelemetria();
   const { user } = useAuth();
@@ -63,9 +59,9 @@ export const TelemetriaPage: React.FC = () => {
   const getEstadoSensor = (ultimaLectura?: string) => {
     if (!ultimaLectura) return { label: 'Sin Datos', variant: 'neutral' as const };
     const diff = Date.now() - new Date(ultimaLectura).getTime();
-    const isOnline = diff < 5 * 60000; // 5 minutos de umbral
-    
-    return isOnline 
+    const isOnline = diff < 5 * 60000;
+
+    return isOnline
       ? { label: 'Online', variant: 'success' as const }
       : { label: 'Offline', variant: 'error' as const };
   };
@@ -227,7 +223,6 @@ export const TelemetriaPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4 -mt-20 mb-10 relative z-50">
         <div className="flex gap-3">
           <Button variant="outline" size="md" onClick={refresh} className="bg-white">
@@ -285,14 +280,12 @@ export const TelemetriaPage: React.FC = () => {
         </section>
       )}
 
-      {/* Stats Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard icon={<Cpu className="text-blue-500" />} label="Sensores Totales" value={sensores.length} />
         <StatCard icon={<Wifi className="text-green-500" />} label="Dispositivos Online" value={sensoresOnline} />
         <StatCard icon={<WifiOff className="text-red-500" />} label="Alertas Críticas" value={sensoresOffline} isCritical={sensoresOffline > 0} />
       </div>
 
-      {/* Mapa 2D (Bosquejo) */}
       <section className="bg-white dark:bg-[#121212] p-8 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm space-y-6 transition-colors duration-500">
         <div className="flex flex-col lg:flex-row justify-between gap-4 lg:items-end">
           <div>
@@ -367,7 +360,6 @@ export const TelemetriaPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Grid de Sensores */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {sensoresSafe.map((sensor) => {
           const { label, variant } = getEstadoSensor(sensor.ultimaLectura);
@@ -376,7 +368,6 @@ export const TelemetriaPage: React.FC = () => {
               key={sensor.codigo} 
               className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/5 rounded-xl p-8 hover:shadow-sm transition-all duration-200 group relative overflow-hidden"
             >
-              {/* Status Badge */}
               <div className="absolute top-0 right-0">
                 <Badge variant={variant} className="!rounded-none !rounded-bl-3xl !px-6 !py-2">
                   {label}

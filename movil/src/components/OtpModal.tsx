@@ -18,7 +18,6 @@ import { useTheme } from '../context/ThemeContext';
 import { fonts, espacios, animaciones } from '../theme/senaTheme';
 import { authService } from '../services/authService';
 
-// Logo SENA importado correctamente como recurso
 const logoSena = require('../../assets/logoSena.png');
 
 interface Props {
@@ -147,7 +146,6 @@ export default function OtpModal({ visible, correo, onCerrar, onExito, modo = 'l
               },
             ]}
           >
-            {/* Decoraciones glass */}
             <View
               style={[
                 styles.decoTop,
@@ -169,7 +167,6 @@ export default function OtpModal({ visible, correo, onCerrar, onExito, modo = 'l
               ]}
             />
 
-            {/* ─── LOGO SENA con círculo blanco y borde verde ─── */}
             <View
               style={[
                 styles.iconoCircular,
@@ -302,7 +299,6 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
   },
-  // ─── ICONO ACTUALIZADO PARA EL LOGO SENA ───
   iconoCircular: {
     width: 80,
     height: 80,

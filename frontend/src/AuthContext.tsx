@@ -2,18 +2,12 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import type { ReactNode } from 'react';
 import type { User } from './types';
 
-/**
- * REFACTOR: Interfaz extendida para incluir tokens en el estado del contexto.
- */
 interface AuthData {
   accessToken: string;
   refreshToken: string;
   usuario: User;
 }
 
-/**
- * Definición de la interfaz del contexto de autenticación con tipado estricto.
- */
 interface AuthContextType {
   isAuthenticated: boolean;
   user: AuthData | null;
@@ -23,18 +17,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/**
- * Provider global de Autenticación.
- * PERFORMANCE: Uso de useCallback para evitar re-renders innecesarios.
- * SECURITY: Tipado estricto para evitar errores en tiempo de ejecución.
- */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<AuthData | null>(null);
 
-  /**
-   * Recupera la sesión guardada al inicializar la aplicación.
-   */
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
@@ -53,19 +39,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  /**
-   * Establece una nueva sesión de usuario.
-   * PERFORMANCE: Memoizado con useCallback.
-   */
   const login = useCallback((userData: AuthData) => {
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
   }, []);
 
-  /**
-   * Finaliza la sesión actual y limpia el almacenamiento local.
-   */
   const logout = useCallback(() => {
     localStorage.removeItem('user');
     setUser(null);
@@ -79,9 +58,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-/**
- * Hook para acceder fácilmente al estado de autenticación desde cualquier componente.
- */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

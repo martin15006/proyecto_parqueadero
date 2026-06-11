@@ -6,8 +6,8 @@ import { espacios, fonts } from '../theme/senaTheme';
 interface Props {
   titulo?: string;
   onMenuPress?: () => void;
-  onBackPress?: () => void; // ← NUEVO
-  mostrarVolver?: boolean;   // ← NUEVO
+  onBackPress?: () => void;
+  mostrarVolver?: boolean;
 }
 
 export default function SenaHeader({ titulo, onMenuPress, onBackPress, mostrarVolver = false }: Props) {
@@ -27,7 +27,6 @@ export default function SenaHeader({ titulo, onMenuPress, onBackPress, mostrarVo
     >
       {esOscuro ? <View style={styles.glow} /> : null}
 
-      {/* Botón izquierdo: volver o menú */}
       {mostrarVolver ? (
         <TouchableOpacity
           onPress={onBackPress}

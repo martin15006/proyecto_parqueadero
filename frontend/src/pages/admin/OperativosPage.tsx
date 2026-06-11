@@ -8,10 +8,6 @@ import { Table } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 
-/**
- * Normaliza el error proveniente de la capa HTTP (Axios interceptor + backend NestJS)
- * para que la UI siempre pueda mostrar una notificación limpia sin romper la pantalla.
- */
 const getUiErrorMessage = (error: unknown, fallback: string): string => {
   const maybeAny = error as any;
   const rawMessage = maybeAny?.message ?? maybeAny?.error ?? maybeAny?.mensaje;
@@ -37,10 +33,6 @@ const getUiErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
-/**
- * Panel Admin: Gestión de Personal Operativo (RF41).
- * Incluye CRUD de operativos, activación/desactivación (soft delete) y restablecimiento de contraseña (RF28).
- */
 export const OperativosPage: React.FC = () => {
   const [operativos, setOperativos] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,10 +67,7 @@ export const OperativosPage: React.FC = () => {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
 
-  /**
-   * Sincroniza la tabla desde el backend.
-   * El endpoint retorna operativos incluyendo inactivos (withDeleted) para permitir activación/desactivación.
-   */
+  // El endpoint retorna operativos incluyendo inactivos (withDeleted) para permitir activación/desactivación.
   const fetchOperativos = async () => {
     try {
       setLoading(true);
@@ -125,10 +114,6 @@ export const OperativosPage: React.FC = () => {
     setIsEditOpen(true);
   };
 
-  /**
-   * Abre el modal de restablecimiento de contraseña (RF28) para un Operativo.
-   * El backend aplica RF3: contraseña segura y no reutilización de la anterior.
-   */
   const openResetPassword = (u: User) => {
     setActionError(null);
     setActionSuccess(null);
@@ -139,10 +124,7 @@ export const OperativosPage: React.FC = () => {
     setIsResetOpen(true);
   };
 
-  /**
-   * Crea un nuevo Operativo (RF41).
-   * Nota: el backend fuerza de forma estricta idTipoUsr=3 (OPERATIVO) y rechaza duplicados (correo/documento).
-   */
+  // El backend fuerza de forma estricta idTipoUsr=3 (OPERATIVO) y rechaza duplicados (correo/documento).
   const handleCreate = async () => {
     setActionError(null);
     setActionSuccess(null);
@@ -168,10 +150,6 @@ export const OperativosPage: React.FC = () => {
     }
   };
 
-  /**
-   * Actualiza datos básicos del Operativo seleccionado.
-   * El backend valida cambios de correo para evitar colisiones con otros usuarios.
-   */
   const handleUpdate = async () => {
     if (!selected) return;
     setActionError(null);
@@ -192,10 +170,7 @@ export const OperativosPage: React.FC = () => {
     }
   };
 
-  /**
-   * Activa/Desactiva el Operativo usando soft-delete.
-   * Esto permite mantener trazabilidad sin eliminar físicamente la cuenta.
-   */
+  // Soft-delete: mantiene trazabilidad sin eliminar físicamente la cuenta.
   const toggleEstado = async (u: User) => {
     setActionError(null);
     setActionSuccess(null);
@@ -209,10 +184,6 @@ export const OperativosPage: React.FC = () => {
     }
   };
 
-  /**
-   * Restablece la contraseña del Operativo seleccionado.
-   * La UI exige confirmación de la contraseña para evitar errores de digitación.
-   */
   const handleResetPassword = async () => {
     const documento = resetTarget?.documento?.trim();
     if (!documento) {

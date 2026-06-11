@@ -13,7 +13,7 @@ export class Contingencia {
   idContingencia: number;
 
   @Column({ length: 20 })
-  tipoOperacion: string; // INGRESO o SALIDA
+  tipoOperacion: string;
 
   @Column({ length: 20 })
   placa: string;

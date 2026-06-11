@@ -13,7 +13,6 @@ import SuccessCheck from '../components/SuccessCheck';
 import { usuarioService } from '../services/usuarioService';
 import { sessionService } from '../services/sessionService';
 
-// Logo SENA importado correctamente como recurso
 const logoSena = require('../../assets/logoSena.png');
 
 type Paso = 'correo' | 'codigo';
@@ -96,7 +95,6 @@ export default function CambiarCorreoScreen({ navigation }: any) {
         enableOnAndroid
       >
         <FadeInView>
-          {/* Logo SENA con círculo blanco y borde verde */}
           <View style={styles.iconoContainer}>
             <View
               style={[

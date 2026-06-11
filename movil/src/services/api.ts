@@ -66,10 +66,6 @@ export function setInMemoryAuthToken(token: string | null) {
   inMemoryAuthToken = raw.length ? raw : null;
 }
 
-/**
- * Configura el callback global que se ejecuta cuando el backend responde 401 en solicitudes autenticadas.
- * @param callback Acción de cierre de sesión y navegación.
- */
 export function configurarManejoSesionInvalida(callback: () => void) {
   onSesionInvalida = callback;
 }
@@ -119,13 +115,6 @@ http.interceptors.response.use(async (response) => {
   return response;
 });
 
-/**
- * Ejecuta una petición HTTP al backend y devuelve el `data` del envelope estándar.
- * @param endpoint Ruta relativa del backend (sin /api/v1).
- * @param options Opciones de la petición (método, headers, body y conAuth).
- * @returns Respuesta desenvuelta del backend.
- * @throws Error en respuestas no exitosas o problemas de red.
- */
 export async function apiRequest<T>(
   endpoint: string,
   options: ApiRequestOptions = {},

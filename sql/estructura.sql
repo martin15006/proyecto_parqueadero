@@ -353,23 +353,6 @@ CREATE INDEX idx_solicitud_documento ON solicitud_vehiculo (documento);
 CREATE INDEX idx_solicitud_estado    ON solicitud_vehiculo (estado);
 
 
--- VISITANTES
-CREATE TABLE visitante (
-    id_visitante    INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    nombre_completo VARCHAR(120) NOT NULL,
-    documento       VARCHAR(20) NOT NULL UNIQUE,
-    placa           VARCHAR(10) NOT NULL UNIQUE,
-    marca           VARCHAR(50) NOT NULL,
-    modelo          VARCHAR(50) NOT NULL,
-    descripcion     TEXT,
-    id_operativo    VARCHAR(10) NOT NULL,
-    fecha_salida    TIMESTAMP,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    deleted_at      TIMESTAMPTZ
-);
-
-
 -- CONTINGENCIA
 CREATE TABLE contingencia (
     id_contingencia INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

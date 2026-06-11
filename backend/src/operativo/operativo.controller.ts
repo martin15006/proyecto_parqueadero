@@ -52,28 +52,26 @@ export class OperativoController {
     return this.operativoService.escanearQr(dto.qr, { ...req.user, ip: req.ip });
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard) // RF31: solo personal autorizado puede operar el acceso.
-  @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO) // RF31: se permite a operativo (y admin por soporte) ejecutar el escaneo.
-  @Post('escanear-codigo') // RF31/RF33: endpoint unificado para lector de barras (Code128) y QR futuro.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
+  @Post('escanear-codigo')
   escanearCodigo(
     @Body() dto: EscanearCodigoDto,
     @Request() req: AuthenticatedRequest,
   ) {
-    // RF31: el operador que ejecuta el ingreso queda como actor del movimiento/auditoría.
     return this.operativoService.escanearCodigo(
       dto.codigo,
       { ...req.user, ip: req.ip },
     );
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard) // RF31: endpoint protegido porque registra un ingreso real.
-  @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO) // RF31: operativo confirma el vehículo observado.
-  @Post('confirmar-ingreso-multivehiculo') // RF31: confirmación secundaria cuando hay múltiples vehículos.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
+  @Post('confirmar-ingreso-multivehiculo')
   confirmarIngresoMultivehiculo(
     @Body() dto: ConfirmarIngresoMultivehiculoDto,
     @Request() req: AuthenticatedRequest,
   ) {
-    // RF31: el backend revalida el código y registra ingreso solo para la placa seleccionada.
     return this.operativoService.confirmarIngresoMultivehiculo(
       dto,
       { ...req.user, ip: req.ip },
@@ -167,11 +165,11 @@ export class OperativoController {
     return this.operativoService.salidaEmergencia({ ...req.user, ip: req.ip });
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard) // Brecha contractual: endpoint dedicado para OPERATIVO (no depende de /dashboard/resumen admin-only).
-  @Roles(TipoUsuarioEnum.OPERATIVO) // PRINCIPIO DE MÍNIMO PRIVILEGIO: solo operativo consume su resumen de turno.
-  @Get('resumen-turno') // RF35: sincronización inicial del dashboard operativo con métricas pertinentes.
+  // Endpoint dedicado para OPERATIVO (no depende de /dashboard/resumen, que es admin-only).
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(TipoUsuarioEnum.OPERATIVO)
+  @Get('resumen-turno')
   resumenTurno(@Request() req: AuthenticatedRequest) {
-    // RF35: el backend retorna solo métricas operativas (ocupación, ingresos/salidas del día, alertas técnicas).
     return this.operativoService.obtenerResumenTurno({ ...req.user, ip: req.ip });
   }
 }

@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, In, IsNull, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Bahia } from './entities/bahia.entity';
 import { ParqueaderoEstado } from './entities/parqueadero-estado.entity';
@@ -307,8 +307,8 @@ export class BahiasService implements OnModuleInit {
 
     const parqueaderoDeshabilitado = Boolean(parqueadero.deshabilitado);
 
-    const total = bahias.length; // bahías sensorizadas (físicas)
-    const ocupados = movimientosActivos.length; // QRs activos
+    const total = bahias.length;
+    const ocupados = movimientosActivos.length;
     const disponibles = Math.max(total - ocupados, 0);
 
     const estadoParqueadero: IOcupacionPayload['estadoParqueadero'] = parqueaderoDeshabilitado
@@ -357,18 +357,20 @@ export class BahiasService implements OnModuleInit {
   }
 
   private async getOrCreateParqueaderoEstado(): Promise<ParqueaderoEstado> {
-    const existing = await this.parqueaderoEstadoRepository.findOne({ where: { id: 1 } }); // DISEÑO: el estado global vive en una fila fija (id=1).
-    if (existing) return existing; // DISEÑO: si ya existe, se retorna sin modificar (evita resets accidentales).
+    // El estado global vive en una fila fija (id=1); si ya existe se retorna sin
+    // modificar para evitar resets accidentales.
+    const existing = await this.parqueaderoEstadoRepository.findOne({ where: { id: 1 } });
+    if (existing) return existing;
 
     const created = this.parqueaderoEstadoRepository.create({
-      id: 1, // DISEÑO: clave fija para un único estado global.
-      deshabilitado: false, // RF14: por defecto el parqueadero inicia habilitado.
-      motivo: null, // RF14: sin motivo cuando está habilitado.
-      duracionEstimada: null, // RF14: sin duración cuando está habilitado.
-      deshabilitadoDesde: null, // RF14: no aplica si no está deshabilitado.
-      ultimoUmbralNotificado: 0, // RF13/RF39: no hay umbral notificado al iniciar.
-    }); // RF14/RF39: inicializa campos necesarios sin romper el contrato existente.
-    return await this.parqueaderoEstadoRepository.save(created); // PERSISTENCIA: garantiza que el estado exista para futuras validaciones.
+      id: 1,
+      deshabilitado: false,
+      motivo: null,
+      duracionEstimada: null,
+      deshabilitadoDesde: null,
+      ultimoUmbralNotificado: 0,
+    });
+    return await this.parqueaderoEstadoRepository.save(created);
   }
 
   /**
@@ -385,77 +387,78 @@ export class BahiasService implements OnModuleInit {
     dto: { deshabilitado: boolean; motivo?: string; duracionEstimada?: string },
     actor: { idUsuario: string; nombre: string | null; ip?: string; userAgent?: string },
   ): Promise<ParqueaderoEstado> {
-    const parqueadero = await this.getOrCreateParqueaderoEstado(); // RF14: cargamos el estado actual antes de aplicar cambios.
-    const anterior = parqueadero.deshabilitado; // RF14: guardamos el estado previo para auditoría y reglas de transición.
-    const motivoAnterior = parqueadero.motivo; // RF14: guardamos el motivo previo para auditoría (brecha: sin motivo antes).
-    const duracionAnterior = parqueadero.duracionEstimada; // RF14: guardamos duración previa para auditoría.
+    const parqueadero = await this.getOrCreateParqueaderoEstado();
+    const anterior = parqueadero.deshabilitado;
+    const motivoAnterior = parqueadero.motivo;
+    const duracionAnterior = parqueadero.duracionEstimada;
 
-    const solicitadoDeshabilitar = Boolean(dto.deshabilitado); // RF14: normalizamos el booleano de entrada.
+    const solicitadoDeshabilitar = Boolean(dto.deshabilitado);
 
     if (solicitadoDeshabilitar) {
-      const motivo = String(dto.motivo ?? '').trim(); // RF14: el motivo debe existir y no ser whitespace.
+      const motivo = String(dto.motivo ?? '').trim();
       if (!motivo.length) {
-        throw new BadRequestException({ // RF14: se rechaza la operación si el admin no suministra el motivo obligatorio.
-          message: 'Para deshabilitar el parqueadero debes indicar un motivo.', // RF14: mensaje semántico para UI.
-          errorCode: 'MOTIVO_OBLIGATORIO', // RF14: código técnico para que frontend muestre un error específico.
-        }); // RF14: evita deshabilitado “sin explicación” (brecha detectada).
+        throw new BadRequestException({
+          message: 'Para deshabilitar el parqueadero debes indicar un motivo.',
+          errorCode: 'MOTIVO_OBLIGATORIO',
+        });
       }
 
-      parqueadero.deshabilitado = true; // RF14: activa bloqueo administrativo global.
-      parqueadero.motivo = motivo; // RF14: persiste la razón (requisito explícito).
-      parqueadero.duracionEstimada = dto.duracionEstimada ? String(dto.duracionEstimada).trim() : null; // RF14: persiste duración (si fue informada).
-      parqueadero.deshabilitadoDesde = anterior ? parqueadero.deshabilitadoDesde : new Date(); // RF14: fija inicio del deshabilitado solo en transición false→true.
-      parqueadero.ultimoUmbralNotificado = 0; // RF13/RF39: resetea umbrales porque el estado “operativo” cambia por administración.
+      parqueadero.deshabilitado = true;
+      parqueadero.motivo = motivo;
+      parqueadero.duracionEstimada = dto.duracionEstimada ? String(dto.duracionEstimada).trim() : null;
+      // Fija el inicio del deshabilitado solo en la transición false→true.
+      parqueadero.deshabilitadoDesde = anterior ? parqueadero.deshabilitadoDesde : new Date();
+      parqueadero.ultimoUmbralNotificado = 0;
     } else {
-      parqueadero.deshabilitado = false; // RF14: levanta el bloqueo administrativo.
-      parqueadero.motivo = null; // RF14: al habilitar, se limpia el motivo para no confundir a usuarios.
-      parqueadero.duracionEstimada = null; // RF14: al habilitar, se limpia duración asociada al deshabilitado.
-      parqueadero.deshabilitadoDesde = null; // RF14: ya no aplica.
-      parqueadero.ultimoUmbralNotificado = 0; // RF13/RF39: reinicia el motor de alertas tras cambio administrativo.
+      parqueadero.deshabilitado = false;
+      parqueadero.motivo = null;
+      parqueadero.duracionEstimada = null;
+      parqueadero.deshabilitadoDesde = null;
+      parqueadero.ultimoUmbralNotificado = 0;
     }
 
-    const guardado = await this.parqueaderoEstadoRepository.save(parqueadero); // PERSISTENCIA: asegura que motivo/duración queden en BD (RF14).
+    const guardado = await this.parqueaderoEstadoRepository.save(parqueadero);
 
     await this.auditoriaService.create({
-      accion: 'CAMBIAR_ESTADO_PARQUEADERO', // RF37: acción auditada (trazabilidad).
-      entidad: 'PARQUEADERO', // RF37: entidad lógica afectada.
-      idEntidad: guardado.id, // RF37: referencia al registro global (id=1).
+      accion: 'CAMBIAR_ESTADO_PARQUEADERO',
+      entidad: 'PARQUEADERO',
+      idEntidad: guardado.id,
       datosAnteriores: {
-        deshabilitado: anterior, // RF37: evidencia del valor anterior.
-        motivo: motivoAnterior, // RF14/RF37: evidencia del motivo anterior (si existía).
-        duracionEstimada: duracionAnterior, // RF14/RF37: evidencia de duración anterior.
+        deshabilitado: anterior,
+        motivo: motivoAnterior,
+        duracionEstimada: duracionAnterior,
       },
       datosNuevos: {
-        deshabilitado: guardado.deshabilitado, // RF37: evidencia del nuevo valor.
-        motivo: guardado.motivo, // RF14/RF37: evidencia del nuevo motivo.
-        duracionEstimada: guardado.duracionEstimada, // RF14/RF37: evidencia de la nueva duración.
+        deshabilitado: guardado.deshabilitado,
+        motivo: guardado.motivo,
+        duracionEstimada: guardado.duracionEstimada,
       },
-      idUsuario: actor.idUsuario, // RF37: quién ejecutó el cambio (documento interno, no para logs públicos).
-      ip: actor.ip, // RNF2: dato técnico para investigación de incidentes.
-      userAgent: actor.userAgent, // RNF2: dato técnico para investigación de incidentes.
+      idUsuario: actor.idUsuario,
+      ip: actor.ip,
+      userAgent: actor.userAgent,
     });
 
     this.eventosGateway.emitirParqueaderoEstadoActualizado({
-      deshabilitado: guardado.deshabilitado, // RF14: permite que frontends reaccionen (bloqueo/avisos).
-      motivo: guardado.motivo ?? undefined, // RF14: se expone motivo al frontend para mostrar al usuario.
-      duracionEstimada: guardado.duracionEstimada ?? undefined, // RF14: se expone duración (si existe) para informar.
-      deshabilitadoDesde: guardado.deshabilitadoDesde ?? undefined, // RF14: se expone inicio del deshabilitado para contexto.
-      fecha: new Date(), // RNF2: timestamp técnico del evento.
+      deshabilitado: guardado.deshabilitado,
+      motivo: guardado.motivo ?? undefined,
+      duracionEstimada: guardado.duracionEstimada ?? undefined,
+      deshabilitadoDesde: guardado.deshabilitadoDesde ?? undefined,
+      fecha: new Date(),
     });
 
     if (!anterior && guardado.deshabilitado) {
-      const duracionTexto = guardado.duracionEstimada ? ` Duración estimada: ${guardado.duracionEstimada}.` : ''; // RF14: ensamblaje seguro del mensaje.
+      const duracionTexto = guardado.duracionEstimada ? ` Duración estimada: ${guardado.duracionEstimada}.` : '';
 
       this.eventosGateway.emitirAlertaParqueadero({
-        tipo: 'PARQUEADERO_DESHABILITADO', // RF13/RF39: alerta técnica para dashboards (evento websocket).
-        mensaje: `Parqueadero deshabilitado. Motivo: ${guardado.motivo}.${duracionTexto}`, // RF14: mensaje listo para UI.
-        fecha: new Date(), // RNF2: timestamp de alerta.
+        tipo: 'PARQUEADERO_DESHABILITADO',
+        mensaje: `Parqueadero deshabilitado. Motivo: ${guardado.motivo}.${duracionTexto}`,
+        fecha: new Date(),
       });
 
       await this.notificacionesService.registrarParqueaderoDeshabilitadoBroadcast({
-        motivo: guardado.motivo ?? 'Sin motivo', // RF14/RF25: motivo persistido en bandeja del usuario.
-        duracionEstimada: guardado.duracionEstimada, // RF14/RF25: duración persistida (si existe).
-        actorNombre: actor.nombre, // RF25: nombre del administrador requerido por criterio de aceptación.
+        motivo: guardado.motivo ?? 'Sin motivo',
+        duracionEstimada: guardado.duracionEstimada,
+        actorNombre: actor.nombre,
       });
     }
 
@@ -513,28 +516,30 @@ export class BahiasService implements OnModuleInit {
    * - Se recomienda invocar después de cada ingreso/salida (sincronización de ocupación).
    */
   async evaluarAlertasOcupacion() {
-    const estado = await this.getOrCreateParqueaderoEstado(); // RF39: consultamos memoria del último umbral notificado para evitar spam.
+    const estado = await this.getOrCreateParqueaderoEstado();
     if (estado.deshabilitado) {
-      await this.resetUmbralSiNecesario(estado, 0); // RF39: si está deshabilitado, no tiene sentido alertar por ocupación.
-      return; // RF39: salida temprana (no emite alertas de ocupación cuando está deshabilitado).
+      await this.resetUmbralSiNecesario(estado, 0);
+      return;
     }
 
-    const ocupacion = await this.obtenerOcupacion(); // RF39: estado actual (total/ocupados/disponibles) ya calculado por backend.
-    const total = ocupacion.total || 0; // RF39: total de bahías.
-    const ocupados = ocupacion.ocupados || 0; // RF39: cantidad de bahías ocupadas.
-    const porcentaje = total > 0 ? (ocupados / total) * 100 : 0; // RF39: porcentaje de ocupación para comparar con umbrales.
+    const ocupacion = await this.obtenerOcupacion();
+    const total = ocupacion.total || 0;
+    const ocupados = ocupacion.ocupados || 0;
+    const porcentaje = total > 0 ? (ocupados / total) * 100 : 0;
 
-    const nuevoUmbral = porcentaje >= 100 ? 100 : porcentaje >= 80 ? 80 : 0; // RF13/RF39: normaliza el estado a 0/80/100.
+    const nuevoUmbral = porcentaje >= 100 ? 100 : porcentaje >= 80 ? 80 : 0;
 
     if (nuevoUmbral === 0) {
-      await this.resetUmbralSiNecesario(estado, 0); // RF39: resetea memoria si bajó de 80%.
-      return; // RF39: no emite alerta si no se cumple umbral.
+      await this.resetUmbralSiNecesario(estado, 0);
+      return;
     }
 
-    if (estado.ultimoUmbralNotificado >= nuevoUmbral) return; // RF39: ya se notificó este umbral (evita alertas repetidas).
+    // Memoria del último umbral notificado: evita re-emitir el mismo umbral (anti-spam),
+    // persistida en BD para sobrevivir reinicios.
+    if (estado.ultimoUmbralNotificado >= nuevoUmbral) return;
 
-    estado.ultimoUmbralNotificado = nuevoUmbral; // RF39: persistimos el nuevo umbral notificado para mantener consistencia.
-    await this.parqueaderoEstadoRepository.save(estado); // RF39: guardamos en BD para evitar spam tras reinicios.
+    estado.ultimoUmbralNotificado = nuevoUmbral;
+    await this.parqueaderoEstadoRepository.save(estado);
 
     if (nuevoUmbral === 80) {
       this.eventosGateway.emitirAlertaParqueadero({
@@ -542,7 +547,6 @@ export class BahiasService implements OnModuleInit {
         mensaje: `Alerta: el parqueadero alcanzó el 80% de ocupación (${ocupados}/${total}).`,
         fecha: new Date(),
       });
-      // Persistir notificación para los admins
       try {
         await this.notificacionesService.notificarAdmins({
           tipo: 'PARQUEADERO_UMBRAL_80',
@@ -554,7 +558,6 @@ export class BahiasService implements OnModuleInit {
       return;
     }
 
-    // 100% → emitir + notificar persistente
     this.eventosGateway.emitirAlertaParqueadero({
       tipo: 'PARQUEADERO_LLENO',
       mensaje: `Alerta: capacidad máxima alcanzada (${ocupados}/${total}). El parqueadero está lleno.`,
@@ -571,9 +574,9 @@ export class BahiasService implements OnModuleInit {
   }
 
   private async resetUmbralSiNecesario(estado: ParqueaderoEstado, valor: number) {
-    if (estado.ultimoUmbralNotificado === valor) return; // RF39: evita escrituras innecesarias si ya está en el valor esperado.
-    estado.ultimoUmbralNotificado = valor; // RF39: resetea o ajusta el umbral notificado.
-    await this.parqueaderoEstadoRepository.save(estado); // RF39: persiste para coherencia entre instancias.
+    if (estado.ultimoUmbralNotificado === valor) return;
+    estado.ultimoUmbralNotificado = valor;
+    await this.parqueaderoEstadoRepository.save(estado);
   }
 
   async forzarEstadoBahia(

@@ -3,15 +3,11 @@ import { Link, useLocation, Outlet } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Car,
   LogOut,
-  FileText, Inbox, Sun, Moon, ChevronLeft, ChevronRight
+  Inbox, Sun, Moon, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 
-/**
- * Layout Principal para el Panel Administrativo.
- * Proporciona navegación lateral persistente con estilo institucional SENA.
- */
 export const AdminLayout: React.FC = () => {
   const { logout, user } = useAuth();
   const { isDark, setTheme } = useTheme();
@@ -27,7 +23,6 @@ export const AdminLayout: React.FC = () => {
     { path: '/appadmin/usuarios', label: 'Usuarios', icon: Users },
     { path: '/appadmin/vehiculos', label: 'Vehículos', icon: Car },
     { path: '/appadmin/solicitudes', label: 'Solicitudes', icon: Inbox },
-    { path: '/appadmin/informes', label: 'Reportes', icon: FileText },
   ];
 
   const pageMeta = useMemo(() => {
@@ -45,7 +40,6 @@ export const AdminLayout: React.FC = () => {
       usuarios: { title: 'Usuarios', subtitle: 'Administración de cuentas institucionales' },
       vehiculos: { title: 'Vehículos', subtitle: 'Control de flota y contingencias' },
       solicitudes: { title: 'Solicitudes', subtitle: 'Aprobación de registros de vehículos' },
-      informes: { title: 'Reportes', subtitle: 'Exportación institucional' },
     };
 
     return metaMap[segment] || { title: 'Panel', subtitle: 'Administración del sistema' };
@@ -53,16 +47,13 @@ export const AdminLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-[#F0F4F0] dark:bg-[#0A0A0A] font-sans overflow-hidden text-gray-900 dark:text-gray-100 transition-colors duration-700">
-      {/* Sidebar Lateral - Estética Premium Institucional */}
       <aside className={`
         fixed inset-y-0 left-0 z-50 lg:relative
         ${isSidebarOpen ? 'w-72 translate-x-0' : 'w-24 -translate-x-full lg:translate-x-0'}
         bg-[#232323] dark:bg-[#121212] transition-all duration-500 flex flex-col overflow-hidden shadow-[10px_0_30px_rgba(0,0,0,0.1)] lg:shadow-none border-r dark:border-white/5
       `}>
-        {/* Círculo decorativo superior (Esquina superior derecha) */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-[#39A900] opacity-10 rounded-full -mr-16 -mt-16 pointer-events-none transition-transform duration-700 group-hover:scale-110" />
-        
-        {/* Header Sidebar - Gradiente SENA */}
+
         <div className={`p-8 flex items-center ${isSidebarOpen ? 'justify-between' : 'justify-center'} relative overflow-hidden`}>
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#39A900] via-[#007832] to-[#39A900]" />
           <div className="flex items-center gap-4 relative z-10">
@@ -105,15 +96,12 @@ export const AdminLayout: React.FC = () => {
           })}
         </nav>
 
-        {/* Perfil de Usuario - Estilo Premium */}
-        {/* Onda Decorativa SENA en Sidebar (Inferior) */}
         <div className="absolute bottom-0 left-0 w-full pointer-events-none opacity-20 z-0">
           <svg viewBox="0 0 500 200" preserveAspectRatio="none" className="w-full h-32">
             <path d="M0,120 C150,180 350,60 500,120 L500,200 L0,200 Z" fill="#39A900" />
           </svg>
         </div>
 
-        {/* Perfil de Usuario - Estilo Premium */}
         <div className="p-6 border-t border-white/5 relative z-10 bg-black/20 dark:bg-black/40">
           <Link 
             to="/appadmin/configuracion"
@@ -135,7 +123,6 @@ export const AdminLayout: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Pestaña de menú en el borde del sidebar: flecha hacia afuera cuando
             está oculto/colapsado y hacia adentro cuando está desplegado. */}
@@ -148,7 +135,6 @@ export const AdminLayout: React.FC = () => {
           {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
         </button>
 
-        {/* Top Header - Estética Vibrante */}
         <header className="h-24 bg-white dark:bg-[#121212]/80 dark:backdrop-blur-xl border-b border-gray-100 dark:border-white/5 flex items-center justify-between px-6 lg:px-10 z-40 shadow-[0_4px_20px_rgba(0,0,0,0.02)] transition-colors duration-500">
           <div className="flex items-center gap-6">
             <div className="flex flex-col">
@@ -165,7 +151,6 @@ export const AdminLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4 lg:gap-8">
-            {/* Toggle de Modo Oscuro */}
             <button
               onClick={toggleTheme}
               className="w-12 h-12 flex items-center justify-center rounded-2xl bg-[#F8FAFC] dark:bg-white/5 text-gray-400 hover:text-[#39A900] transition-all duration-300 border border-gray-100 dark:border-white/10"
@@ -190,10 +175,8 @@ export const AdminLayout: React.FC = () => {
           </div>
         </header>
 
-        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-6 lg:p-10 scrollbar-thin scrollbar-thumb-[#39A900]/20 dark:scrollbar-thumb-white/10">
           <div className="max-w-7xl mx-auto">
-            {/* Breadcrumb y Títulos Premium */}
             <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div className="flex-1">

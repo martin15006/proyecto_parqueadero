@@ -17,11 +17,6 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 export class VehiculosController {
   constructor(private readonly vehiculosService: VehiculosService) {}
 
-  /**
-   * Lista todos los vehículos registrados con paginación.
-   * MOBILE_API: Usado por administradores para supervisar la flota total.
-   * PAGINATION: Query params 'page' y 'limit' admitidos.
-   */
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(TipoUsuarioEnum.ADMIN)
   @Get()
@@ -47,7 +42,6 @@ export class VehiculosController {
     return this.vehiculosService.solicitarRegistroVehiculo(usuario.documento, dto);
   }
 
-  /** Lista las solicitudes del usuario autenticado */
   @UseGuards(JwtAuthGuard)
   @Get('solicitudes')
   misSolicitudes(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
@@ -73,10 +67,10 @@ export class VehiculosController {
     return this.vehiculosService.listarMisVehiculos(usuario.documento);
   }
 
-  @UseGuards(JwtAuthGuard) // RF32: solo el usuario autenticado puede consultar su historial.
-  @Get('historial') // RF32: endpoint de transparencia para que el Aprendiz vea sus ingresos/salidas.
+  @UseGuards(JwtAuthGuard)
+  @Get('historial')
   listarHistorial(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
-    return this.vehiculosService.listarHistorialUsuario(usuario.documento); // RNF2: limita la consulta al documento del token.
+    return this.vehiculosService.listarHistorialUsuario(usuario.documento);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -116,8 +110,6 @@ export class VehiculosController {
   ) {
     return this.vehiculosService.eliminarRegistro(usuario.documento, placa);
   }
-
-  // ─── COMPARTIR ────────────────────────────────────────────────────────────────
 
   /** Lista los vehículos que otros compartieron conmigo (ya ACEPTADOS) */
   @UseGuards(JwtAuthGuard)

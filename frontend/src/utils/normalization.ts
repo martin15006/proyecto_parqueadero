@@ -1,15 +1,9 @@
-/**
- * Convierte un string de snake_case a camelCase.
- */
 export const snakeToCamel = (str: string): string => {
   return str.replace(/([-_][a-z])/gi, ($1) => {
     return $1.toUpperCase().replace('-', '').replace('_', '');
   });
 };
 
-/**
- * Convierte un string de camelCase a snake_case.
- */
 export const camelToSnake = (str: string): string => {
   return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 };

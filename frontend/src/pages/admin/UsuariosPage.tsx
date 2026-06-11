@@ -43,17 +43,14 @@ export const UsuariosPage: React.FC = () => {
   const [rol, setRol] = useState<Rol>('TODOS');
   const [q, setQ] = useState('');
 
-  // Crear/Editar
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'crear' | 'editar'>('crear');
   const [form, setForm] = useState<FormUsuario>(FORM_INICIAL);
   const [errores, setErrores] = useState<Partial<Record<keyof FormUsuario, string>>>({});
   const [saving, setSaving] = useState(false);
 
-  // Eliminar
   const [confirmDeleteDoc, setConfirmDeleteDoc] = useState<string | null>(null);
 
-  // Ver vehículos registrados de un usuario (al hacer clic en la fila)
   const [viewUser, setViewUser] = useState<AdminUsuarioItem | null>(null);
 
   const getErrorMessage = (error: unknown, fallback: string) => {
@@ -104,7 +101,7 @@ export const UsuariosPage: React.FC = () => {
       correo: u.correo,
       numTelf: u.numTelf || '',
       contactoEmerg: u.contactoEmerg || '',
-      contra: '', // No se muestra
+      contra: '',
       idTipoUsr: u.idTipoUsr,
       fotoPersona: u.fotoPersona || '',
       idFormacion: u.idFormacion || '',
@@ -272,7 +269,6 @@ export const UsuariosPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Cabecera de Acciones - Alineada al Layout superior */}
       <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4 -mt-20 mb-10 relative z-50">
         <Button
           type="button"
@@ -316,7 +312,6 @@ export const UsuariosPage: React.FC = () => {
         emptyMessage="No se encontraron usuarios"
       />
 
-      {/* Modal Crear/Editar */}
       <Modal
         isOpen={modalOpen}
         onClose={cerrar}
@@ -445,7 +440,6 @@ export const UsuariosPage: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Confirmar eliminación */}
       <Modal
         isOpen={!!confirmDeleteDoc}
         onClose={() => setConfirmDeleteDoc(null)}
@@ -463,7 +457,6 @@ export const UsuariosPage: React.FC = () => {
         </p>
       </Modal>
 
-      {/* Vehículos registrados del usuario (al hacer clic en la fila) */}
       <Modal
         isOpen={!!viewUser}
         onClose={() => setViewUser(null)}

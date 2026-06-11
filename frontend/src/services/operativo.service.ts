@@ -1,6 +1,5 @@
 import api from '../api/axios';
 
-// FIX: consumo endpoint operativo existente
 export const operativoService = {
   login: async (documento: string, contra: string) => {
     const response = await api.post('/operativo/login', { documento, password: contra });
@@ -78,61 +77,38 @@ export const dashboardService = {
     const response = await api.get('/dashboard/heatmap');
     return response.data.data;
   },
-  /** Historial de movimientos paginado (vista Movimientos del panel operativo). */
   getHistorial: async (page = 1, limit = 20) => {
     const response = await api.get('/dashboard/historial', { params: { page, limit } });
     return (response.data && response.data.data) ? response.data.data : response.data;
   }
 };
 
-/**
- * Servicio de Autenticación Centralizado.
- * Maneja el flujo de login, verificación de OTP y recuperación.
- */
 export const authService = {
-  /**
-   * Paso 1: Valida credenciales y dispara envío de OTP.
-   */
   loginPaso1: async (correo: string, contra: string) => {
     const response = await api.post('/auth/login', { correo, contra });
     return response.data;
   },
 
-  /**
-   * Paso 2: Valida OTP y emite tokens JWT.
-   */
   verificarOtp: async (correo: string, codigo: string) => {
     const response = await api.post('/auth/verificar-otp', { correo, codigo });
     return response.data;
   },
 
-  /**
-   * Solicita renovación de Access Token usando Refresh Token.
-   */
   refreshToken: async (refreshToken: string) => {
     const response = await api.post('/auth/refresh', { refreshToken });
     return response.data;
   },
 
-  /**
-   * Cierra la sesión en el servidor (Blacklist de tokens).
-   */
   logout: async (refreshToken: string) => {
     const response = await api.post('/auth/logout', { refreshToken });
     return response.data;
   },
 
-  /**
-   * Obtiene la información del usuario autenticado (Validación de sesión).
-   */
   getMe: async () => {
     const response = await api.get('/auth/me');
     return response.data;
   },
 
-  /**
-   * Flujo de recuperación de contraseña.
-   */
   solicitarRecuperacion: async (correo: string) => {
     const response = await api.post('/auth/recuperar/solicitar', { correo });
     return response.data;

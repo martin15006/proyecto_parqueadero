@@ -14,11 +14,6 @@ interface IExceptionResponse {
   statusCode?: number;
 }
 
-/**
- * Filtro global de excepciones.
- * REFACTOR: Centraliza el manejo de errores, estandariza respuestas y mejora el logging.
- * SECURITY: Oculta detalles internos del servidor en producción.
- */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -52,23 +47,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
       data: null,
     };
 
-    // PERFORMANCE: Logging inteligente basado en severidad
     this.logError(request, status, exception, message);
 
     response.status(status).json(errorResponse);
   }
 
-  /**
-   * Extrae el mensaje de error de forma segura y tipada.
-   */
   private extractMessage(response: string | IExceptionResponse): string | string[] {
     if (typeof response === 'string') return response;
     return response.message || 'Error desconocido';
   }
 
-  /**
-   * Registra el error en la consola con contexto enriquecido.
-   */
   private logError(request: Request, status: number, exception: unknown, message: string | string[]) {
     const context = `${request.method} ${request.url}`;
     const messageStr = Array.isArray(message) ? message.join(', ') : message;

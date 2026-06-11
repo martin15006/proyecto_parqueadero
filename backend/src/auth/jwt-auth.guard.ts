@@ -9,11 +9,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // 1. Validar JWT estándar vía Passport
     const canActivate = await super.canActivate(context);
     if (!canActivate) return false;
 
-    // 2. Verificar si el token está en la lista negra (logout)
+    // Verificar si el token está en la lista negra (logout)
     const request = context.switchToHttp().getRequest();
     if (!request?.headers) {
       throw new UnauthorizedException('Token inválido');

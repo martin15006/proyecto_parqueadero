@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Car, CheckCircle2, FileText, Hash, ScanLine, ShieldAlert, XCircle } from 'lucide-react';
-import { operativoService } from '../services/operativo.service'; // RF10/RF14: integración real con backend operativo (entrada/salida/contingencia).
+import { operativoService } from '../services/operativo.service';
 import { socketService } from '../services/socket.service';
 
 interface MovementFormProps {
@@ -14,13 +14,13 @@ interface FeedbackState {
 }
 
 interface OperativoResponse {
-  ok: boolean; // RF33: indica éxito de la operación (feedback verde/rojo).
-  mensaje: string; // RF33: mensaje semántico para mostrar al vigilante.
-  bahia?: string; // RF33: bahía asignada cuando hay ingreso.
+  ok: boolean;
+  mensaje: string;
+  bahia?: string;
   movimiento?: {
     horaIngreso?: string;
     horaSalida?: string;
-  }; // RF32: el backend persiste el movimiento y lo retorna opcionalmente.
+  };
   aprendiz?: {
     nombreCompleto: string;
     documento: string;
@@ -40,30 +40,30 @@ type TurnoIngresoRow = {
   placa: string;
   horaIngreso: string;
   tipoVehiculo: string;
-  tipo?: 'INGRESO' | 'SALIDA'; // distingue si el movimiento fue ingreso o salida.
+  tipo?: 'INGRESO' | 'SALIDA';
 };
 
 type VehiculoSeleccionable = {
-  placa: string; // RF31: identificador mínimo para selección manual.
-  tipoVehiculo: string; // RF31: muestra tipo existente en el sistema (no inventa modelo/marca).
-  color: string; // RF31: apoyo visual para confirmar el vehículo observado.
-  fotoVehiculo?: string; // RF31: imagen del vehículo (el backend ya la envía) para confirmación visual.
+  placa: string;
+  tipoVehiculo: string;
+  color: string;
+  fotoVehiculo?: string;
 };
 
 type EscaneoCodigoAutoResponse = OperativoResponse & {
-  modo: 'AUTO'; // RF31: ingreso automático (un solo vehículo).
+  modo: 'AUTO';
 };
 
 type EscaneoCodigoSeleccionResponse = {
-  ok: boolean; // RF31: operación de escaneo exitosa, pero requiere selección.
-  modo: 'SELECCION'; // RF31: múltiples vehículos => modal de selección obligatorio.
+  ok: boolean;
+  modo: 'SELECCION';
   aprendiz: {
     nombreCompleto: string;
     documento: string;
     fotoPersona: string;
-  }; // RF33: feedback visual.
-  codigo: string; // RF31: se reenvía en la confirmación sin mantener estado server-side.
-  vehiculos: VehiculoSeleccionable[]; // RF31: lista para elegir.
+  };
+  codigo: string;
+  vehiculos: VehiculoSeleccionable[];
 };
 
 type EscaneoCodigoResponse = EscaneoCodigoAutoResponse | EscaneoCodigoSeleccionResponse;
@@ -90,29 +90,24 @@ type InfoPlacaResponse = {
   } | null;
 };
 
-/**
- * FEATURE: MovementForm - Control de ingresos/salidas con escaneo híbrido y contingencia (RF33, RF34).
- * UI alineada a la estética institucional compacta (paleta #012E25 / #39B000 con modo oscuro);
- * conserva intactos los flujos del backend: info-placa, multivehículo, contingencia y evidencias.
- */
 export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
-  const [inputValue, setInputValue] = useState<string>(''); // RF10/RF11/RF14: entrada única (placa o token escaneado) para flujo operativo.
-  const [feedback, setFeedback] = useState<FeedbackState>({ type: null, message: '' }); // RF14/RF39: feedback semántico (permitido/denegado/bloqueado).
-  const [multiVehiculos, setMultiVehiculos] = useState<VehiculoSeleccionable[] | null>(null); // RF31: lista para selección si el aprendiz tiene múltiples vehículos.
-  const [codigoPendiente, setCodigoPendiente] = useState<string>(''); // RF31: token escaneado a reenviar en confirmación secundaria.
-  const [aprendizPendiente, setAprendizPendiente] = useState<string>(''); // RF31/RF33: nombre visible del aprendiz para confirmación humana.
-  const [feedbackOverlayOpen, setFeedbackOverlayOpen] = useState<boolean>(false); // RF33: overlay masivo para lectura a distancia.
+  const [inputValue, setInputValue] = useState<string>('');
+  const [feedback, setFeedback] = useState<FeedbackState>({ type: null, message: '' });
+  const [multiVehiculos, setMultiVehiculos] = useState<VehiculoSeleccionable[] | null>(null);
+  const [codigoPendiente, setCodigoPendiente] = useState<string>('');
+  const [aprendizPendiente, setAprendizPendiente] = useState<string>('');
+  const [feedbackOverlayOpen, setFeedbackOverlayOpen] = useState<boolean>(false);
   const [lastResponse, setLastResponse] = useState<OperativoResponse | null>(null);
   const [turnoIngresos, setTurnoIngresos] = useState<TurnoIngresoRow[]>([]);
   const [turnoLoading, setTurnoLoading] = useState<boolean>(true);
 
-  // Estado para el modal de selección de usuario (cuando el vehículo está compartido)
   const [infoPlaca, setInfoPlaca] = useState<InfoPlacaResponse | null>(null);
 
-  const inputRef = useRef<HTMLInputElement>(null); // RF33: foco permanente en el input (lector emula teclado).
-  const scannerBufferRef = useRef<string>(''); // RF33: buffer local para capturar ráfagas del lector (keyboard wedge) cuando el foco se pierde.
-  const lastScanKeyAtRef = useRef<number>(0); // RF33: timestamp del último carácter recibido; permite detectar ráfagas y reconstruir el código completo.
-  const lastInputChangeAtRef = useRef<number>(0); // RF33: timestamp del último onChange del input para detectar nueva ráfaga del lector.
+  const inputRef = useRef<HTMLInputElement>(null);
+  // buffer local para capturar ráfagas del lector (keyboard wedge) cuando el foco se pierde.
+  const scannerBufferRef = useRef<string>('');
+  const lastScanKeyAtRef = useRef<number>(0);
+  const lastInputChangeAtRef = useRef<number>(0);
 
   async function loadTurnoIngresos() {
     try {
@@ -141,27 +136,27 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
   }, []);
 
   /**
-   * UX: Auto-foco permanente para operación manos libres (RF33)
+   * Auto-foco permanente para operación manos libres.
    * Los lectores físicos USB emulan un teclado rápido + 'Enter'.
    */
   useEffect(() => {
-    const focusScanInput = () => { // RF33: función central para forzar foco "mouse-free".
-      inputRef.current?.focus(); // RF33: enfoque directo al input de lectura (lector físico).
+    const focusScanInput = () => {
+      inputRef.current?.focus();
     };
 
-    focusScanInput(); // RF33: foco inicial al montar para comenzar operación inmediata.
+    focusScanInput();
 
-    const handleWindowFocus = () => focusScanInput(); // RF33: si el usuario vuelve a la pestaña, retoma foco al lector.
+    const handleWindowFocus = () => focusScanInput();
     window.addEventListener('focus', handleWindowFocus);
 
-    const handleGlobalKeys = (e: KeyboardEvent) => { // RF33: atajos globales para operación sin mouse.
-      if (e.key === 'F2') { // RF33: F2 fuerza el foco al lector en cualquier momento.
+    const handleGlobalKeys = (e: KeyboardEvent) => {
+      if (e.key === 'F2') {
         e.preventDefault();
         focusScanInput();
         return;
       }
 
-      if (e.key === 'Escape') { // RF33: ESC limpia campo y prepara el siguiente escaneo.
+      if (e.key === 'Escape') {
         e.preventDefault();
         setInputValue('');
         setFeedback({ type: null, message: '' });
@@ -169,7 +164,7 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
         setMultiVehiculos(null);
         setCodigoPendiente('');
         setAprendizPendiente('');
-        setInfoPlaca(null); // Cierra el modal de selección de usuario manual
+        setInfoPlaca(null);
         setTimeout(() => focusScanInput(), 0);
         scannerBufferRef.current = '';
         lastScanKeyAtRef.current = 0;
@@ -248,7 +243,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
     setFeedback({ type: null, message: '' });
     setFeedbackOverlayOpen(false);
     setLastResponse(null);
-    // Prepara el input para el siguiente escaneo
     setInputValue('');
     scannerBufferRef.current = '';
     lastScanKeyAtRef.current = 0;
@@ -256,34 +250,27 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
-  /**
-   * Orquestador de acciones operativas.
-   * Conecta con los endpoints reales del backend.
-   */
   async function handleAction(action: 'entrada' | 'salida' | 'codigo', value?: string) {
-    const targetValue = String(value ?? inputValue).trim(); // RF33: normaliza string proveniente del lector o del teclado.
+    const targetValue = String(value ?? inputValue).trim();
 
-    if (!targetValue && action !== 'codigo') { // RF33: validación de entrada mínima.
+    if (!targetValue && action !== 'codigo') {
       setFeedback({ type: 'error', message: 'LA PLACA O CÓDIGO ES OBLIGATORIO' });
       setFeedbackOverlayOpen(true);
       return;
     }
 
-    // Cierra cualquier modal/feedback anterior antes de empezar la nueva operación.
     setLastResponse(null);
     setFeedbackOverlayOpen(false);
     setFeedback({ type: 'loading', message: 'COMUNICANDO CON EL SERVIDOR...' });
 
     try {
-      const upper = targetValue.toUpperCase(); // RF33: normalización para evaluar formatos.
+      const upper = targetValue.toUpperCase();
 
       switch (action) {
         case 'entrada': {
-          // Si la placa tiene varios usuarios autorizados (compartidos), preguntar quién entra.
           const info: InfoPlacaResponse = await operativoService.obtenerInfoPlaca(upper);
 
           if (info.usuariosAutorizados.length > 1 && !info.movimientoActivo) {
-            // Múltiples usuarios autorizados → mostrar modal para elegir
             setInfoPlaca(info);
             setFeedback({ type: null, message: '' });
             return;
@@ -301,10 +288,10 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
         }
 
         case 'salida': {
-          const resSalida: OperativoResponse = await operativoService.registrarSalida(upper); // RF11: registra salida por placa (normalizada).
+          const resSalida: OperativoResponse = await operativoService.registrarSalida(upper);
           setFeedback({ type: 'success', message: resSalida.mensaje });
           setLastResponse(resSalida);
-          setFeedbackOverlayOpen(true); // RF33: muestra overlay verde para confirmación.
+          setFeedbackOverlayOpen(true);
           onSuccess(`Salida: ${targetValue}`);
           loadTurnoIngresos();
           setInputValue('');
@@ -312,16 +299,16 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
         }
 
         case 'codigo': {
-          const resCodigo: EscaneoCodigoResponse = await operativoService.escanearCodigo(upper); // RF33: identifica aprendiz por token opaco.
+          const resCodigo: EscaneoCodigoResponse = await operativoService.escanearCodigo(upper);
 
-          if (resCodigo.modo === 'AUTO') { // RF31: un solo vehículo => ingreso/salida directo.
+          if (resCodigo.modo === 'AUTO') {
             setFeedback({ type: 'success', message: resCodigo.mensaje });
             setLastResponse(resCodigo);
-            setFeedbackOverlayOpen(true); // RF33: overlay verde masivo.
+            setFeedbackOverlayOpen(true);
             onSuccess(resCodigo.mensaje);
             loadTurnoIngresos();
             setInputValue('');
-          } else { // RF31: múltiples vehículos => abre modal de selección.
+          } else {
             setMultiVehiculos(resCodigo.vehiculos);
             setCodigoPendiente(resCodigo.codigo);
             setAprendizPendiente(resCodigo.aprendiz?.nombreCompleto || 'USUARIO DESCONOCIDO');
@@ -333,11 +320,10 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
       }
     } catch (error: any) {
       const msg = error.message || error.response?.data?.message || 'ERROR DE COMUNICACIÓN CON EL SERVIDOR';
-      setFeedback({ type: 'error', message: msg.toUpperCase() }); // RF39: feedback de error institucional.
-      setFeedbackOverlayOpen(true); // RF33: overlay rojo.
+      setFeedback({ type: 'error', message: msg.toUpperCase() });
+      setFeedbackOverlayOpen(true);
       setLastResponse(null);
       onError(msg);
-      // Limpia el input para que el siguiente escaneo no se acumule sobre el anterior
       setInputValue('');
       scannerBufferRef.current = '';
       lastScanKeyAtRef.current = 0;
@@ -348,24 +334,20 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleAction('codigo'); // RF31/RF33: Enter desde lector (teclado emulado) dispara siempre el escaneo unificado.
+      handleAction('codigo');
     }
   };
 
   // Flag para evitar dobles confirmaciones por clicks rápidos
   const procesandoMultiRef = useRef<boolean>(false);
 
-  /**
-   * Confirma el ingreso manual de placa eligiendo qué usuario (propietario o
-   * receptor compartido) está entrando con el vehículo.
-   */
   async function handleConfirmarUsuarioManual(documento: string) {
     if (!infoPlaca) return;
     if (procesandoMultiRef.current) return;
     procesandoMultiRef.current = true;
 
     const placa = infoPlaca.vehiculo.placa;
-    setInfoPlaca(null); // cierra el modal inmediatamente
+    setInfoPlaca(null);
 
     setFeedback({ type: 'loading', message: 'REGISTRANDO INGRESO...' });
     try {
@@ -393,7 +375,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
   }
 
   async function handleConfirmarMultivehiculo(placa: string) {
-    // Protección contra doble click / doble confirmación
     if (procesandoMultiRef.current) return;
     procesandoMultiRef.current = true;
 
@@ -428,7 +409,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
     }
   }
 
-  // RF33: El modal profesional se muestra cuando hay una respuesta exitosa.
   const showProfessionalModal = Boolean(feedback.type === 'success' && lastResponse);
 
   const horaTurno = useMemo(() => (iso: string) => {
@@ -441,7 +421,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
 
   return (
     <div className="space-y-6 relative" onClick={() => !infoPlaca && !multiVehiculos && inputRef.current?.focus()}>
-      {/* Overlay de Error o Carga — lectura a distancia */}
       {feedbackOverlayOpen && feedback.type && feedback.type !== 'success' && (
         <div
           className={`
@@ -473,7 +452,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
         </div>
       )}
 
-      {/* Input de Escaneo Compacto */}
       <div className="relative group max-w-xl mx-auto">
         <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
           <ScanLine className={`w-5 h-5 transition-colors ${inputValue ? 'text-[#39B000]' : 'text-gray-300 dark:text-gray-600 group-focus-within:text-[#39B000]'}`} />
@@ -529,7 +507,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
         Lector físico en escucha activa • F2: Enfocar • ESC: Limpiar • Enter: Enviar
       </p>
 
-      {/* Botones de Acción */}
       <div className="grid grid-cols-2 gap-4 max-w-xl mx-auto">
         <button
           onClick={() => handleAction('entrada')}
@@ -549,8 +526,7 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
         </button>
       </div>
 
-      {/* Actividad reciente — movimientos (ingresos/salidas). Solo informativo:
-          detenemos la propagación del clic para que no se reenfoque el input de escaneo. */}
+      {/* Solo informativo: detenemos la propagación del clic para que no se reenfoque el input de escaneo. */}
       <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-white/5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-1">
           <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Movimientos recientes</h4>
@@ -597,7 +573,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
         </div>
       </div>
 
-      {/* Overlay: Selección de USUARIO en registro manual de placa (vehículo compartido) */}
       {infoPlaca && (
         <div className="fixed inset-0 z-[110] bg-[#012E25]/90 backdrop-blur-sm p-4 flex items-center justify-center overflow-y-auto animate-in fade-in duration-300">
           <div className="bg-white dark:bg-[#121212] rounded-2xl w-full max-w-3xl my-auto overflow-hidden shadow-2xl border border-gray-100 dark:border-white/5 transition-colors duration-300">
@@ -618,7 +593,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Galería de fotos del vehículo */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <FotoCard label="Vehículo" url={infoPlaca.vehiculo.fotoVehiculo} />
                 <FotoCard label="Tarjeta de Propiedad" url={infoPlaca.vehiculo.fotoTarjetaP} />
@@ -672,7 +646,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
         </div>
       )}
 
-      {/* Overlay de Selección de Vehículo (RF31) */}
       {multiVehiculos && (
         <div className="fixed inset-0 z-[100] bg-[#012E25]/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white dark:bg-[#121212] rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl border border-gray-100 dark:border-white/5 transition-colors duration-300">
@@ -718,11 +691,9 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
         </div>
       )}
 
-      {/* Modal de Confirmación de Ingreso/Salida (Panel Profesional para el Vigilante) */}
       {showProfessionalModal && lastResponse && (
         <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
           <div className="bg-white w-full max-w-6xl sm:rounded-[2rem] overflow-hidden shadow-[0_0_150px_rgba(0,0,0,0.9)] animate-in zoom-in duration-500 my-auto border border-white/20">
-            {/* Header de Estado Ultra-Prominente */}
             <div className={`p-6 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 border-b-[12px] ${lastResponse.movimiento?.horaSalida ? 'bg-orange-600 border-orange-700' : 'bg-[#012E25] border-[#39B000]'}`}>
               <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
                 <div className="bg-white/20 p-5 rounded-[2rem] shadow-2xl backdrop-blur-xl border border-white/30">
@@ -752,10 +723,8 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
             <div className="p-6 sm:p-12">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12">
 
-                {/* Columna Izquierda: Usuario y Tiempos */}
                 <div className="lg:col-span-5 space-y-8 sm:space-y-12">
 
-                  {/* Perfil del Usuario */}
                   <div className="bg-slate-50 p-8 rounded-[2rem] border-2 border-slate-100 flex items-center gap-8 shadow-inner">
                     <div className="relative">
                       <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-[2rem] overflow-hidden border-8 border-white shadow-2xl bg-white">
@@ -790,7 +759,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
                     </div>
                   </div>
 
-                  {/* Tiempos de Operación */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div className="bg-slate-900 p-8 rounded-[2rem] shadow-2xl flex flex-col items-center justify-center text-center">
                       <p className="text-[#39B000] text-xs font-black uppercase tracking-[0.3em] mb-4">Hora de Registro</p>
@@ -818,7 +786,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
                   </div>
                 </div>
 
-                {/* Columna Derecha: Galería de Inspección */}
                 <div className="lg:col-span-7 space-y-8">
                   <div className="flex items-center justify-between px-4">
                     <p className="text-[#012E25] text-sm font-black uppercase tracking-[0.5em] border-l-8 border-[#39B000] pl-4">
@@ -831,7 +798,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-8">
-                    {/* Foto Principal: Vehículo */}
                     <div className="col-span-2 relative group cursor-zoom-in">
                       <div className="absolute top-6 left-6 z-10 bg-[#012E25]/90 backdrop-blur-md text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl border border-white/20">
                         Vehículo Registrado
@@ -847,7 +813,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
                       </div>
                     </div>
 
-                    {/* Foto Placa */}
                     <div className="relative group cursor-zoom-in">
                       <div className="absolute top-5 left-5 z-10 bg-black/70 backdrop-blur-md text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg">
                         Placa Física
@@ -863,7 +828,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
                       </div>
                     </div>
 
-                    {/* Tarjeta Propiedad */}
                     <div className="relative group cursor-zoom-in">
                       <div className="absolute top-5 left-5 z-10 bg-black/70 backdrop-blur-md text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg">
                         Documento Legal
@@ -907,7 +871,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
   );
 };
 
-/** Tarjeta pequeña de foto del vehículo para el modal de registro manual */
 const FotoCard = ({ label, url }: { label: string; url: string | null }) => (
   <div className="rounded-xl overflow-hidden border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/5">
     <div className="px-3 py-2 border-b border-gray-100 dark:border-white/5">

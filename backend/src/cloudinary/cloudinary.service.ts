@@ -63,9 +63,6 @@ export class CloudinaryService implements OnModuleInit {
     }
   }
 
-  /**
-   * Borra múltiples imágenes a la vez.
-   */
   async borrarVariasPorUrl(urls: string[]): Promise<void> {
     await Promise.all(urls.map((url) => this.borrarPorUrl(url)));
   }

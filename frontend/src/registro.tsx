@@ -2,11 +2,6 @@ import React, { useState } from 'react';
 import api from './api/axios';
 import { UserPlus, Mail, Lock, Phone, User, Camera, GraduationCap, Loader2, ArrowLeft } from 'lucide-react';
 
-/**
- * Componente de Registro Profesional.
- * Interfaz moderna para el alta de nuevos usuarios (Aprendices, Operativos, Admin).
- * FEATURE: Validación de campos, selección de roles y diseño responsivo.
- */
 const Registro: React.FC = () => {
   const [formData, setFormData] = useState({
     documento: '',
@@ -63,7 +58,6 @@ const Registro: React.FC = () => {
       setStatus({ msg: '¡Usuario registrado con éxito! Ya puedes iniciar sesión.', tipo: 'success' });
     } catch (error: any) {
       console.error('Error al registrar usuario:', error);
-      // REFACTOR: Extraer mensaje de error de forma robusta soportando arrays de validación
       let mensajeError = 'No se pudo completar el registro';
       
       if (error.message) {
@@ -83,7 +77,6 @@ const Registro: React.FC = () => {
   return (
     <div className="auth-screen min-h-screen bg-[#F4F7F6] flex items-center justify-center p-6 font-sans selection:bg-[#39A900]/20">
       <div className="max-w-2xl w-full space-y-8 bg-white p-10 rounded-2xl border border-black/5 shadow-xl relative overflow-hidden">
-        {/* Decoración de fondo */}
         <div className="absolute -top-28 -right-24 w-72 h-72 bg-[#39A900]/16 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-28 -left-24 w-72 h-72 bg-[#007832]/10 rounded-full blur-3xl"></div>
 
@@ -97,25 +90,21 @@ const Registro: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6 relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Documento */}
             <div className="relative group">
               <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/45 group-focus-within:text-[#39A900] transition-colors" />
               <input name="documento" placeholder="Documento de Identidad" onChange={handleChange} required className="w-full bg-white border border-black/10 text-[#232323] pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-[#39A900]/30 focus:border-[#39A900] outline-none text-sm transition-all placeholder:text-black/40" />
             </div>
 
-            {/* Nombre Completo */}
             <div className="relative group">
               <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/45 group-focus-within:text-[#39A900] transition-colors" />
               <input name="nombreCompleto" placeholder="Nombre Completo" onChange={handleChange} required className="w-full bg-white border border-black/10 text-[#232323] pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-[#39A900]/30 focus:border-[#39A900] outline-none text-sm transition-all placeholder:text-black/40" />
             </div>
 
-            {/* Correo */}
             <div className="relative group">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/45 group-focus-within:text-[#39A900] transition-colors" />
               <input name="correo" type="email" placeholder="Correo Electrónico" onChange={handleChange} required className="w-full bg-white border border-black/10 text-[#232323] pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-[#39A900]/30 focus:border-[#39A900] outline-none text-sm transition-all placeholder:text-black/40" />
             </div>
 
-            {/* Contraseña */}
             <div className="relative group">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/45 group-focus-within:text-[#39A900] transition-colors" />
               <input 
@@ -131,25 +120,21 @@ const Registro: React.FC = () => {
               </p>
             </div>
 
-            {/* Teléfono */}
             <div className="relative group">
               <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/45 group-focus-within:text-[#39A900] transition-colors" />
               <input name="numTelf" placeholder="Número de Teléfono" onChange={handleChange} required className="w-full bg-white border border-black/10 text-[#232323] pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-[#39A900]/30 focus:border-[#39A900] outline-none text-sm transition-all placeholder:text-black/40" />
             </div>
 
-            {/* Contacto Emergencia */}
             <div className="relative group">
               <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/45 group-focus-within:text-[#39A900] transition-colors" />
               <input name="contactoEmerg" placeholder="Contacto de Emergencia" onChange={handleChange} required className="w-full bg-white border border-black/10 text-[#232323] pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-[#39A900]/30 focus:border-[#39A900] outline-none text-sm transition-all placeholder:text-black/40" />
             </div>
 
-            {/* URL Foto */}
             <div className="relative group md:col-span-2">
               <Camera className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/45 group-focus-within:text-[#39A900] transition-colors" />
               <input name="fotoPersona" placeholder="URL de Fotografía (Cloudinary/Avatar)" onChange={handleChange} required className="w-full bg-white border border-black/10 text-[#232323] pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-[#39A900]/30 focus:border-[#39A900] outline-none text-sm transition-all placeholder:text-black/40" />
             </div>
 
-            {/* Ficha Formación */}
             <div className="relative group">
               <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/45 group-focus-within:text-[#39A900] transition-colors" />
               <input

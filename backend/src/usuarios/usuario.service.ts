@@ -93,7 +93,6 @@ export class UsuarioService {
         datosNuevos: { correo: usuarioGuardado.correo, nombre: usuarioGuardado.nombreCompleto },
       });
 
-      // Enviar OTP de verificación al correo registrado
       await this.authService.generarYEnviarOtpPublico(usuarioGuardado);
 
       return {
@@ -137,7 +136,7 @@ export class UsuarioService {
         contra: hashedPassword,
         qr: qrValue,
         correo: correoNormalizado,
-        correoVerificado: true, // Admin crea usuarios ya verificados
+        correoVerificado: true,
       });
 
       const usuarioGuardado = await this.usuarioRepository.save(nuevoUsuario);
@@ -213,9 +212,6 @@ export class UsuarioService {
       .getOne();
   }
 
-  /**
-   * Actualiza el token de notificaciones push para la aplicación móvil.
-   */
   async actualizarTokenPush(documento: string, token: string) {
     const usuario = await this.findOneByDocumento(documento);
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
@@ -225,9 +221,6 @@ export class UsuarioService {
     return { ok: true, mensaje: 'Token push actualizado' };
   }
 
-  /**
-   * Regenera el código QR institucional.
-   */
   async regenerarQr(documento: string): Promise<{ qr: string }> {
     const usuario = await this.usuarioRepository.findOne({ where: { documento } });
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
@@ -239,13 +232,7 @@ export class UsuarioService {
     return { qr: nuevoQr };
   }
 
-  /**
-   * Lista usuarios con paginación para dashboard administrativo.
-   * MOBILE_API: Usado para la gestión de usuarios desde la app administrativa.
-   * PAGINATION: Offset y límite para evitar sobrecarga en la vista de lista.
-   */
   async findAll(page: number = 1, limit: number = 10) {
-    // PAGINATION: Búsqueda controlada de usuarios institucionales
     const [data, total] = await this.usuarioRepository.findAndCount({
       skip: (page - 1) * limit,
       take: limit,
@@ -261,10 +248,6 @@ export class UsuarioService {
     };
   }
 
-  /**
-   * Búsqueda institucional por código QR, Documento o Placa.
-   * RF31/RF33: Permite identificación unificada en portería.
-   */
   /**
    * Búsqueda institucional unificada por QR, documento o placa de vehículo.
    *
@@ -345,24 +328,20 @@ export class UsuarioService {
     return { usuario: perfil, vehiculos, placaDetectada };
   }
 
-  /**
-   * Búsqueda institucional por código QR.
-   */
   async buscarPorQR(qr: string) {
-    const entrada = String(qr ?? '') // RNF2/RF8: normalizamos la entrada para evitar falsos negativos por espacios o tipos inesperados.
-      .trim(); // RF8: lectores físicos suelen añadir espacios/linebreaks; los removemos.
+    const entrada = String(qr ?? '').trim();
 
-    const esHex32 = /^[0-9a-fA-F]{32}$/.test(entrada); // RF8 (Code128): formato alfanumérico puro (UUID sin guiones).
+    const esHex32 = /^[0-9a-fA-F]{32}$/.test(entrada);
     const normalizado = (esHex32
-      ? `${entrada.slice(0, 8)}-${entrada.slice(8, 12)}-${entrada.slice(12, 16)}-${entrada.slice(16, 20)}-${entrada.slice(20)}` // RF8: reconstruye el UUID estándar esperado por la BD (compatibilidad con registros existentes).
-      : entrada).toLowerCase(); // RF8: normalizamos a minúsculas para coincidir con el formato de UUID en la base de datos (PostgreSQL es case-sensitive).
+      ? `${entrada.slice(0, 8)}-${entrada.slice(8, 12)}-${entrada.slice(12, 16)}-${entrada.slice(16, 20)}-${entrada.slice(20)}`
+      : entrada).toLowerCase();
 
     const usuario = await this.usuarioRepository.findOne({
-      where: { qr: normalizado }, // RF8: permite validar tanto el token para Code128 (sin guiones) como el QR (con guiones) sin exponer PII.
+      where: { qr: normalizado },
       relations: ['tipoUsuario', 'formacion'],
     });
 
-    if (!usuario) throw new NotFoundException('Código de acceso inválido'); // RF31/RF33: mensaje neutral (barras/QR) para el flujo de portería.
+    if (!usuario) throw new NotFoundException('Código de acceso inválido');
 
     const vehiculos = await this.vehiculosService.findByUsuario(usuario.documento);
     const { contra: _, ...perfil } = usuario;
@@ -392,9 +371,6 @@ export class UsuarioService {
     return sinContrasena;
   }
 
-  /**
-   * Gestión de cambio de correo electrónico con verificación OTP.
-   */
   async solicitarCambioCorreo(documento: string, nuevoCorreo: string): Promise<{ mensaje: string }> {
     const usuario = await this.usuarioRepository.findOne({ where: { documento } });
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
@@ -411,9 +387,6 @@ export class UsuarioService {
     return { mensaje: `Código enviado a ${nuevoCorreo}` };
   }
 
-  /**
-   * Confirmación final de cambio de correo electrónico.
-   */
   async confirmarCambioCorreo(documento: string, nuevoCorreo: string, codigo: string): Promise<Omit<Usuario, 'contra'>> {
     const usuario = await this.usuarioRepository.findOne({ where: { documento } });
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
@@ -439,7 +412,6 @@ export class UsuarioService {
       idTipoUsr: TipoUsuarioEnum.OPERATIVO,
     };
 
-    // Los operativos se crean desde el panel admin → ya verificados, sin OTP
     return await this.createAdmin(payload);
   }
 
@@ -553,7 +525,6 @@ export class UsuarioService {
       .leftJoinAndSelect('rv.vehiculo', 'vehiculo')
       .leftJoinAndSelect('vehiculo.tipoVehiculo', 'tipoVehiculo');
 
-    // Filtro por rol
     if (rol === 'APRENDIZ') {
       qb.andWhere('u.id_tipo_usr = :rolId', { rolId: TipoUsuarioEnum.APRENDIZ });
     } else if (rol === 'ADMIN') {
@@ -604,11 +575,9 @@ export class UsuarioService {
    */
   async crearUsuarioPorAdmin(dto: CreateUsuarioAdminDto): Promise<{ mensaje: string; usuario?: Omit<Usuario, 'contra'> }> {
     if (dto.idTipoUsr === TipoUsuarioEnum.APRENDIZ) {
-      // Crea con correoVerificado=false y envía OTP
       const respuesta = await this.create(dto);
       return { mensaje: respuesta.mensaje };
     }
-    // Admin/Operativo → verificado
     const usuario = await this.createAdmin(dto);
     return { mensaje: 'Usuario creado exitosamente', usuario };
   }
@@ -644,7 +613,7 @@ export class UsuarioService {
   }
 
   /**
-   * Admin → elimina un usuario (hard delete) y revoca sus sesiones.
+   * Admin → elimina un usuario (hard delete).
    */
   async eliminarUsuarioPorAdmin(documento: string): Promise<{ mensaje: string }> {
     const usuario = await this.usuarioRepository.findOne({ where: { documento } });

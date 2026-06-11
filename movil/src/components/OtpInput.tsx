@@ -1,13 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
 import {
-  View,
   TextInput,
   StyleSheet,
   Animated,
   NativeSyntheticEvent,
   TextInputKeyPressEventData,
 } from 'react-native';
-import { colors, fonts, espacios, animaciones } from '../theme/senaTheme';
+import { colors, espacios } from '../theme/senaTheme';
 
 interface Props {
   longitud?: number;
@@ -26,7 +25,6 @@ export default function OtpInput({
   const inputsRef = useRef<Array<TextInput | null>>([]);
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
-  // Animación de shake cuando hay error
   useEffect(() => {
     if (error) {
       Animated.sequence([
@@ -36,7 +34,6 @@ export default function OtpInput({
         Animated.timing(shakeAnim, { toValue: -8, duration: 50, useNativeDriver: true }),
         Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
       ]).start();
-      // Limpiar valores cuando hay error
       setValores(Array(longitud).fill(''));
       setTimeout(() => inputsRef.current[0]?.focus(), 300);
     }
@@ -49,7 +46,6 @@ export default function OtpInput({
       const nuevosValores = numeros.split('').concat(Array(longitud).fill('')).slice(0, longitud);
       setValores(nuevosValores);
 
-      // Enfocar el último input lleno o el último
       const ultimoLleno = numeros.length - 1;
       const indiceEnfocar = Math.min(ultimoLleno, longitud - 1);
       inputsRef.current[indiceEnfocar]?.focus();
@@ -60,19 +56,16 @@ export default function OtpInput({
       return;
     }
 
-    // Solo permitir números
     if (texto && !/^[0-9]$/.test(texto)) return;
 
     const nuevosValores = [...valores];
     nuevosValores[indice] = texto;
     setValores(nuevosValores);
 
-    // Auto-foco al siguiente input
     if (texto && indice < longitud - 1) {
       inputsRef.current[indice + 1]?.focus();
     }
 
-    // Si se completó el código, notificar
     const codigoCompleto = nuevosValores.join('');
     if (codigoCompleto.length === longitud) {
       onCompleto(codigoCompleto);
@@ -84,7 +77,6 @@ export default function OtpInput({
     indice: number,
   ) => {
     if (evento.nativeEvent.key === 'Backspace' && !valores[indice] && indice > 0) {
-      // Si está vacío y se presiona backspace, ir al anterior
       inputsRef.current[indice - 1]?.focus();
       const nuevosValores = [...valores];
       nuevosValores[indice - 1] = '';
@@ -113,8 +105,8 @@ export default function OtpInput({
           onKeyPress={(evento) => manejarBackspace(evento, indice)}
           keyboardType="numeric"
           maxLength={indice === 0 ? longitud : 1} // El primero permite pegar todo el código
-          textContentType="oneTimeCode" // iOS: autocompletar desde SMS/correo
-          autoComplete="sms-otp" // Android: igual
+          textContentType="oneTimeCode"
+          autoComplete="sms-otp"
           editable={!deshabilitado}
           selectionColor={colors.verde}
           textAlign="center"

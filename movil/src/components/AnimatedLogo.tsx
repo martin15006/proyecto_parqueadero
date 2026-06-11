@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Image, StyleSheet, ImageStyle, StyleProp } from 'react-native';
+import { Animated, Image, ImageStyle, StyleProp } from 'react-native';
 
 interface Props {
   size?: number;

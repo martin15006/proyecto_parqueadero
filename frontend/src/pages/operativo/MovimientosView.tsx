@@ -63,7 +63,6 @@ export const MovimientosView: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in duration-500">
-      {/* Filtros Compactos */}
       <div className="bg-white dark:bg-[#121212] p-6 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex flex-col md:flex-row items-end gap-4 transition-colors duration-300">
         <div className="flex-1 w-full space-y-1.5">
           <label className="text-[9px] font-bold uppercase tracking-widest text-gray-400 ml-1">Búsqueda de Registros</label>
@@ -88,7 +87,6 @@ export const MovimientosView: React.FC = () => {
         </button>
       </div>
 
-      {/* Tabla Administrativa */}
       <div className="bg-white dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-white/5 shadow-sm overflow-hidden transition-colors duration-300">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -175,7 +173,6 @@ export const MovimientosView: React.FC = () => {
           </table>
         </div>
 
-        {/* Paginación */}
         <div className="px-6 py-4 border-t border-gray-50 dark:border-white/5 flex items-center justify-between bg-gray-50/30 dark:bg-white/5">
           <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
             {total} registros • Página {page} de {lastPage}

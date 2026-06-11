@@ -31,13 +31,11 @@ export const EstadoBahiasView: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in duration-500">
-      {/* Resumen de Bahías Superior */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <StatCard label="Libres" value={stats.libres} icon={<CheckCircle2 size={16} />} color="text-[#39B000]" bg="bg-green-50 dark:bg-[#39B000]/10" />
         <StatCard label="Ocupadas" value={stats.ocupadas} icon={<Car size={16} />} color="text-red-600 dark:text-red-400" bg="bg-red-50 dark:bg-red-900/20" />
       </div>
 
-      {/* Grid de Bahías Sensorizadas */}
       <div className="bg-white dark:bg-[#121212] rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm p-6 lg:p-8 transition-colors duration-300">
         {bahias.length === 0 ? (
           <div className="py-16 text-center">

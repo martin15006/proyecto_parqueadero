@@ -11,11 +11,6 @@ import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
-  /**
-   * Obtiene el historial detallado de movimientos con paginación.
-   * MOBILE_API: Endpoint clave para la auditoría operativa desde el móvil.
-   * PAGINATION: Parámetros opcionales 'page' y 'limit'.
-   */
   @Get('historial')
   @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
   async getHistorial(@Query('page') page: number = 1, @Query('limit') limit: number = 20) {

@@ -99,7 +99,6 @@ export default function LoginScreen({ navigation, route }: any) {
   return (
     <>
       <View style={[styles.container, { backgroundColor: esOscuro ? colores.fondo : '#F4F6F4' }]}>
-        {/* AURORA DE FONDO solo en modo oscuro */}
         {esOscuro && (
           <>
             <View style={styles.auroraTop} />
@@ -117,10 +116,8 @@ export default function LoginScreen({ navigation, route }: any) {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* LOGO con wrapper para centrar correctamente */}
             <FadeInView style={styles.logoContainer}>
               <View style={styles.logoWrapper}>
-                {/* Círculos decorativos detrás del logo (solo en oscuro) */}
                 {esOscuro && (
                   <>
                     <View style={styles.anilloExterno} />
@@ -261,7 +258,6 @@ const styles = StyleSheet.create({
     paddingBottom: espacios.grande,
   },
 
-  // ─── LOGO CENTRADO CORRECTAMENTE ───
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -312,7 +308,6 @@ const styles = StyleSheet.create({
     elevation: 15,
   },
 
-  // ─── TÍTULOS ───
   titulo: {
     fontSize: fonts.enorme,
     fontWeight: '800',
@@ -326,7 +321,6 @@ const styles = StyleSheet.create({
     marginBottom: espacios.grande,
   },
 
-  // ─── FORM ───
   formContainer: { marginTop: espacios.pequeno },
   formCard: {
     borderRadius: 24,

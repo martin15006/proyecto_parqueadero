@@ -1,34 +1,26 @@
-﻿import React, { useMemo, useState } from 'react'; // UI: hooks para render reactivo del panel operativo (tiempo real).
-import { AlertTriangle, CheckCircle2, RefreshCw, ShieldAlert } from 'lucide-react'; // UI: iconografía accesible y de alto contraste (WCAG).
-import { useAuth } from '../AuthContext'; // UX: mantiene el hook de autenticación existente (sesión/operador/logout).
-import { MovementForm } from '../components/MovementForm'; // RF10/RF11/RF14: pasarela de acceso (escaneo/placa/contingencia).
-import { useOperativo } from '../hooks/useOperativo'; // RF15/RF18: fuente única de datos en vivo (REST + WebSocket) para ocupación/alertas.
-import { useNotification } from '../contexts/NotificationContext'; // UX: notificaciones en UI sin romper integración existente.
-import type { BahiaSensorizada } from '../types'; // RF15: tipo con estadoPanel calculado por el backend (LIBRE/OCUPADO/SALIDA_PENDIENTE/etc).
+import React, { useMemo, useState } from 'react';
+import { AlertTriangle, CheckCircle2, RefreshCw, ShieldAlert } from 'lucide-react';
+import { useAuth } from '../AuthContext';
+import { MovementForm } from '../components/MovementForm';
+import { useOperativo } from '../hooks/useOperativo';
+import { useNotification } from '../contexts/NotificationContext';
+import type { BahiaSensorizada } from '../types';
 
-/**
- * Dashboard Operativo (Vista Principal) — Rediseño UI/UX SENA.
- *
- * Objetivo:
- * - Alinear estrictamente la estética a la guía digital del SENA (paleta institucional y alto contraste).
- * - Consumir reglas críticas de negocio ya inyectadas (bloqueos RF14, capacidad RF15, emergencia RF18).
- * - Mantener intactos los hooks de sockets, autenticación y llamadas asíncronas existentes (directriz).
- */
 export const OperativoDashboard: React.FC = () => {
-  const { stats, bahias, vehiculos, alerts, loading, handleQuickSalida, refresh } = useOperativo(); // RF15/RF18: mantiene el consumo de datos en vivo.
-  const { showNotification } = useNotification(); // UX: notificaciones no intrusivas.
-  const { user, logout } = useAuth(); // UX: mantiene autenticación y cierre de sesión existente.
+  const { stats, bahias, vehiculos, alerts, loading, handleQuickSalida, refresh } = useOperativo();
+  const { showNotification } = useNotification();
+  const { user, logout } = useAuth();
 
-  const [recent, setRecent] = useState<Array<{ id: string; tipo: 'SUCCESS' | 'ERROR'; mensaje: string; fecha: Date }>>([]); // RF12 (operación): historial local de eventos recientes (últimos 5) para auditoría visual.
+  const [recent, setRecent] = useState<Array<{ id: string; tipo: 'SUCCESS' | 'ERROR'; mensaje: string; fecha: Date }>>([]);
 
-  const operadorNombre = useMemo(() => { // UX: nombre del operador para navbar sin exponer tokens.
-    return user?.usuario?.nombreCompleto || 'Operador'; // UX: fallback si no hay perfil disponible.
-  }, [user?.usuario?.nombreCompleto]); // UX: memoiza por estabilidad.
+  const operadorNombre = useMemo(() => {
+    return user?.usuario?.nombreCompleto || 'Operador';
+  }, [user?.usuario?.nombreCompleto]);
 
-  const ocupacionPct = useMemo(() => { // RF15: porcentaje de ocupación para semáforo de capacidad.
-    if (!stats.total) return 0; // RF15: evita división por cero.
-    return Math.round((stats.ocupados / stats.total) * 100); // RF15: cálculo simple y estable para UI.
-  }, [stats.ocupados, stats.total]); // RF15: depende de stats.
+  const ocupacionPct = useMemo(() => {
+    if (!stats.total) return 0;
+    return Math.round((stats.ocupados / stats.total) * 100);
+  }, [stats.ocupados, stats.total]);
 
   const estadoGlobal = useMemo(() => {
     const tipos = alerts.map((a) => String(a.tipo || '').toUpperCase());
@@ -41,50 +33,50 @@ export const OperativoDashboard: React.FC = () => {
     return 'DISPONIBLE';
   }, [alerts, stats.ocupados, stats.total]);
 
-  const estadoStyle = useMemo(() => { // UI: paleta institucional de alto contraste (hex exigidos).
-    if (estadoGlobal === 'DESHABILITADO') return { bg: 'bg-[#D32F2F]', label: 'DESHABILITADO', sub: 'Bloqueo total de ingresos (RF14)', ring: 'ring-[#D32F2F]/25' }; // RF14.
-    if (estadoGlobal === 'LLENO') return { bg: 'bg-[#FF6B00]', label: 'LLENO', sub: 'Cupos agotados (100%)', ring: 'ring-[#FF6B00]/25' }; // RF15.
-    if (estadoGlobal === 'ALERTA_80') return { bg: 'bg-[#FF6B00]', label: 'ALERTA 80%', sub: 'Ocupación alta (RF15/RF39)', ring: 'ring-[#FF6B00]/25' }; // RF15.
-    return { bg: 'bg-[#39A900]', label: 'DISPONIBLE', sub: 'Ingreso permitido según reglas', ring: 'ring-[#39A900]/25' }; // RF15.
-  }, [estadoGlobal]); // UI: depende del estado.
+  const estadoStyle = useMemo(() => {
+    if (estadoGlobal === 'DESHABILITADO') return { bg: 'bg-[#D32F2F]', label: 'DESHABILITADO', sub: 'Bloqueo total de ingresos (RF14)', ring: 'ring-[#D32F2F]/25' };
+    if (estadoGlobal === 'LLENO') return { bg: 'bg-[#FF6B00]', label: 'LLENO', sub: 'Cupos agotados (100%)', ring: 'ring-[#FF6B00]/25' };
+    if (estadoGlobal === 'ALERTA_80') return { bg: 'bg-[#FF6B00]', label: 'ALERTA 80%', sub: 'Ocupación alta (RF15/RF39)', ring: 'ring-[#FF6B00]/25' };
+    return { bg: 'bg-[#39A900]', label: 'DISPONIBLE', sub: 'Ingreso permitido según reglas', ring: 'ring-[#39A900]/25' };
+  }, [estadoGlobal]);
 
-  const pushRecent = (tipo: 'SUCCESS' | 'ERROR', mensaje: string) => { // RF12: inserta evento reciente y limita a 5.
-    setRecent((prev) => [{ id: `${Date.now()}-${Math.random()}`, tipo, mensaje, fecha: new Date() }, ...prev].slice(0, 5)); // RF12: id estable sin depender de APIs del navegador.
-  }; // RF12: fin pushRecent.
+  const pushRecent = (tipo: 'SUCCESS' | 'ERROR', mensaje: string) => {
+    setRecent((prev) => [{ id: `${Date.now()}-${Math.random()}`, tipo, mensaje, fecha: new Date() }, ...prev].slice(0, 5));
+  };
 
-  if (loading) { // UX: pantalla de carga con guía institucional (sin parpadeos).
-    return ( // UX: render loading.
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center px-6"> {/* UI: fondo base claro requerido. */}
-        <div className="w-14 h-14 rounded-full border-4 border-[#003939]/20 border-t-[#003939] animate-spin" /> {/* UI: spinner en verde oscuro. */}
-        <p className="mt-4 text-[12px] font-black uppercase tracking-[0.28em] text-[#003939]">Sincronizando sistema...</p> {/* UX: feedback institucional. */}
-        <p className="mt-2 text-sm text-slate-600 font-medium text-center max-w-md">Conectando a infraestructura de bahías y eventos en tiempo real.</p> {/* UX: mensaje calmante. */}
-      </div> // UX: fin loading.
-    ); // UX: fin return.
-  } // UX: fin loading.
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center px-6">
+        <div className="w-14 h-14 rounded-full border-4 border-[#003939]/20 border-t-[#003939] animate-spin" />
+        <p className="mt-4 text-[12px] font-black uppercase tracking-[0.28em] text-[#003939]">Sincronizando sistema...</p>
+        <p className="mt-2 text-sm text-slate-600 font-medium text-center max-w-md">Conectando a infraestructura de bahías y eventos en tiempo real.</p>
+      </div>
+    );
+  }
 
-  return ( // UI: render principal.
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-[#39A900]/20"> {/* Paleta: fondo base + selección SENA. */}
-      <header className="sticky top-0 z-50 bg-[#003939] text-white border-b border-black/10"> {/* Paleta: navbar portería verde oscuro (requisito). */}
-        <div className="max-w-[1800px] mx-auto px-4 md:px-6 py-4 flex items-center justify-between gap-4"> {/* UI: contenedor central. */}
-          <div className="flex items-center gap-3"> {/* UI: marca + estado. */}
-            <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center"> {/* UI: ícono container. */}
-              <span className="w-2.5 h-2.5 rounded-full bg-[#39A900] animate-pulse" /> {/* UI: punto vivo (sistema online). */}
-            </div> {/* UI: fin icono container. */}
-            <div> {/* UI: títulos. */}
-              <p className="text-[11px] font-black uppercase tracking-[0.28em] opacity-90">SENA • Portería</p> {/* Guía: marca institucional. */}
-              <h1 className="text-lg font-black tracking-tight">Panel Operativo de Acceso</h1> {/* UI: título principal. */}
-            </div> {/* UI: fin títulos. */}
-          </div> {/* UI: fin marca. */}
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-[#39A900]/20">
+      <header className="sticky top-0 z-50 bg-[#003939] text-white border-b border-black/10">
+        <div className="max-w-[1800px] mx-auto px-4 md:px-6 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#39A900] animate-pulse" />
+            </div>
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.28em] opacity-90">SENA • Portería</p>
+              <h1 className="text-lg font-black tracking-tight">Panel Operativo de Acceso</h1>
+            </div>
+          </div>
 
-          <div className="flex items-center gap-3"> {/* UI: acciones navbar. */}
-            <div className="hidden sm:flex flex-col items-end"> {/* UI: información del operador. */}
-              <p className="text-sm font-black leading-none">{operadorNombre}</p> {/* UX: nombre del operador (no PII sensible). */}
-              <p className="text-[11px] font-bold opacity-85">Operador de turno</p> {/* UX: rol visible. */}
-            </div> {/* UI: fin info operador. */}
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex flex-col items-end">
+              <p className="text-sm font-black leading-none">{operadorNombre}</p>
+              <p className="text-[11px] font-bold opacity-85">Operador de turno</p>
+            </div>
 
             <button
               type="button"
-              onClick={refresh} // UX: recarga manual sin romper hooks.
+              onClick={refresh}
               className="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/15 flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white/25"
               aria-label="Refrescar datos"
               title="Refrescar datos"
@@ -94,17 +86,16 @@ export const OperativoDashboard: React.FC = () => {
 
             <button
               type="button"
-              onClick={logout} // UX: cierre de sesión preservando el contexto existente.
+              onClick={logout}
               className="h-10 px-4 rounded-xl bg-white text-[#003939] font-black uppercase tracking-widest text-[11px] hover:bg-white/90 focus:outline-none focus:ring-4 focus:ring-white/25"
             >
               Cerrar sesión
             </button>
-          </div> {/* UI: fin acciones navbar. */}
-        </div> {/* UI: fin container navbar. */}
-      </header> {/* UI: fin header. */}
+          </div>
+        </div>
+      </header>
 
       <main className="max-w-[1800px] mx-auto px-4 md:px-6 py-6 space-y-6">
-        {/* Banner crítico — parqueadero lleno */}
         {estadoGlobal === 'LLENO' && (
           <div className="rounded-3xl border-2 border-[#D32F2F] bg-[#D32F2F]/5 p-5 flex items-start gap-4 animate-pulse">
             <div className="w-14 h-14 rounded-2xl bg-[#D32F2F] text-white flex items-center justify-center shrink-0">
@@ -137,25 +128,25 @@ export const OperativoDashboard: React.FC = () => {
         )}
 
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-12"> {/* Sección A: barra superior de estado (a lo ancho). */}
-            <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.08)]"> {/* UI: card premium. */}
-              <div className="absolute inset-0 pointer-events-none"> {/* UI: capa de pulso perimetral. */}
-                <div className={`absolute inset-0 ${estadoStyle.ring} ring-8 animate-pulse`} /> {/* RF14/RF15: pulso cambia con estado. */}
+          <div className="lg:col-span-12">
+            <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+              <div className="absolute inset-0 pointer-events-none">
+                <div className={`absolute inset-0 ${estadoStyle.ring} ring-8 animate-pulse`} />
               </div>
 
-              <div className="p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6"> {/* UI: layout responsive. */}
-                <div className="flex items-center gap-4"> {/* UI: bloque estado gigante. */}
-                  <div className={`w-16 h-16 rounded-3xl ${estadoStyle.bg} text-white flex items-center justify-center shadow-sm`}> {/* Paleta: estado. */}
-                    {estadoGlobal === 'DESHABILITADO' ? <ShieldAlert className="w-9 h-9" /> : <AlertTriangle className="w-9 h-9" />} {/* RF14: icono de bloqueo; RF15: alerta. */}
+              <div className="p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className={`w-16 h-16 rounded-3xl ${estadoStyle.bg} text-white flex items-center justify-center shadow-sm`}>
+                    {estadoGlobal === 'DESHABILITADO' ? <ShieldAlert className="w-9 h-9" /> : <AlertTriangle className="w-9 h-9" />}
                   </div>
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-[0.28em] text-slate-500">Estado general</p>
-                    <p className="mt-2 text-3xl sm:text-4xl font-black text-[#003939] tracking-tight">{estadoStyle.label}</p> {/* Paleta: tipografía fuerte. */}
-                    <p className="mt-1 text-sm font-semibold text-slate-600">{estadoStyle.sub}</p> {/* RF14/RF15: explicación corta. */}
+                    <p className="mt-2 text-3xl sm:text-4xl font-black text-[#003939] tracking-tight">{estadoStyle.label}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-600">{estadoStyle.sub}</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 lg:min-w-[520px]"> {/* UI: KPIs de alto contraste. */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 lg:min-w-[520px]">
                   <Kpi label="TOTAL" value={stats.total} />
                   <Kpi label="OCUPADOS" value={stats.ocupados} />
                   <Kpi label="LIBRES" value={stats.disponibles} highlight />
@@ -163,12 +154,12 @@ export const OperativoDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div> {/* Fin sección A. */}
+          </div>
 
-          <div className="lg:col-span-4 space-y-6"> {/* Sección B: pasarela de acceso (input foco). */}
+          <div className="lg:col-span-4 space-y-6">
             <MovementForm
-              onSuccess={(msg) => { showNotification(msg, 'success'); pushRecent('SUCCESS', msg); }} // RF10/RF11: registra éxito visual y en historial.
-              onError={(msg) => { showNotification(msg, 'error'); pushRecent('ERROR', msg); }} // RF14/RF15: registra bloqueo/error y en historial.
+              onSuccess={(msg) => { showNotification(msg, 'success'); pushRecent('SUCCESS', msg); }}
+              onError={(msg) => { showNotification(msg, 'error'); pushRecent('ERROR', msg); }}
             />
           </div>
 
@@ -176,15 +167,15 @@ export const OperativoDashboard: React.FC = () => {
             <MapaBahias bahias={bahias} />
           </div>
 
-          <div className="lg:col-span-3 space-y-6"> {/* Sección D: historial y alertas. */}
-            <MovimientosRecientes recent={recent} /> {/* RF12: últimos 5 eventos del turno (según acciones y errores). */}
-            <AlertasOperativas alerts={alerts} /> {/* RF14/RF15/RF18: alertas del sistema (socket) con alto contraste. */}
-            <VehiculosActivos vehiculos={vehiculos.slice(0, 5)} onSalida={handleQuickSalida} /> {/* RF11: salida rápida sobre vehículos activos. */}
+          <div className="lg:col-span-3 space-y-6">
+            <MovimientosRecientes recent={recent} />
+            <AlertasOperativas alerts={alerts} />
+            <VehiculosActivos vehiculos={vehiculos.slice(0, 5)} onSalida={handleQuickSalida} />
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-slate-200 bg-white"> {/* UI: footer limpio. */}
+      <footer className="border-t border-slate-200 bg-white">
         <div className="max-w-[1800px] mx-auto px-4 md:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-[11px] font-bold text-slate-600 uppercase tracking-widest text-center sm:text-left">Sistema Institucional de Parqueadero SENA • Sede Ibagué</p>
           <div className="flex items-center gap-3">
@@ -200,18 +191,18 @@ export const OperativoDashboard: React.FC = () => {
         </div>
       </footer>
     </div>
-  ); // UI: fin return.
+  );
 };
 
-const Kpi: React.FC<{ label: string; value: string | number; highlight?: boolean }> = ({ label, value, highlight }) => ( // UI: KPI accesible y reusable.
-  <div className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4"> {/* UI: card KPI. */}
-    <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">{label}</p> {/* UI: label. */}
-    <p className={`mt-2 text-3xl font-black tracking-tight ${highlight ? 'text-[#39A900]' : 'text-[#003939]'}`}>{value}</p> {/* Paleta: valor destacado en verde. */}
+const Kpi: React.FC<{ label: string; value: string | number; highlight?: boolean }> = ({ label, value, highlight }) => (
+  <div className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4">
+    <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">{label}</p>
+    <p className={`mt-2 text-3xl font-black tracking-tight ${highlight ? 'text-[#39A900]' : 'text-[#003939]'}`}>{value}</p>
   </div>
 );
 
 
-const MapaBahias: React.FC<{ bahias: BahiaSensorizada[] }> = ({ bahias }) => { // RF15: mapa operativo — usa estadoPanel calculado por el backend.
+const MapaBahias: React.FC<{ bahias: BahiaSensorizada[] }> = ({ bahias }) => {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)] overflow-hidden">
       <div className="p-6 border-b border-slate-200 flex items-center justify-between gap-4">
@@ -231,7 +222,7 @@ const MapaBahias: React.FC<{ bahias: BahiaSensorizada[] }> = ({ bahias }) => { /
             <div className="col-span-full py-16 text-center text-slate-500 font-semibold">Cargando infraestructura...</div>
           ) : (
             bahias.map((b) => {
-              // RF15: la fuente de verdad es estadoPanel (calculado por BahiasService.derivarEstadoPanel).
+              // La fuente de verdad es estadoPanel (calculado por BahiasService.derivarEstadoPanel).
               // NO usar b.ocupada — ese campo no existe en BahiaSensorizada y siempre sería undefined.
               const isOffline = b.estadoPanel === 'OFFLINE' || b.estadoPanel === 'DESHABILITADO';
               const isOcupado = b.estadoPanel === 'OCUPADO'
@@ -278,14 +269,14 @@ const MapaBahias: React.FC<{ bahias: BahiaSensorizada[] }> = ({ bahias }) => { /
   );
 };
 
-const LegendDot: React.FC<{ color: string; label: string }> = ({ color, label }) => ( // UI: componente de leyenda accesible.
+const LegendDot: React.FC<{ color: string; label: string }> = ({ color, label }) => (
   <span className="inline-flex items-center gap-2">
     <span className={`w-3 h-3 rounded-sm ${color}`} aria-hidden="true" />
     <span>{label}</span>
   </span>
 );
 
-const MovimientosRecientes: React.FC<{ recent: Array<{ id: string; tipo: 'SUCCESS' | 'ERROR'; mensaje: string; fecha: Date }> }> = ({ recent }) => ( // RF12: historial de operación reciente.
+const MovimientosRecientes: React.FC<{ recent: Array<{ id: string; tipo: 'SUCCESS' | 'ERROR'; mensaje: string; fecha: Date }> }> = ({ recent }) => (
   <div className="rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)] overflow-hidden">
     <div className="p-6 border-b border-slate-200 bg-[#003939] text-white">
       <p className="text-[11px] font-black uppercase tracking-[0.28em] opacity-90">Historial reciente</p>
@@ -313,7 +304,7 @@ const MovimientosRecientes: React.FC<{ recent: Array<{ id: string; tipo: 'SUCCES
   </div>
 );
 
-const AlertasOperativas: React.FC<{ alerts: Array<{ id: string; tipo: string; mensaje: string; fecha: Date }> }> = ({ alerts }) => ( // RF14/RF15/RF18: lista de alertas del sistema.
+const AlertasOperativas: React.FC<{ alerts: Array<{ id: string; tipo: string; mensaje: string; fecha: Date }> }> = ({ alerts }) => (
   <div className="rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)] overflow-hidden">
     <div className="p-6 border-b border-slate-200">
       <p className="text-[11px] font-black uppercase tracking-[0.28em] text-slate-500">Alertas en vivo</p>
@@ -334,7 +325,7 @@ const AlertasOperativas: React.FC<{ alerts: Array<{ id: string; tipo: string; me
   </div>
 );
 
-const VehiculosActivos: React.FC<{ vehiculos: Array<{ placa: string; bahia: string; estado: string; horaIngreso: string }>; onSalida: (placa: string) => void }> = ({ vehiculos, onSalida }) => ( // RF11: vista compacta para salida rápida.
+const VehiculosActivos: React.FC<{ vehiculos: Array<{ placa: string; bahia: string; estado: string; horaIngreso: string }>; onSalida: (placa: string) => void }> = ({ vehiculos, onSalida }) => (
   <div className="rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)] overflow-hidden">
     <div className="p-6 border-b border-slate-200">
       <p className="text-[11px] font-black uppercase tracking-[0.28em] text-slate-500">Vehículos activos</p>

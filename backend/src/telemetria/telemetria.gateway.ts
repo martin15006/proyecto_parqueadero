@@ -73,9 +73,6 @@ const buildCorsOriginsSet = () => {
   pingTimeout: 10000,
   pingInterval: 5000,
 })
-/**
- * Gateway de WebSocket para telemetría (namespace: telemetria).
- */
 export class TelemetriaGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(TelemetriaGateway.name);
 
@@ -84,27 +81,14 @@ export class TelemetriaGateway implements OnGatewayConnection, OnGatewayDisconne
   
   constructor(private readonly telemetriaService: TelemetriaService) {}
 
-  /**
-   * Maneja la conexión de un cliente al namespace de telemetría.
-   * @param client Cliente Socket.IO conectado.
-   */
   handleConnection(client: Socket) {
     this.logger.log(`Cliente conectado: ${client.id}`);
   }
 
-  /**
-   * Maneja la desconexión de un cliente del namespace de telemetría.
-   * @param client Cliente Socket.IO desconectado.
-   */
   handleDisconnect(client: Socket) {
     this.logger.log(`Cliente desconectado: ${client.id}`);
   }
 
-  /**
-   * Recibe datos de sensor y los retransmite a los suscriptores.
-   * @param client Cliente que emite el evento.
-   * @param payload Datos de sensor.
-   */
   @SubscribeMessage('sensor_data')
   async handleSensorData(client: Socket, payload: ISensorDataPayload) {
     const debugWs =
@@ -137,10 +121,6 @@ export class TelemetriaGateway implements OnGatewayConnection, OnGatewayDisconne
     this.server.emit('broadcast_sensor', payload);
   }
 
-  /**
-   * Emite una alerta a los clientes conectados.
-   * @param alerta Payload de alerta.
-   */
   emitirAlerta(alerta: IAlertaPayload) {
     this.server.emit('alerta_sensor', alerta);
   }

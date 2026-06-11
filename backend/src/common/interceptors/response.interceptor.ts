@@ -17,10 +17,6 @@ export interface ApiResponse<T> {
   meta?: unknown;
 }
 
-/**
- * Interceptor global para estandarización de respuestas.
- * @template T Tipo de dato retornado por el endpoint.
- */
 @Injectable()
 export class ResponseInterceptor<T> implements NestInterceptor<T, ApiResponse<T>> {
   intercept(

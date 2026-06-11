@@ -16,7 +16,6 @@ export const useAdmin = () => {
 
  
   const loadAdminData = useCallback(async () => {
-    // EVITAR CARGAS SIMULTÁNEAS
     if (isFetching.current) return;
 
     try {
@@ -73,8 +72,7 @@ export const useAdmin = () => {
 
   useEffect(() => {
     loadAdminData();
-    
-    // SOCKET: Sincronización Realtime para KPIs Gerenciales
+
     const handleOcupacion = (data: any) => {
       setResumen((prev) => prev ? ({
         ...prev,

@@ -13,8 +13,8 @@ import { IotStatusEnum } from '../common/enums/iot-status.enum';
 @Injectable()
 export class TelemetriaService {
   private readonly logger = new Logger(TelemetriaService.name);
-  
-  // ESTRATEGIA ANTI-SATURACIÓN: Almacena en memoria el último estado reportado por cada sensor
+
+  // Almacena en memoria el último estado reportado por cada sensor (anti-saturación)
   private cacheLecturas: Map<string, { status: IotStatusEnum; timestamp: number }> = new Map();
 
   constructor(
@@ -46,7 +46,6 @@ export class TelemetriaService {
   async procesarLectura(dto: TelemetryPayloadDto) {
     const { sensorId, status, battery, rssi } = dto;
 
-    // Throttle: ¿escribir en DB el registro del sensor?
     const ultimaLectura = this.cacheLecturas.get(sensorId);
     const tiempoTranscurrido = ultimaLectura ? Date.now() - ultimaLectura.timestamp : Infinity;
     const mismoEstado = ultimaLectura?.status === status;
@@ -57,7 +56,6 @@ export class TelemetriaService {
       `[Telemetría] ${sensorId} | ${status} | mismo=${mismoEstado} | ${Math.round(tiempoTranscurrido / 1000)}s | omitirDB=${omitirDbSensor}`,
     );
 
-    // Localizar sensor siempre (necesario para `gestionarImpactoOperativo`)
     const sensor = await this.sensorRepository.findOne({ where: { codigo: sensorId } });
     if (!sensor) {
       this.logger.error(`[IOT ERROR] Sensor no registrado: ${sensorId}`);
@@ -65,7 +63,6 @@ export class TelemetriaService {
     }
 
     if (!omitirDbSensor) {
-      // Escribir en DB solo cuando hay cambio real o venció la ventana
       const estadoAnterior = sensor.estadoActual;
       sensor.estadoActual = status;
       sensor.bateria = battery ?? sensor.bateria;
@@ -93,22 +90,17 @@ export class TelemetriaService {
     return { ok: true, mensaje: omitirDbSensor ? 'Telemetría procesada (DB omitida por throttle)' : 'Telemetría procesada exitosamente' };
   }
 
-  /**
-   * Determina las acciones a tomar según el nuevo estado del sensor.
-   * REALTIME_EMIT: Notifica al frontend sobre cambios críticos.
-   */
   private async gestionarImpactoOperativo(sensor: Sensor, status: IotStatusEnum) {
     await this.bahiasService.procesarTelemetriaSensor(
       sensor.codigo,
       status === IotStatusEnum.OCCUPIED,
     );
 
-    // REALTIME_EMIT: Alertas críticas por falla de hardware
     if (status === IotStatusEnum.ERROR) {
       const mensaje = `¡ALERTA TÉCNICA! El sensor ${sensor.codigo} (Bahía ${sensor.idBahia}) reporta un error crítico.`;
-      
+
       await this.registrarAlertaSistema('FALLA_HARDWARE', mensaje);
-      
+
       this.gateway.emitirAlertaParqueadero({
         tipo: 'ERROR_IOT',
         mensaje,
@@ -119,17 +111,14 @@ export class TelemetriaService {
     return;
   }
 
-  /**
-   * Persiste una alerta crítica en el historial del sistema.
-   */
   private async registrarAlertaSistema(tipo: string, mensaje: string) {
     const alerta = this.alertaRepository.create({ tipo, mensaje });
     await this.alertaRepository.save(alerta);
   }
 
   /**
-   * Simulador (DEMO): Registra una alerta y la emite en tiempo real.
-   * Se utiliza para presentaciones locales cuando no hay hardware conectado, pero se desea demostrar RF14.
+   * Simulador (DEMO): registra una alerta y la emite en tiempo real.
+   * Se utiliza para presentaciones locales cuando no hay hardware conectado.
    */
   async simularAlertaSistema(tipo: string, mensaje: string) {
     await this.registrarAlertaSistema(tipo, mensaje);
@@ -140,28 +129,17 @@ export class TelemetriaService {
     });
   }
 
-  /**
-   * Tarea programada para detectar dispositivos que han dejado de reportar.
-   * REALTIME_EMIT: Notifica cuando un sensor pasa a estado OFFLINE.
-   */
-  /**
-   * Monitorización automática de salud de sensores.
-   * PERFORMANCE: Se ejecuta cada minuto para detectar dispositivos desconectados.
-   * Compara la última lectura con el tiempo actual menos 60 segundos.
-   */
   @Cron(CronExpression.EVERY_MINUTE)
   async monitorizarSensores() {
     this.logger.log('Iniciando monitoreo de salud de sensores IoT...');
 
-    // 1. Definir el umbral de desconexión (60 segundos)
     const umbral = new Date();
     umbral.setSeconds(umbral.getSeconds() - 60);
 
-    // 2. Buscar sensores que no han reportado en el último minuto y están ONLINE o OCCUPIED
      const sensoresInactivos = await this.sensorRepository.find({
        where: {
          ultimaLectura: LessThan(umbral),
-         estadoActual: Not(IotStatusEnum.OFFLINE), // Solo sensores que estaban activos
+         estadoActual: Not(IotStatusEnum.OFFLINE),
        },
      });
 
@@ -172,46 +150,39 @@ export class TelemetriaService {
 
     this.logger.warn(`Se detectaron ${sensoresInactivos.length} sensores sin reporte. Marcando como OFFLINE.`);
 
-    // 3. Procesar desconexiones de forma controlada
     for (const sensor of sensoresInactivos) {
       const estadoAnterior = sensor.estadoActual;
-      
-      // Actualizar estado en DB
+
       sensor.estadoActual = IotStatusEnum.OFFLINE;
       await this.sensorRepository.save(sensor);
 
       await this.bahiasService.marcarBahiaOfflinePorSensor(sensor.codigo);
 
-      // REALTIME_EMIT: Notificar al frontend sobre la desconexión específica
       this.gateway.emitirSensorOffline({
         idBahia: sensor.idBahia,
         sensorId: sensor.codigo,
         fecha: new Date(),
       });
 
-      // Auditoría Técnica: Registro del evento de desconexión
       const evento = this.eventoRepository.create({
         idSensor: sensor.idSensor,
         tipoEvento: IotStatusEnum.OFFLINE,
-        payload: { 
-          motivo: 'Timeout de lectura (>60s)', 
+        payload: {
+          motivo: 'Timeout de lectura (>60s)',
           estadoAnterior,
-          ultimaLectura: sensor.ultimaLectura 
+          ultimaLectura: sensor.ultimaLectura
         },
       });
       await this.eventoRepository.save(evento);
     }
 
-    return { 
-      ok: true, 
-      mensaje: 'Chequeo de salud completado', 
-      desconectados: sensoresInactivos.length 
+    return {
+      ok: true,
+      mensaje: 'Chequeo de salud completado',
+      desconectados: sensoresInactivos.length
     };
   }
 
-  /**
-   * Obtiene todos los sensores registrados.
-   */
   async findAllSensores() {
     return await this.sensorRepository.find();
   }

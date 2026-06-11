@@ -79,7 +79,6 @@ export default function DrawerContent(props: any) {
       ) : null}
 
       <DrawerContentScrollView {...props} contentContainerStyle={styles.scroll}>
-        {/* HEADER */}
         <View style={[styles.header, { backgroundColor: colores.verdeOscuro }]}>
           <View style={styles.circuloDeco1} />
           <View style={styles.circuloDeco2} />
@@ -108,7 +107,6 @@ export default function DrawerContent(props: any) {
           />
         </View>
 
-        {/* ITEMS DEL MENÚ */}
         <View style={styles.itemsContainer}>
           {ITEMS.map((item, indice) => {
             const activo = rutaActual === item.ruta;
@@ -170,7 +168,6 @@ export default function DrawerContent(props: any) {
         </View>
       </DrawerContentScrollView>
 
-      {/* CERRAR SESIÓN */}
       <View style={[styles.footer, { borderTopColor: colores.borde }]}>
         <TouchableOpacity
           style={[

@@ -1,7 +1,5 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
-import { fonts } from '../theme/senaTheme';
 
 interface Props {
   nombre?: string | null;
@@ -9,12 +7,7 @@ interface Props {
   size?: number;
 }
 
-/**
- * Obtiene las iniciales de un nombre completo de forma segura.
- * Si el nombre es null/undefined/vacío, devuelve "?".
- */
 function obtenerIniciales(nombre?: string | null): string {
-  // Protección triple: null, undefined, vacío
   if (!nombre || typeof nombre !== 'string') return '?';
 
   const limpio = nombre.trim();
@@ -32,9 +25,6 @@ function obtenerIniciales(nombre?: string | null): string {
   return `${primera}${ultima}`;
 }
 
-/**
- * Genera un color de fondo consistente basado en el nombre.
- */
 function generarColor(nombre?: string | null): string {
   const colores = ['#39A900', '#007832', '#00304D', '#71277A', '#5fd924'];
 
@@ -54,9 +44,6 @@ export default function AvatarIniciales({
   fotoUrl,
   size = 80,
 }: Props) {
-  const { colores } = useTheme();
-
-  // Si hay foto válida (URL no vacía), mostrarla
   if (fotoUrl && typeof fotoUrl === 'string' && fotoUrl.trim().length > 0) {
     return (
       <Image
@@ -74,7 +61,6 @@ export default function AvatarIniciales({
     );
   }
 
-  // Sino, mostrar iniciales con color de fondo
   const iniciales = obtenerIniciales(nombre);
   const colorFondo = generarColor(nombre);
 

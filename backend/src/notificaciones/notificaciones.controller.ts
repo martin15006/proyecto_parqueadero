@@ -8,24 +8,20 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { IJwtPayload } from '../common/interfaces/auth.interface';
 import { NotificacionesService } from './notificaciones.service';
 
-/**
- * RF25: Controlador de consulta para la bandeja de notificaciones del Aprendiz.
- */
 @ApiTags('notificaciones')
-@ApiBearerAuth() // RNF2: requiere JWT; evita exposición pública de historial.
+@ApiBearerAuth()
 @Controller('notificaciones')
-@UseGuards(JwtAuthGuard, RolesGuard) // RNF2: autenticación + autorización obligatorias.
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class NotificacionesController {
   constructor(private readonly notificacionesService: NotificacionesService) {}
 
-  @Get('mias') // RF25: bandeja personal del usuario autenticado.
-  @Roles(TipoUsuarioEnum.APRENDIZ) // RF25: endpoint orientado a Aprendiz (usuario final).
-  @ApiOperation({ summary: 'Obtener mis notificaciones (RF25)' }) // RF25: trazabilidad explícita.
+  @Get('mias')
+  @Roles(TipoUsuarioEnum.APRENDIZ)
+  @ApiOperation({ summary: 'Obtener mis notificaciones (RF25)' })
   async obtenerMisNotificaciones(@CurrentUser() usuario: IJwtPayload) {
-    return await this.notificacionesService.obtenerMisNotificaciones(usuario.sub); // RNF2: usa sub del JWT (documento) sin loguearlo.
+    return await this.notificacionesService.obtenerMisNotificaciones(usuario.sub);
   }
 
-  /** Elimina una notificación específica del usuario autenticado */
   @Delete(':id')
   @Roles(TipoUsuarioEnum.APRENDIZ)
   @ApiOperation({ summary: 'Eliminar una notificación' })
@@ -36,7 +32,6 @@ export class NotificacionesController {
     return await this.notificacionesService.eliminarNotificacion(usuario.sub, id);
   }
 
-  /** Elimina TODAS las notificaciones del usuario autenticado */
   @Delete()
   @Roles(TipoUsuarioEnum.APRENDIZ)
   @ApiOperation({ summary: 'Eliminar todas mis notificaciones' })
@@ -44,4 +39,3 @@ export class NotificacionesController {
     return await this.notificacionesService.eliminarTodas(usuario.sub);
   }
 }
-

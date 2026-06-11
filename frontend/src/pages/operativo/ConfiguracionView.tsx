@@ -24,15 +24,13 @@ export const ConfiguracionView: React.FC = () => {
     const requested = (location.state as { section?: string } | null)?.section;
     if (requested) setActiveSection(requested);
   }, [location.key]);
-  
-  // Estado para Perfil
+
   const [profileData, setProfileData] = useState({
     nombre: user?.usuario?.nombreCompleto || 'Juan Carlos Operativo',
     correo: user?.usuario?.correo || 'j.operativo@misena.edu.co',
     cargo: 'Operador de Turno'
   });
 
-  // Estado para Seguridad
   const [securityData, setSecurityData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -40,7 +38,6 @@ export const ConfiguracionView: React.FC = () => {
   });
   const [showPass, setShowPass] = useState(false);
 
-  // Estado para Preferencias
   const [prefs, setPrefs] = useState({
     sonido: true,
     alertasOcupacion: true,
@@ -50,7 +47,6 @@ export const ConfiguracionView: React.FC = () => {
 
   const handleSave = () => {
     setSaving(true);
-    // Simular guardado
     setTimeout(() => {
       setSaving(false);
       showNotification('Configuración actualizada correctamente', 'success');
@@ -193,7 +189,6 @@ export const ConfiguracionView: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-5xl mx-auto animate-in fade-in duration-500">
-      {/* Menú de Configuración */}
       <div className="lg:col-span-4 space-y-4">
         <div className="bg-white dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-white/5 shadow-sm overflow-hidden p-2 transition-colors duration-300">
           {sections.map((section) => (
@@ -227,7 +222,6 @@ export const ConfiguracionView: React.FC = () => {
         </div>
       </div>
 
-      {/* Formulario de Configuración */}
       <div className="lg:col-span-8">
         <div className="bg-white dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-white/5 shadow-sm overflow-hidden flex flex-col h-full transition-colors duration-300">
           <div className="px-6 py-4 border-b border-gray-50 dark:border-white/5 bg-gray-50/30 dark:bg-white/5">

@@ -8,10 +8,6 @@ import {
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 
-/**
- * Layout Principal para el Panel Operativo.
- * Corregido: Sidebar no se superpone, botón de colapso en header, logo SENA ajustado, modo oscuro funcional.
- */
 export const OperativoLayout: React.FC = () => {
   const { logout, user } = useAuth();
   const { setTheme, isDark } = useTheme();
@@ -22,13 +18,11 @@ export const OperativoLayout: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Actualizar hora cada minuto
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  // Control responsive
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 1024);
@@ -83,7 +77,6 @@ export const OperativoLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-[#F8F9FA] dark:bg-[#0a0a0a] font-sans overflow-hidden transition-colors duration-300">
-      {/* Overlay para Mobile */}
       {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-black/20 dark:bg-black/40 z-[60] lg:hidden backdrop-blur-sm"
@@ -91,7 +84,6 @@ export const OperativoLayout: React.FC = () => {
         />
       )}
 
-      {/* Sidebar Lateral */}
       <aside className={`
         ${sidebarWidth} bg-[#012E25] text-white flex flex-col h-full
         transition-all duration-300 ease-in-out z-[70] overflow-hidden border-r border-white/5 shadow-2xl
@@ -99,7 +91,6 @@ export const OperativoLayout: React.FC = () => {
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         <div className="flex flex-col h-full py-6">
-          {/* Logo SENA Ajustado - Más pequeño con texto al lado */}
           <div className={`px-4 flex items-center ${isCollapsed ? 'justify-center' : 'justify-start px-6'} mb-10`}>
             <div className="flex items-center gap-3 overflow-hidden">
               <img 
@@ -116,7 +107,6 @@ export const OperativoLayout: React.FC = () => {
             </div>
           </div>
 
-          {/* Navegación Principal */}
           <nav className="flex-1 px-3 space-y-1 overflow-y-auto custom-scrollbar">
             {!isCollapsed && (
               <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] mb-4 ml-4">Módulos</p>
@@ -148,7 +138,6 @@ export const OperativoLayout: React.FC = () => {
             })}
           </nav>
 
-          {/* Info Usuario Reducida */}
           <div className="mt-auto px-3 pt-6 border-t border-white/5">
             <button
               type="button"
@@ -182,10 +171,7 @@ export const OperativoLayout: React.FC = () => {
         </div>
       </aside>
 
-      {/* Área de Contenido Principal - Corregida para no ser sobrepasada */}
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
-        {/* Pestaña de menú en el borde del sidebar: flecha hacia afuera cuando
-            está oculto/colapsado y hacia adentro cuando está desplegado. */}
         <button
           onClick={toggleMenu}
           aria-label={menuAbierto ? 'Ocultar menú' : 'Mostrar menú'}
@@ -195,7 +181,6 @@ export const OperativoLayout: React.FC = () => {
           {menuAbierto ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
         </button>
 
-        {/* Header Superior Sobrio */}
         <header className="bg-white dark:bg-[#121212] border-b border-gray-100 dark:border-white/5 px-6 lg:px-8 py-4 flex items-center justify-between sticky top-0 z-[40] transition-colors duration-300">
           <div className="flex items-center gap-4">
             <div className="pl-6">
@@ -213,8 +198,7 @@ export const OperativoLayout: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-1">
-              {/* Botón de Modo Oscuro - Togle entre light y dark */}
-              <button 
+              <button
                 onClick={() => {
                   const nextTheme = isDark ? 'light' : 'dark';
                   setTheme(nextTheme);
@@ -259,14 +243,12 @@ export const OperativoLayout: React.FC = () => {
           </div>
         </header>
 
-        {/* Contenido Dinámico - Asegurado con overflow-y-auto y padding */}
         <div className="flex-1 overflow-y-auto p-6 lg:p-8 bg-[#F8F9FA] dark:bg-[#0a0a0a] custom-scrollbar transition-colors duration-300">
           <div className="max-w-[1400px] mx-auto animate-in fade-in duration-300">
             <Outlet />
           </div>
         </div>
 
-        {/* Footer Sobrio */}
         <footer className="bg-white dark:bg-[#121212] border-t border-gray-100 dark:border-white/5 px-8 py-4 flex flex-col md:flex-row items-center justify-between gap-4 transition-colors duration-300">
           <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
             SISTEMA DE PARQUEADERO INSTITUCIONAL • SENA IBAGUÉ

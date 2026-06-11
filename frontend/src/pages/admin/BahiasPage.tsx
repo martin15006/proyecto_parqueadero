@@ -7,10 +7,6 @@ import { Button } from '../../components/ui/Button';
 import { parqueaderoAdminService } from '../../services/parqueadero-admin.service';
 import type { BahiaEstado, OcupacionPayload } from '../../types';
 
-/**
- * Gestión de Bahías (Admin).
- * Mapa visual de la infraestructura con estados en tiempo real y detalles técnicos.
- */
 export const BahiasPage: React.FC = () => {
   const [ocupacion, setOcupacion] = useState<OcupacionPayload | null>(null);
   const [bahias, setBahias] = useState<OcupacionPayload['bahias']>([]);
@@ -60,7 +56,6 @@ export const BahiasPage: React.FC = () => {
     fetchOcupacion();
     socketService.connect();
 
-    // Sincronización Realtime
     const handleOcupacion = (data: any) => {
       setLoadError(null);
       const lista = Array.isArray(data?.bahias) ? data.bahias : [];
@@ -113,14 +108,7 @@ export const BahiasPage: React.FC = () => {
     }
   };
 
-  /**
-   * Diseño premium del mapa 2D:
-   * - Disponible: emerald suave
-   * - Ocupado: rose suave
-   * - Deshabilitado / Offline: slate neutro
-   *
-   * Nota: este mapa se alimenta del payload `OcupacionPayload.bahias`, que debe traer 30 elementos.
-   */
+  // Este mapa se alimenta del payload `OcupacionPayload.bahias`, que debe traer 30 elementos.
   const tileStyles = (estado: BahiaEstado) => {
     if (estado === 'OCCUPIED') {
       return {

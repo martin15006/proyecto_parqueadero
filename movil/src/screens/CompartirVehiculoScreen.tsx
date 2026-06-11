@@ -6,7 +6,6 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
-  TouchableOpacity,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { fonts, espacios } from '../theme/senaTheme';
@@ -118,7 +117,6 @@ export default function CompartirVehiculoScreen({ route, navigation }: any) {
           </View>
 
           {info?.compartido && info.receptor ? (
-            // ─── Vehículo YA compartido (PENDIENTE o ACEPTADO) ──────────
             <FadeInView delay={150}>
               {info.estado === 'PENDIENTE' ? (
                 <View style={[styles.estadoBox, { backgroundColor: esOscuro ? 'rgba(255,193,7,0.10)' : '#FFF8E1', borderColor: '#FFC107' }]}>
@@ -169,7 +167,6 @@ export default function CompartirVehiculoScreen({ route, navigation }: any) {
               />
             </FadeInView>
           ) : (
-            // ─── Compartir vehículo (formulario) ──────────────────────
             <FadeInView delay={150}>
               <View style={[styles.aviso, { backgroundColor: esOscuro ? 'rgba(33,150,243,0.10)' : '#E3F2FD', borderColor: '#2196F3' }]}>
                 <Text style={[styles.avisoTexto, { color: esOscuro ? '#90CAF9' : '#0D47A1' }]}>

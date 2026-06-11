@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { socketService } from '../services/socket.service';
 
-// FEATURE: Hook unificado para consumo de WebSockets.
-// SOCKET: Escucha eventos globales del sistema y gestiona el ciclo de vida de la conexión.
 export const useWebSocket = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -16,7 +14,6 @@ export const useWebSocket = () => {
     const handleConnect = () => setIsConnected(true);
     const handleDisconnect = () => setIsConnected(false);
 
-    // FEATURE: Registro de eventos operativos reales del backend
     const events = [
       'vehiculo_ingresado',
       'vehiculo_retirado',

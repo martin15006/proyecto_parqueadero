@@ -23,14 +23,14 @@ export class AdminMovimientosController {
   @ApiOperation({ summary: 'Salida manual de emergencia por vehículo (RF24)' })
   @ApiResponse({ status: 200, description: 'Salida registrada' })
   async salidaEmergenciaVehiculo(@Body() dto: SalidaEmergenciaVehiculoDto, @Req() req: AuthenticatedRequest) {
-    const documentoActor = req.user?.sub || 'SISTEMA'; // RF25: actor para notificación (nombre del administrador).
-    const actor = await this.usuarioService.findOneByDocumento(documentoActor); // RF25: se resuelve nombreCompleto para el historial.
+    const documentoActor = req.user?.sub || 'SISTEMA';
+    const actor = await this.usuarioService.findOneByDocumento(documentoActor);
 
     return await this.operativoService.salidaEmergenciaVehiculo(dto, {
-      sub: documentoActor, // RF24/RF37: documento del admin para auditoría interna.
-      nombre: actor?.nombreCompleto || null, // RF25: nombre del admin requerido en la notificación al usuario.
-      ip: req.ip, // Auditoría técnica.
-      userAgent: req.headers['user-agent'], // Auditoría técnica.
+      sub: documentoActor,
+      nombre: actor?.nombreCompleto || null,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
     });
   }
 }

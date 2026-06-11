@@ -53,7 +53,6 @@ export const ControlAccesoView: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto animate-in fade-in duration-500">
-      {/* Resumen de Estado Superior - Compacto */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="md:col-span-1 bg-white dark:bg-[#121212] p-4 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center gap-4 transition-colors duration-300">
           <div className={`w-10 h-10 rounded-lg ${estadoStyle.bg} flex items-center justify-center text-white shrink-0`}>
@@ -71,7 +70,6 @@ export const ControlAccesoView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Área Principal de Gestión */}
         <div className="lg:col-span-8 space-y-6">
           <div className="bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 overflow-hidden transition-colors duration-300">
             <div className="px-6 py-4 border-b border-gray-50 dark:border-white/5 bg-gray-50/30 dark:bg-white/5 flex items-center justify-between">
@@ -90,7 +88,6 @@ export const ControlAccesoView: React.FC = () => {
           </div>
         </div>
 
-        {/* Acciones Secundarias */}
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 p-6 space-y-4 transition-colors duration-300">
             <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Protocolos Especiales</h3>
@@ -109,7 +106,6 @@ export const ControlAccesoView: React.FC = () => {
             </button>
           </div>
 
-          {/* Vehículos activos — salida rápida (RF11) */}
           <div className="bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 p-6 transition-colors duration-300">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Salida Rápida</h3>

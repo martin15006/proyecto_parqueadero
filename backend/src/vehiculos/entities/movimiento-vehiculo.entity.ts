@@ -14,19 +14,19 @@ export class MovimientoVehiculo {
   @PrimaryGeneratedColumn()
   idMovimiento: number;
 
-  @Index() // Acelera reportes históricos por fecha de ingreso
+  @Index()
   @Column({ type: 'timestamp' })
   horaIngreso: Date;
 
-  @Index() // Acelera reportes históricos por fecha de salida
+  @Index()
   @Column({ type: 'timestamp', nullable: true })
   horaSalida: Date | null;
 
-  @Index() // Optimiza búsquedas de historial por vehículo
+  @Index()
   @Column({ type: 'int' })
   idRegistroVehiculo: number;
 
-  @Index() // Filtrado rápido por estado (ADENTRO/SALIDA)
+  @Index()
   @Column({
     type: 'enum',
     enum: EstadoMovimiento,
@@ -54,7 +54,7 @@ export class MovimientoVehiculo {
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
-  @Index() // Optimiza consultas que excluyen registros eliminados (soft delete)
+  @Index()
   @DeleteDateColumn({ type: 'timestamptz', nullable: true })
   deletedAt: Date;
 

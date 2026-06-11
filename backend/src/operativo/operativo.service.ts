@@ -28,10 +28,6 @@ import { RegistrarIngresoManualDto } from './dto/registrar-ingreso-manual.dto';
 import { SalidaEmergenciaVehiculoDto } from './dto/salida-emergencia-vehiculo.dto';
 import { IJwtPayload } from '../common/interfaces/auth.interface';
 
-/**
- * Servicio Operativo: Motor de control de entrada y salida de vehículos.
- * REFACTOR: Implementa transacciones atómicas y lógica de negocio desacoplada.
- */
 @Injectable()
 export class OperativoService {
   constructor(
@@ -49,17 +45,7 @@ export class OperativoService {
   ) {}
 
   /**
-   * RF31/RF33/RF35: Flujo unificado de escaneo (Code128 actual + QR futuro).
-   *
-   * Comportamiento RF31 (Multi-vehículo):
-   * - 1 vehículo: registra ingreso inmediato (flujo rápido).
-   * - >1 vehículo: retorna lista de vehículos para selección y NO registra ingreso hasta confirmación.
-   *
-   * Seguridad y Fase 3 (RF14/RF39):
-   * - Reutiliza registrarEntrada() que ya valida DESHABILITADO/LLENO de forma fulminante.
-   */
-  /**
-   * RF31/RF33: Flujo unificado de escaneo (Code128 / QR).
+   * Flujo unificado de escaneo (Code128 / QR).
    *
    * Routing de acción por estado del movimiento activo:
    * - `TRANSITO` sin bahía → vehículo ya autorizado en ingreso; rechaza doble scan.
@@ -100,7 +86,7 @@ export class OperativoService {
       });
     }
 
-    // 🔍 Si el usuario YA tiene un movimiento activo (con cualquiera de sus vehículos),
+    // Si el usuario YA tiene un movimiento activo (con cualquiera de sus vehículos),
     // la acción es siempre SALIDA de ese vehículo — no mostramos modal de selección.
     const placas = vehiculos.map((v) => v.placa);
     const movimientoActivoMio = await this.movimientoRepository
@@ -140,7 +126,6 @@ export class OperativoService {
       };
     }
 
-    // Si solo tiene un vehículo, va directo a ingresarlo
     if (vehiculos.length === 1) {
       const placa = vehiculos[0].placa;
       const resultadoOp = await this.resolverAccionPorEstado(placa, usuario.documento, operador, usuario);
@@ -164,7 +149,6 @@ export class OperativoService {
       };
     }
 
-    // Tiene varios vehículos y NINGUNO está adentro → debe elegir con cuál ingresar
     return {
       ok: true,
       modo: 'SELECCION',
@@ -186,12 +170,6 @@ export class OperativoService {
   }
 
   /**
-   * Determina la acción a ejecutar según el estado del movimiento activo del vehículo:
-   * - TRANSITO sin bahía → el vehículo ya está en camino hacia la bahía; no se duplica.
-   * - TRANSITO con bahía / ADENTRO → el sensor detectó salida; el operario confirma.
-   * - Sin movimiento → inicia tránsito de ingreso (sin asignar bahía).
-   */
-  /**
    * Lógica de portería simplificada:
    * - Si el vehículo NO tiene movimiento activo → ingreso (ADENTRO, sin bahía).
    * - Si el vehículo ya está ADENTRO → salida.
@@ -205,7 +183,7 @@ export class OperativoService {
     operador: IJwtPayload & { ip: string },
     usuarioInfo?: any,
   ) {
-    // Buscamos el registro del vehículo (sin filtrar por usuario, ya que puede ser compartido).
+    // Sin filtrar por usuario, ya que el vehículo puede ser compartido.
     const registro = await this.movimientoRepository.manager.findOne(RegistroVehiculo, {
       where: { idVehiculo: placa },
     });
@@ -214,7 +192,6 @@ export class OperativoService {
       return await this.iniciarTransitoIngreso(placa, documentoUsuario, operador, usuarioInfo);
     }
 
-    // ¿Tiene movimiento activo? → entonces tocaría salida
     const movimientoActivo = await this.movimientoRepository.findOne({
       where: [
         { idRegistroVehiculo: registro.idRegistroV, estado: EstadoMovimiento.ADENTRO },
@@ -239,22 +216,20 @@ export class OperativoService {
   }
 
   /**
-   * RF31: Confirmación secundaria cuando el aprendiz posee múltiples vehículos.
-   *
-   * Seguridad:
-   * - Revalida el `codigo` (token opaco) para obtener el usuario real.
-   * - Verifica que la placa seleccionada pertenezca a ese usuario antes de registrar el ingreso.
+   * Confirmación secundaria cuando el aprendiz posee múltiples vehículos.
+   * Revalida el `codigo` (token opaco) y verifica que la placa seleccionada
+   * pertenezca a ese usuario antes de registrar el ingreso.
    */
   async confirmarIngresoMultivehiculo(
     dto: ConfirmarIngresoMultivehiculoDto,
     operador: IJwtPayload & { ip: string },
   ) {
-    const codigo = String(dto.codigo ?? '').trim(); // RF31: normalización del token.
-    const placaSeleccionada = String(dto.placa ?? '').trim().toUpperCase(); // RF31: normalización de placa para comparación y registro.
+    const codigo = String(dto.codigo ?? '').trim();
+    const placaSeleccionada = String(dto.placa ?? '').trim().toUpperCase();
 
-    const resultado = await this.usuarioService.buscarPorQR(codigo); // RF31: revalidación del aprendiz.
+    const resultado = await this.usuarioService.buscarPorQR(codigo);
     const usuario = resultado.usuario;
-    const vehiculos = resultado.vehiculos || []; // RF31: flota del usuario.
+    const vehiculos = resultado.vehiculos || [];
 
     const vehiculoSeleccionado = vehiculos.find((v: Vehiculo) => v.placa === placaSeleccionada);
     if (!vehiculoSeleccionado) {
@@ -272,14 +247,14 @@ export class OperativoService {
     );
 
     return {
-      ...resultadoOp, // RF33: mensaje y bahía asignada.
-      modo: 'CONFIRMADO', // RF31: confirma al frontend que el ingreso fue ejecutado tras selección.
-      aprendiz: { 
+      ...resultadoOp,
+      modo: 'CONFIRMADO',
+      aprendiz: {
         nombreCompleto: usuario.nombreCompleto,
         documento: usuario.documento,
         fotoPersona: usuario.fotoPersona
       },
-      vehiculo: { 
+      vehiculo: {
         placa: placaSeleccionada,
         fotoVehiculo: vehiculoSeleccionado.fotoVehiculo,
         fotoTarjetaP: vehiculoSeleccionado.fotoTarjetaP,
@@ -289,22 +264,18 @@ export class OperativoService {
   }
 
   /**
-   * RF35: Resumen operativo para sincronización inicial del dashboard (no depende de /dashboard/resumen admin-only).
-   *
-   * Contenido restringido (mínimo privilegio):
-   * - Ocupación actual (bahías total/ocupadas/disponibles + estado global).
-   * - Conteo de ingresos/salidas del día ejecutados por este operativo (basado en auditoría existente).
-   * - Alertas técnicas recientes (sensores/hardware) desde la tabla de alertas del sistema.
+   * Resumen operativo para sincronización inicial del dashboard, restringido
+   * por mínimo privilegio (no expone datos administrativos).
    */
   async obtenerResumenTurno(operador: IJwtPayload & { ip: string }) {
-    // obtenerOcupacion ahora devuelve:
-    //   total     = bahías con sensor activo (físicas reales)
-    //   ocupados  = QRs escaneados activos (movimientos ADENTRO/TRANSITO)
+    // obtenerOcupacion devuelve:
+    //   total       = bahías con sensor activo (físicas reales)
+    //   ocupados    = QRs escaneados activos (movimientos ADENTRO/TRANSITO)
     //   disponibles = total - ocupados
     const estadoGlobal = await this.bahiasService.obtenerOcupacion();
 
-    const inicioDia = new Date(); // RF35: para "ingresos del día" sin inventar el concepto de turnos no modelado.
-    inicioDia.setHours(0, 0, 0, 0); // RF35: fija inicio del día local del servidor.
+    const inicioDia = new Date();
+    inicioDia.setHours(0, 0, 0, 0);
 
     const accionesIngreso = await this.auditoriaService.listarAccionesPorUsuarioEnRango({
       idUsuario: operador.sub,
@@ -314,7 +285,6 @@ export class OperativoService {
       limit: 50,
     });
 
-    // RF35: también las salidas del turno, para distinguir el tipo de cada movimiento.
     const accionesSalida = await this.auditoriaService.listarAccionesPorUsuarioEnRango({
       idUsuario: operador.sub,
       accion: 'REGISTRAR_SALIDA',
@@ -323,7 +293,6 @@ export class OperativoService {
       limit: 50,
     });
 
-    // Unimos ingresos y salidas etiquetando el tipo de cada acción.
     const accionesTurno: Array<{ a: any; tipo: 'INGRESO' | 'SALIDA' }> = [
       ...accionesIngreso.map((a: any) => ({ a, tipo: 'INGRESO' as const })),
       ...accionesSalida.map((a: any) => ({ a, tipo: 'SALIDA' as const })),
@@ -357,9 +326,9 @@ export class OperativoService {
         if (!placa) return null;
         return {
           placa,
-          horaIngreso: a.createdAt, // momento del movimiento (ingreso o salida)
+          horaIngreso: a.createdAt,
           tipoVehiculo: tipoPorPlaca.get(placa) ?? 'N/D',
-          tipo, // 'INGRESO' | 'SALIDA'
+          tipo,
         };
       })
       .filter((r): r is NonNullable<typeof r> => r !== null)
@@ -367,23 +336,23 @@ export class OperativoService {
       .slice(0, 50);
 
     const ingresosHoy = await this.auditoriaService.contarAccionPorUsuarioEnRango({
-      idUsuario: operador.sub, // RF35: documento del operativo autenticado.
-      accion: 'REGISTRAR_ENTRADA', // RF35: acción registrada en auditoría al procesar un ingreso.
-      desde: inicioDia, // RF35: rango del día.
-      hasta: new Date(), // RF35: hasta el momento actual.
-    }); // RF35: métrica operativa basada en auditoría existente.
+      idUsuario: operador.sub,
+      accion: 'REGISTRAR_ENTRADA',
+      desde: inicioDia,
+      hasta: new Date(),
+    });
 
     const salidasHoy = await this.auditoriaService.contarAccionPorUsuarioEnRango({
-      idUsuario: operador.sub, // RF35: documento del operativo autenticado.
-      accion: 'REGISTRAR_SALIDA', // RF35: acción registrada en auditoría al procesar una salida.
-      desde: inicioDia, // RF35: rango del día.
-      hasta: new Date(), // RF35: hasta el momento actual.
-    }); // RF35: métrica operativa basada en auditoría existente.
+      idUsuario: operador.sub,
+      accion: 'REGISTRAR_SALIDA',
+      desde: inicioDia,
+      hasta: new Date(),
+    });
 
     const alertasTecnicas = await this.alertaSistemaRepository.find({
       order: { createdAt: 'DESC' },
       take: 10,
-    }); // RF35: entrega últimas alertas del sistema (incluye sensores/hardware si existen).
+    });
 
     const porcentajeOcupacion = estadoGlobal.total > 0
       ? parseFloat(((estadoGlobal.ocupados / estadoGlobal.total) * 100).toFixed(1))
@@ -399,23 +368,18 @@ export class OperativoService {
         estadoParqueadero: estadoGlobal.estadoParqueadero,
       },
       turno: {
-        ingresosHoy, // RF35: conteo de ingresos del día ejecutados por el operativo.
-        salidasHoy, // RF35: conteo de salidas del día ejecutadas por el operativo.
+        ingresosHoy,
+        salidasHoy,
         ingresos: ingresosTurno,
-      }, // RF35: agrupación sin exponer datos administrativos.
+      },
       alertasTecnicas: alertasTecnicas.map(a => ({
         tipo: a.tipo,
         mensaje: a.mensaje,
         fecha: a.createdAt,
-      })), // RF35: payload mínimo para UI (sin datos sensibles).
+      })),
     };
   }
 
-  /**
-   * Autenticación para personal operativo.
-   * SECURITY: Valida credenciales y rol operativo (ID: 3).
-   * @param dto Credenciales de operador
-   */
   async login(dto: LoginOperativoDto) {
     const usuario = await this.usuarioService.findOneByDocumento(dto.documento);
     if (!usuario) throw new NotFoundException('Operador no encontrado');
@@ -442,15 +406,8 @@ export class OperativoService {
   }
 
   /**
-   * Procesa el ingreso de un vehículo.
-   * OPTIMIZATION: Utiliza Pessimistic Write Lock para evitar condiciones de carrera en bahías.
-   * @param placa Identificador del vehículo
-   * @param operador Datos del operador que registra
-   */
-  /**
    * Registra el ingreso de un vehículo identificado por placa.
    * Sin asignación de bahía: el sensor gestiona el estado visual de forma independiente.
-   * Mismo modelo que `iniciarTransitoIngreso` (flujo QR).
    */
   async registrarEntrada(
     placa: string,
@@ -462,7 +419,6 @@ export class OperativoService {
       const { vehiculo, registro } = await this.validarVehiculoYRegistro(placa, manager);
       await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
 
-      // Cargamos el vehículo CON su tipo (para devolver datos completos al frontend).
       const vehiculoCompleto = await manager.findOne(Vehiculo, {
         where: { placa: vehiculo.placa },
         relations: ['tipoVehiculo'],
@@ -507,7 +463,6 @@ export class OperativoService {
 
       await this.ejecutarPostIngreso(guardado, placa, 'LIBRE', operador);
 
-      // Usuario que efectivamente ingresó (puede ser propietario o receptor compartido)
       const usuarioIngreso = await this.usuarioService.findOneByDocumento(documentoIngreso);
 
       return {
@@ -536,14 +491,11 @@ export class OperativoService {
   }
 
   /**
-   * Registro Manual de Contingencia (RF34).
-   * Permite el ingreso de vehículos cuando fallan los sistemas automáticos o por casos especiales.
-   * PERFORMANCE: Mantiene Pessimistic Write Lock y transaccionalidad completa.
-   * @param dto Datos del ingreso y motivo de contingencia
-   * @param operador Datos del operario responsable
+   * Registro Manual de Contingencia: permite el ingreso cuando fallan los
+   * sistemas automáticos o por casos especiales.
    */
   async registrarIngresoManual(dto: RegistrarIngresoManualDto, operador: IJwtPayload & { ip: string }) {
-    await this.bahiasService.validarIngresoPermitido(); // RF14/RF39: contingencia sigue subordinada al estado administrativo y a la capacidad real.
+    await this.bahiasService.validarIngresoPermitido();
     return await this.movimientoRepository.manager.transaction(async (manager) => {
       if (!operador?.sub) {
         throw new UnauthorizedException('Operador inválido');
@@ -577,7 +529,6 @@ export class OperativoService {
         placaARegistrar = this.normalizarPlaca(registroUsuario.idVehiculo);
       }
 
-      // 1. Validaciones de existencia (placa normalizada)
       const { vehiculo, registro } = await this.validarVehiculoYRegistro(placaARegistrar, manager);
       await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
 
@@ -647,15 +598,11 @@ export class OperativoService {
    * 2. `ADENTRO` → salida directa (sin fase sensor, ej. contingencia o bahía manual).
    *
    * No cierra movimientos `TRANSITO` sin bahía (tránsito de ingreso activo).
-   *
-   * @param placa    Placa del vehículo a procesar.
-   * @param operador Contexto JWT del operativo autorizante.
    */
   async registrarSalida(placa: string, operador: IJwtPayload & { ip: string }) {
     return await this.movimientoRepository.manager.transaction(async (manager) => {
       const { vehiculo, registro } = await this.validarVehiculoYRegistro(placa, manager);
 
-      // Cargamos el vehículo CON su tipo (para devolver datos completos al frontend).
       const vehiculoCompleto = await manager.findOne(Vehiculo, {
         where: { placa: vehiculo.placa },
         relations: ['tipoVehiculo'],
@@ -680,7 +627,7 @@ export class OperativoService {
 
       await this.ejecutarPostSalida(movimientoActivo, placa, operador);
 
-      // Usuario que efectivamente ingresó el vehículo (puede ser propietario o receptor compartido)
+      // Usuario que efectivamente ingresó (puede ser propietario o receptor compartido)
       const docQuienIngreso = movimientoActivo.documentoIngreso ?? registro.idUsuario;
       const usuarioIngreso = await this.usuarioService.findOneByDocumento(docQuienIngreso);
 
@@ -711,11 +658,9 @@ export class OperativoService {
   }
 
   /**
-   * Procedimiento de emergencia global.
-   * Cierra todos los movimientos `ADENTRO` y los `TRANSITO` (tanto de ingreso
-   * sin bahía como de salida con bahía) dejando el parqueadero limpio.
-   *
-   * @param operador Operador que autoriza la emergencia.
+   * Procedimiento de emergencia global. Cierra todos los movimientos `ADENTRO`
+   * y los `TRANSITO` (ingreso sin bahía y salida con bahía) dejando el
+   * parqueadero limpio.
    */
   async salidaEmergencia(operador: IJwtPayload & { ip: string }) {
     const ahora = new Date();
@@ -816,22 +761,22 @@ export class OperativoService {
       const correo = registro.usuario?.correo;
       const nombreUsuario = registro.usuario?.nombreCompleto;
       if (correo && nombreUsuario) {
-        await this.mailService.enviarNotificacionSalidaEmergencia( // RF25: notificación por correo (canal externo) ante salida de emergencia.
-          correo, // RNF2: se usa solo para envío, no para logs.
-          nombreUsuario, // RF25: personaliza el mensaje sin exponer datos sensibles adicionales.
-          registro.idVehiculo, // RF25: placa afectada (dato funcional requerido).
-          dto.motivo, // RF25: motivo informado al usuario.
+        await this.mailService.enviarNotificacionSalidaEmergencia(
+          correo,
+          nombreUsuario,
+          registro.idVehiculo,
+          dto.motivo,
         );
       }
 
       const documentoUsuario = registro.usuario?.documento;
       if (documentoUsuario) {
-        await this.notificacionesService.registrarSalidaEmergencia({ // RF25: persistencia en bandeja (historial visible).
-          idUsuario: documentoUsuario, // RF25: destinatario (aprendiz) para consulta posterior.
-          placa: registro.idVehiculo, // RF25: placa del vehículo afectado.
-          motivo: dto.motivo, // RF25: motivo de la salida de emergencia.
-          actorNombre: actor.nombre, // RF25: nombre del administrador que autorizó (criterio explícito).
-        }); // RNF2: no se persisten tokens/QR/credenciales; solo datos de notificación.
+        await this.notificacionesService.registrarSalidaEmergencia({
+          idUsuario: documentoUsuario,
+          placa: registro.idVehiculo,
+          motivo: dto.motivo,
+          actorNombre: actor.nombre,
+        });
       }
 
       return {
@@ -844,18 +789,15 @@ export class OperativoService {
   }
 
   /**
-   * RF33: Punto de entrada del flujo IoT.  El QR se escanea en portería y el
-   * vehículo queda en estado {@link EstadoMovimiento.TRANSITO} **sin bahía
-   * asignada**.  La asignación física es responsabilidad exclusiva del
-   * {@link SerialBridgeService}: cuando el sensor detecta presencia (<umbral
-   * cm) en la bahía, llama a `BahiasService.procesarTelemetriaSensor` que
-   * vincula el movimiento y lo promueve a {@link EstadoMovimiento.ADENTRO}.
+   * Punto de entrada del flujo IoT. El QR se escanea en portería y el vehículo
+   * queda en {@link EstadoMovimiento.TRANSITO} **sin bahía asignada**. La
+   * asignación física es responsabilidad exclusiva del {@link SerialBridgeService}:
+   * cuando el sensor detecta presencia (<umbral cm) en la bahía, llama a
+   * `BahiasService.procesarTelemetriaSensor` que vincula el movimiento y lo
+   * promueve a {@link EstadoMovimiento.ADENTRO}.
    *
    * Flujo multi-vehículo: si el aprendiz tiene más de un vehículo registrado
    * se devuelve `modo: 'SELECCION'` igual que en `escanearCodigo`.
-   *
-   * @param qr   Token QR o documento del aprendiz.
-   * @param operador Contexto JWT del operativo en turno.
    */
   async escanearQr(qr: string, operador: IJwtPayload & { ip: string }) {
     const token = String(qr ?? '').trim();
@@ -877,7 +819,7 @@ export class OperativoService {
       });
     }
 
-    // 🔍 Si el usuario YA tiene un movimiento activo con cualquiera de sus vehículos,
+    // Si el usuario YA tiene un movimiento activo con cualquiera de sus vehículos,
     // la acción es siempre SALIDA — no se le consulta cuál usar.
     const placas = vehiculos.map((v) => v.placa);
     const movimientoActivoMio = await this.movimientoRepository
@@ -964,20 +906,7 @@ export class OperativoService {
   }
 
   /**
-   * Registra el tránsito de ingreso **sin asignar bahía**.
-   *
-   * Crea un {@link MovimientoVehiculo} con `estado = TRANSITO` e `idBahia =
-   * null`.  El `SerialBridgeService` completará la asignación al detectar
-   * presencia física en alguna bahía sensorizada.
-   *
-   * @param placa    Placa normalizada del vehículo.
-   * @param operador Contexto JWT del operativo autorizante.
-   * @param usuarioInfo Datos opcionales del aprendiz (evita una re-consulta).
-   */
-  /**
-   * Registra el ingreso de un vehículo.
-   *
-   * Crea un MovimientoVehiculo con estado ADENTRO e idBahia=null.
+   * Registra el ingreso de un vehículo con estado ADENTRO e idBahia=null.
    * El sensor gestiona el estado visual de las bahías de forma completamente
    * independiente — la portería no asigna ni conoce la bahía donde se estacionará.
    */
@@ -996,7 +925,6 @@ export class OperativoService {
       // Un usuario solo puede tener UN vehículo adentro a la vez
       await this.verificarUsuarioSinIngresoActivo(documentoUsuario, manager);
 
-      // Cargamos el vehículo CON su tipo para devolver datos completos al frontend.
       const vehiculoCompleto = await manager.findOne(Vehiculo, {
         where: { placa: vehiculo.placa },
         relations: ['tipoVehiculo'],
@@ -1007,7 +935,7 @@ export class OperativoService {
         idRegistroVehiculo: registro.idRegistroV,
         estado: EstadoMovimiento.ADENTRO,
         esManual: false,
-        documentoIngreso: documentoUsuario, // Quien escaneó el QR para ingresar
+        documentoIngreso: documentoUsuario,
       });
 
       const guardado = await manager.save(nuevoMovimiento);
@@ -1059,8 +987,6 @@ export class OperativoService {
     });
   }
 
-  // --- MÉTODOS PRIVADOS DE SOPORTE ---
-
   private normalizarPlaca(value: string) {
     return String(value ?? '').replace(/[- ]/g, '').toUpperCase();
   }
@@ -1099,9 +1025,7 @@ export class OperativoService {
 
   /**
    * Garantiza que el usuario que va a ingresar NO tenga otro vehículo
-   * (propio o compartido) ya adentro del parqueadero.
-   *
-   * Un usuario solo puede tener UN movimiento activo a la vez.
+   * (propio o compartido) ya adentro: solo puede tener UN movimiento activo.
    *
    * NOTA técnica: PostgreSQL no permite `FOR UPDATE` con LEFT JOIN, por eso
    * primero bloqueamos solo la tabla movimiento_vehiculo y luego, si hay
@@ -1118,7 +1042,6 @@ export class OperativoService {
       .getOne();
 
     if (activo) {
-      // Cargamos por separado la placa (sin lock) para incluirla en el mensaje
       const registro = await manager.findOne(RegistroVehiculo, {
         where: { idRegistroV: activo.idRegistroVehiculo },
       });
@@ -1163,8 +1086,8 @@ export class OperativoService {
 
   private async sincronizarEstadoGlobal() {
     // Conteo unificado:
-    //  - total     = bahías sensorizadas (físicas)
-    //  - ocupados  = QRs escaneados activos (movimientos ADENTRO/TRANSITO)
+    //  - total       = bahías sensorizadas (físicas)
+    //  - ocupados    = QRs escaneados activos (movimientos ADENTRO/TRANSITO)
     //  - disponibles = total - ocupados
     const conteo = await this.bahiasService.obtenerConteoGlobal();
 
@@ -1179,15 +1102,13 @@ export class OperativoService {
   }
 
   /**
-   * Información de una placa para registro manual:
-   *  - Datos y fotos del vehículo
-   *  - Lista de usuarios que pueden ingresarlo (propietario + receptores con compartido ACEPTADO)
-   *  - Si tiene un movimiento activo, indica quién lo ingresó
+   * Información de una placa para registro manual: datos y fotos del vehículo,
+   * usuarios autorizados (propietario + receptores con compartido ACEPTADO) y,
+   * si tiene un movimiento activo, quién lo ingresó.
    */
   async obtenerInfoPlacaParaRegistroManual(placa: string) {
     const placaNormalizada = this.normalizarPlaca(placa);
 
-    // 1) Vehículo + tipo
     const vehiculo = await this.movimientoRepository.manager.findOne(Vehiculo, {
       where: { placa: placaNormalizada },
       relations: ['tipoVehiculo'],
@@ -1199,7 +1120,6 @@ export class OperativoService {
       });
     }
 
-    // 2) Registro vehículo-propietario
     const registro = await this.movimientoRepository.manager.findOne(RegistroVehiculo, {
       where: { idVehiculo: placaNormalizada },
       relations: ['usuario'],
@@ -1220,7 +1140,6 @@ export class OperativoService {
         rol: 'PROPIETARIO',
       });
 
-      // 3) Receptores con compartido ACEPTADO
       const compartidosRaw = await this.movimientoRepository.manager
         .createQueryBuilder()
         .select('u.documento', 'documento')
@@ -1242,7 +1161,6 @@ export class OperativoService {
       }
     }
 
-    // 4) Movimiento activo (si existe)
     let movimientoActivoInfo: { idMovimiento: number; documentoIngreso: string | null; nombreIngreso: string | null } | null = null;
     if (registro) {
       const activo = await this.movimientoRepository.findOne({

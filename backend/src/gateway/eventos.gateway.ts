@@ -167,9 +167,6 @@ export class EventosGateway
     }
   }
 
-  /**
-   * Método base para emisión de eventos con tipado genérico.
-   */
   private emitirEvento<T>(evento: string, payload: T, room?: string) {
     if (room) {
       this.server.to(room).emit(evento, payload);
@@ -246,12 +243,10 @@ export class EventosGateway
     // Si el estado no cambió respecto al último emitido, ignorar
     if (lastEmitState === payload.nuevoEstado) return;
 
-    // Cancelar timer anterior si existe
     if (current?.timer) {
       clearTimeout(current.timer);
     }
 
-    // Emitir inmediatamente sin esperar el debounce
     this.emitirEvento('bahia_modificada', payload, this.ROOMS.PARQUEADERO_BAHIAS);
     this.bahiaDebounce.set(key, {
       timer: null,

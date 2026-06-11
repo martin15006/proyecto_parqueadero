@@ -9,11 +9,6 @@ interface ExportButtonProps {
   filename?: string;
 }
 
-/**
- * Botón de Exportación de Datos.
- * FEATURE: Descarga de reportes administrativos (Excel/PDF).
- * API: Consume endpoints de exportación del DashboardController.
- */
 export const ExportButton: React.FC<ExportButtonProps> = ({ label, url, color, filename }) => {
   const { showNotification } = useNotification();
   const [loading, setLoading] = useState(false);

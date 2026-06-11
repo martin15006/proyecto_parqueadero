@@ -31,7 +31,6 @@
 }
 
 :root {
-  /* VSCode Integrated Theme Variables */
   --vscode-font-family: -apple-system, BlinkMacSystemFont, "Inter",  Roboto, Helvetica, Arial, sans-serif;
   --vscode-editor-background: #ffffff;
   --vscode-editor-foreground: #333333;
@@ -62,7 +61,6 @@
   background: var(--bg);
 }
 
-/* Dark Mode overrides using class selector instead of media query */
 .dark {
   --vscode-editor-background: #1e1e1e;
   --vscode-editor-foreground: #cccccc;
@@ -96,7 +94,6 @@ body {
   flex-direction: column;
 }
 
-/* Scrollbar Modernization */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -112,7 +109,6 @@ body {
   background: #9ca3af;
 }
 
-/* Utility to hide scrollbar but maintain functionality */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
@@ -121,7 +117,6 @@ body {
   scrollbar-width: none;
 }
 
-/* Common UI Components */
 .monaco-list-row {
   @apply transition-colors duration-150;
   background-color: transparent;
@@ -162,7 +157,7 @@ body {
 .auth-screen input:-webkit-autofill:hover,
 .auth-screen input:-webkit-autofill:focus,
 .auth-screen input:-webkit-autofill:active {
-  -webkit-text-fill-color: #1f2937; /* text-gray-800 */
+  -webkit-text-fill-color: #1f2937;
   -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
   box-shadow: 0 0 0 1000px #ffffff inset;
   caret-color: #1f2937;

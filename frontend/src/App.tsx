@@ -14,9 +14,6 @@ import { BahiasPage } from './pages/admin/BahiasPage';
 import { TelemetriaPage } from './pages/admin/TelemetriaPage';
 import { OperativosPage } from './pages/admin/OperativosPage';
 import { ConfiguracionAdminPage } from './pages/admin/ConfiguracionAdminPage';
-import { VisitantesPage } from './pages/admin/VisitantesPage';
-import { InformesPage } from './pages/admin/InformesPage';
-import { GraficosPage } from './pages/admin/GraficosPage';
 import { OperativoLayout } from './layouts/OperativoLayout';
 import { ControlAccesoView } from './pages/operativo/ControlAccesoView';
 import { EstadoBahiasView } from './pages/operativo/EstadoBahiasView';
@@ -97,17 +94,13 @@ function App() {
               
               <Route path="/" element={<ProtectedRoute><RedirectByRole /></ProtectedRoute>} />
 
-              {/* Rutas Admin con Layout */}
               <Route path="/appadmin" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><AdminLayout /></ProtectedRoute>}>
                 <Route index element={<AdminDashboard />} />
                 <Route path="usuarios" element={<UsuariosPage />} />
                 <Route path="operativos" element={<OperativosPage />} />
-                <Route path="visitantes" element={<VisitantesPage />} />
                 <Route path="vehiculos" element={<VehiculosPage />} />
                 <Route path="solicitudes" element={<SolicitudesPage />} />
                 <Route path="bahias" element={<BahiasPage />} />
-                <Route path="informes" element={<InformesPage />} />
-                <Route path="graficos" element={<GraficosPage />} />
                 <Route path="telemetria" element={<TelemetriaPage />} />
                 <Route path="configuracion" element={<ConfiguracionAdminPage />} />
               </Route>
@@ -121,7 +114,6 @@ function App() {
                 element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><Navigate to="/appadmin/configuracion" replace /></ProtectedRoute>}
               />
 
-              {/* Rutas Operativo con Layout */}
               <Route path="/appperop" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.OPERATIVO]}><OperativoLayout /></ProtectedRoute>}>
                 <Route index element={<ControlAccesoView />} />
                 <Route path="bahias" element={<EstadoBahiasView />} />
@@ -130,7 +122,6 @@ function App() {
                 <Route path="configuracion" element={<ConfiguracionView />} />
               </Route>
 
-              {/* Alias para rutas operativo solicitadas */}
               <Route path="/control-acceso" element={<Navigate to="/appperop" replace />} />
               <Route path="/estado-salidas" element={<Navigate to="/appperop/bahias" replace />} />
               <Route path="/movimientos" element={<Navigate to="/appperop/movimientos" replace />} />

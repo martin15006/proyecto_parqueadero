@@ -1,25 +1,15 @@
-/**
- * Catálogo de Roles de Usuario (Sincronizado con Backend).
- */
+// Sincronizado con el backend.
 export const UserRole = {
   APRENDIZ: 1,
   ADMIN: 2,
   OPERATIVO: 3
 } as const;
 
-/**
- * Catálogo de Tipos de Vehículo.
- */
 export const VehicleType = {
-  MOTO: 1,
-  CARRO: 2,
-  BICICLETA: 3,
-  CAMIONETA: 4
+  CARRO: 1,
+  MOTO: 2
 } as const;
 
-/**
- * Estados de Movimiento de Vehículo.
- */
 export const MovementStatus = {
   ADENTRO: 'ADENTRO',
   SALIDA: 'SALIDA'

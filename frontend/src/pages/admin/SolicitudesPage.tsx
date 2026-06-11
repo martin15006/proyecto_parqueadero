@@ -6,7 +6,6 @@ import { Modal } from '../../components/ui/Modal';
 import { Check, X, Clock, Eye, AlertTriangle, RefreshCw } from 'lucide-react';
 import type { SolicitudVehiculoAdmin, EstadoSolicitudVehiculo } from '../../types';
 
-/** Campos de la solicitud que el admin puede marcar como incorrectos. */
 const CAMPOS_SOLICITUD: { key: string; label: string }[] = [
   { key: 'fotoVehiculo', label: 'Foto del vehículo' },
   { key: 'fotoTarjetaP', label: 'Foto tarjeta de propiedad' },
@@ -31,11 +30,9 @@ export const SolicitudesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<EstadoSolicitudVehiculo | 'TODOS'>('PENDIENTE');
 
-  // Modal de detalle / acción
   const [seleccionada, setSeleccionada] = useState<SolicitudVehiculoAdmin | null>(null);
   const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null);
 
-  // Modal de rechazo
   const [rechazoOpen, setRechazoOpen] = useState(false);
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [camposRechazados, setCamposRechazados] = useState<string[]>([]);
@@ -102,7 +99,6 @@ export const SolicitudesPage: React.FC = () => {
   const confirmarRechazo = async () => {
     if (!seleccionada) return;
     const motivo = motivoRechazo.trim();
-    // Debe marcar al menos un campo a corregir o escribir un motivo válido.
     if (camposRechazados.length === 0 && motivo.length < 5) {
       setError('Marca al menos un campo a corregir o indica un motivo de al menos 5 caracteres');
       return;
@@ -147,7 +143,6 @@ export const SolicitudesPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header con contadores */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white border border-amber-200 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center gap-3">
@@ -184,7 +179,6 @@ export const SolicitudesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtros */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-2 flex-wrap">
         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 mr-2">Filtrar:</span>
         {(['PENDIENTE', 'APROBADO', 'RECHAZADO', 'TODOS'] as const).map((estado) => (
@@ -208,7 +202,6 @@ export const SolicitudesPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Feedback */}
       {feedbackOk && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
           <Check className="text-emerald-700" size={20} />
@@ -222,7 +215,6 @@ export const SolicitudesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Lista de solicitudes */}
       {loading ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
           <p className="text-sm font-bold text-slate-500">Cargando solicitudes...</p>
@@ -335,7 +327,6 @@ export const SolicitudesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal de detalle */}
       <Modal
         isOpen={!!seleccionada && !rechazoOpen}
         onClose={() => setSeleccionada(null)}
@@ -419,7 +410,6 @@ export const SolicitudesPage: React.FC = () => {
         )}
       </Modal>
 
-      {/* Modal de rechazo (campos + motivo) */}
       <Modal
         isOpen={rechazoOpen}
         onClose={() => {
@@ -518,7 +508,6 @@ export const SolicitudesPage: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Foto ampliada */}
       {fotoAmpliada && (
         <div
           className="fixed inset-0 bg-black/90 z-[150] flex items-center justify-center p-6 cursor-pointer"

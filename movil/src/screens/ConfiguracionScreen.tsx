@@ -26,7 +26,6 @@ export default function ConfiguracionScreen({ navigation }: any) {
                 onBackPress={() => navigation.navigate('Home', { screen: 'MiPerfil' })}
             />
 
-            {/* Aurora decorativa solo en oscuro */}
             {esOscuro && (
                 <>
                     <View style={styles.auroraTop} />
@@ -40,12 +39,10 @@ export default function ConfiguracionScreen({ navigation }: any) {
             >
                 <FadeInView style={{ flex: 1 }}>
                     <View style={styles.contenido}>
-                        {/* ─── SECCIÓN: APARIENCIA ─── */}
                         <Text style={[styles.seccionLabel, { color: colores.textoTenue }]}>
                             APARIENCIA
                         </Text>
 
-                        {/* Card del sol/luna - sin padding interno */}
                         <View
                             style={[
                                 styles.cardTema,
@@ -62,7 +59,6 @@ export default function ConfiguracionScreen({ navigation }: any) {
                             </View>
                         </View>
 
-                        {/* Preview de cada tema */}
                         <View style={styles.previewContainer}>
                             <TouchableOpacity
                                 style={[
@@ -117,7 +113,6 @@ export default function ConfiguracionScreen({ navigation }: any) {
                             </TouchableOpacity>
                         </View>
 
-                        {/* ─── SECCIÓN: CUENTA ─── */}
                         <Text
                             style={[
                                 styles.seccionLabel,
@@ -140,7 +135,6 @@ export default function ConfiguracionScreen({ navigation }: any) {
                         >
                             <View style={styles.cardRow}>
                                 <View style={styles.cardInfo}>
-                                    {/* Icono lápiz sin fondo verde, cambia según tema */}
                                     <View style={styles.iconoBox}>
                                         <Image
                                             source={esOscuro ? lapizOscuro : lapizClaro}
@@ -161,7 +155,6 @@ export default function ConfiguracionScreen({ navigation }: any) {
                             </View>
                         </TouchableOpacity>
 
-                        {/* ─── SECCIÓN: INFORMACIÓN (sin íconos) ─── */}
                         <Text
                             style={[
                                 styles.seccionLabel,
@@ -209,10 +202,8 @@ export default function ConfiguracionScreen({ navigation }: any) {
                             </View>
                         </View>
 
-                        {/* Spacer que empuja el footer hacia abajo */}
                         <View style={styles.spacer} />
 
-                        {/* Footer institucional pegado al fondo */}
                         <View style={styles.footerInfo}>
                             <Text style={[styles.footerTexto, { color: colores.textoTenue }]}>
                                 © 2026 SENA · Todos los derechos reservados
@@ -265,7 +256,6 @@ const styles = StyleSheet.create({
         marginTop: espacios.pequeno,
     },
 
-    // ── Card del tema (sol/luna) — sin padding ──
     cardTema: {
         borderRadius: 16,
         marginBottom: espacios.pequeno,
@@ -280,7 +270,6 @@ const styles = StyleSheet.create({
     },
     icono: { fontSize: 44 },
 
-    // ── Card de cuenta/información — con padding ──
     card: {
         borderRadius: 16,
         marginBottom: espacios.pequeno,
@@ -297,7 +286,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         flex: 1,
     },
-    // Caja del icono SIN fondo verde — solo contenedor del tamaño
     iconoBox: {
         width: 44,
         height: 44,
@@ -326,7 +314,6 @@ const styles = StyleSheet.create({
         marginLeft: 4,
     },
 
-    // ── Preview de temas ──
     previewContainer: {
         flexDirection: 'row',
         gap: espacios.normal,
@@ -373,13 +360,11 @@ const styles = StyleSheet.create({
     },
     previewCheckText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
 
-    // ── Spacer para empujar footer al fondo ──
     spacer: {
         flex: 1,
         minHeight: espacios.grande,
     },
 
-    // ── Footer institucional ──
     footerInfo: {
         alignItems: 'center',
         paddingTop: espacios.medio,

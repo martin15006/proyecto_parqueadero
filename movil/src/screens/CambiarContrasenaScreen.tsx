@@ -13,7 +13,6 @@ import { usuarioService } from '../services/usuarioService';
 import MedidorContrasena from '../components/MedidorContrasena';
 import { validarContrasenaSegura } from '../utils/validacionContrasena';
 
-// Logo SENA importado correctamente como recurso
 const logoSena = require('../../assets/logoSena.png');
 
 export default function CambiarContrasenaScreen({ navigation }: any) {
@@ -43,7 +42,6 @@ export default function CambiarContrasenaScreen({ navigation }: any) {
     try {
       await usuarioService.cambiarContrasena(contraActual, contraNueva);
 
-      // Limpiar los campos después del cambio exitoso
       setContraActual('');
       setContraNueva('');
       setConfirmarContra('');
@@ -143,7 +141,6 @@ export default function CambiarContrasenaScreen({ navigation }: any) {
             }}
           />
 
-          {/* Medidor visual de fortaleza */}
           <MedidorContrasena contrasena={contraNueva} />
 
           <AnimatedInput

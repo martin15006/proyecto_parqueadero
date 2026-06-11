@@ -24,7 +24,7 @@ import { InfraestructuraSeedService } from './infraestructura-seed.service';
     GatewayModule,
     NotificacionesModule,
     UsuariosModule,
-    AuthModule, // RNF2: necesario para que JwtAuthGuard inyecte AuthService correctamente en BahiasController.
+    AuthModule, // necesario para que JwtAuthGuard inyecte AuthService correctamente en BahiasController.
   ],
   controllers: [BahiasController, BahiasAdminController],
   providers: [BahiasService, InfraestructuraSeedService],

@@ -23,11 +23,6 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 
-/**
- * Servicio de Gestión de Vehículos.
- * Controla el registro, actualización y vinculación de vehículos con usuarios.
- * REFACTOR: Implementa limpieza de recursos multimedia y auditoría integrada.
- */
 @Injectable()
 export class VehiculosService {
   constructor(
@@ -48,10 +43,6 @@ export class VehiculosService {
     private readonly notificacionesService: NotificacionesService,
   ) {}
 
-  /**
-   * Normalización institucional de placas.
-   * RNF2: Elimina guiones y espacios para evitar duplicidad técnica.
-   */
   private normalizarPlaca(placa: string): string {
     return String(placa ?? '').replace(/[- ]/g, '').toUpperCase().trim();
   }
@@ -80,7 +71,6 @@ export class VehiculosService {
 
     const placaNormalizada = this.normalizarPlaca(dto.placa);
 
-    // Verificar que la placa no esté ya registrada en el sistema
     const vehiculoExistente = await this.vehiculoRepository.findOne({
       where: { placa: placaNormalizada },
     });
@@ -88,7 +78,6 @@ export class VehiculosService {
       throw new ConflictException('Esta placa ya se encuentra registrada en el sistema');
     }
 
-    // Verificar que no haya una solicitud PENDIENTE del mismo usuario para la misma placa
     const solicitudPendiente = await this.solicitudRepository.findOne({
       where: { documento, placa: placaNormalizada, estado: EstadoSolicitud.PENDIENTE },
     });
@@ -117,7 +106,6 @@ export class VehiculosService {
       datosNuevos: { placa: placaNormalizada },
     });
 
-    // Notificar a los administradores (tipo 2)
     await this.notificacionesService.notificarAdmins({
       tipo: 'SOLICITUD_VEHICULO',
       titulo: 'Nueva solicitud de vehículo',
@@ -131,9 +119,6 @@ export class VehiculosService {
     };
   }
 
-  // ─── ADMIN: gestión de solicitudes ───────────────────────────────────────────
-
-  /** Lista solicitudes (filtro opcional por estado) */
   async listarSolicitudes(estado?: EstadoSolicitud) {
     const where = estado ? { estado } : {};
     return this.solicitudRepository.find({
@@ -143,7 +128,6 @@ export class VehiculosService {
     });
   }
 
-  /** Aprueba o rechaza una solicitud */
   async resolverSolicitud(idSolicitud: number, dto: ResolverSolicitudDto, adminDocumento: string): Promise<{ mensaje: string }> {
     const solicitud = await this.solicitudRepository.findOne({
       where: { idSolicitud },
@@ -172,7 +156,6 @@ export class VehiculosService {
       solicitud.resueltoEn = new Date();
       await this.solicitudRepository.save(solicitud);
 
-      // Notificar al usuario del rechazo
       const detalleMotivo = motivo ? ` Motivo: ${motivo}` : '';
       await this.notificacionesService.notificarUsuario({
         idUsuario: solicitud.documento,
@@ -240,7 +223,6 @@ export class VehiculosService {
       datosNuevos: { placa: solicitud.placa, propietario: solicitud.documento },
     });
 
-    // Notificar al usuario de la aprobación
     await this.notificacionesService.notificarUsuario({
       idUsuario: solicitud.documento,
       tipo: 'SOLICITUD_VEHICULO_APROBADA',
@@ -253,7 +235,6 @@ export class VehiculosService {
     return { mensaje: 'Solicitud aprobada. Vehículo registrado exitosamente.' };
   }
 
-  /** Lista las solicitudes del usuario autenticado */
   async listarMisSolicitudes(documento: string) {
     return this.solicitudRepository.find({
       where: { documento },
@@ -337,7 +318,6 @@ export class VehiculosService {
       datosNuevos: { placa: solicitud.placa },
     });
 
-    // Notificar a los administradores que hay una solicitud corregida
     await this.notificacionesService.notificarAdmins({
       tipo: 'SOLICITUD_VEHICULO',
       titulo: 'Solicitud corregida',
@@ -347,8 +327,6 @@ export class VehiculosService {
 
     return { mensaje: 'Solicitud corregida y reenviada para revisión.' };
   }
-
-  // ─── COMPARTIR VEHÍCULO ───────────────────────────────────────────────────────
 
   /**
    * Comparte un vehículo con otro usuario (queda PENDIENTE de aceptación).
@@ -375,7 +353,6 @@ export class VehiculosService {
       .findOne({ where: { documento: dto.documentoReceptor } });
     if (!receptor) throw new NotFoundException('El usuario receptor no existe');
 
-    // Un vehículo solo puede tener una invitación PENDIENTE o ACEPTADA
     const yaCompartido = await this.compartirRepository.findOne({
       where: {
         idRegistroV: registro.idRegistroV,
@@ -389,7 +366,6 @@ export class VehiculosService {
       throw new ConflictException(msg);
     }
 
-    // El receptor no puede tener más de 2 vehículos ACEPTADOS
     const aceptadosReceptor = await this.compartirRepository.count({
       where: { documento: dto.documentoReceptor, estado: EstadoCompartido.ACEPTADO },
     });
@@ -405,7 +381,6 @@ export class VehiculosService {
       }),
     );
 
-    // Notificar al receptor
     const propietario = await this.compartirRepository.manager
       .getRepository('usuario')
       .findOne({ where: { documento: documentoPropietario } }) as any;
@@ -451,7 +426,6 @@ export class VehiculosService {
 
     await this.compartirRepository.remove(compartido);
 
-    // Si era aceptado, avisar al receptor que perdió acceso
     if (erasAceptado) {
       await this.notificacionesService.notificarUsuario({
         idUsuario: receptorDoc,
@@ -466,9 +440,6 @@ export class VehiculosService {
     return { mensaje: 'Vehículo dejó de estar compartido' };
   }
 
-  /**
-   * El receptor ACEPTA un compartido pendiente.
-   */
   async aceptarCompartido(documentoReceptor: string, idCompartir: number): Promise<{ mensaje: string }> {
     const compartido = await this.compartirRepository.findOne({
       where: { idCompartir },
@@ -494,7 +465,6 @@ export class VehiculosService {
     compartido.respondidoEn = new Date();
     await this.compartirRepository.save(compartido);
 
-    // Notificar al propietario
     const placa = compartido.registroVehiculo.vehiculo.placa;
     const propietarioDoc = compartido.registroVehiculo.usuario.documento;
     const receptor = await this.compartirRepository.manager
@@ -513,9 +483,6 @@ export class VehiculosService {
     return { mensaje: `Vehículo ${placa} aceptado correctamente` };
   }
 
-  /**
-   * El receptor RECHAZA un compartido pendiente.
-   */
   async rechazarCompartido(documentoReceptor: string, idCompartir: number): Promise<{ mensaje: string }> {
     const compartido = await this.compartirRepository.findOne({
       where: { idCompartir },
@@ -573,7 +540,6 @@ export class VehiculosService {
       throw new BadRequestException('Solo se puede eliminar un compartido que ya fue aceptado.');
     }
 
-    // Validar que el receptor no tenga un movimiento activo con este vehículo
     const movimientoActivo = await this.movimientoRepository.findOne({
       where: {
         idRegistroVehiculo: compartido.idRegistroV,
@@ -595,7 +561,6 @@ export class VehiculosService {
 
     await this.compartirRepository.remove(compartido);
 
-    // Notificar al propietario que el receptor renunció
     await this.notificacionesService.notificarUsuario({
       idUsuario: propietarioDoc,
       tipo: 'COMPARTIDO_RENUNCIADO',
@@ -608,9 +573,6 @@ export class VehiculosService {
     return { mensaje: `Eliminaste el acceso al vehículo ${placa}` };
   }
 
-  /**
-   * Lista los vehículos compartidos ACEPTADOS por el usuario.
-   */
   async listarVehiculosCompartidosConmigo(documento: string) {
     const compartidos = await this.compartirRepository.find({
       where: { documento, estado: EstadoCompartido.ACEPTADO },
@@ -629,9 +591,6 @@ export class VehiculosService {
     }));
   }
 
-  /**
-   * Lista las invitaciones de compartido PENDIENTES dirigidas al usuario.
-   */
   async listarInvitacionesPendientes(documento: string) {
     const pendientes = await this.compartirRepository.find({
       where: { documento, estado: EstadoCompartido.PENDIENTE },
@@ -651,10 +610,6 @@ export class VehiculosService {
     }));
   }
 
-  /**
-   * Información del compartido de un vehículo propio (con quién está compartido).
-   * Incluye el estado (PENDIENTE/ACEPTADO).
-   */
   async infoCompartidoMio(documentoPropietario: string, placa: string) {
     const placaNormalizada = this.normalizarPlaca(placa);
     const registro = await this.registroRepository.findOne({
@@ -683,11 +638,6 @@ export class VehiculosService {
     };
   }
 
-  /**
-   * Lista vehículos vinculados al usuario autenticado.
-   * MOBILE_API: Optimizado para mostrar la flota personal del usuario en la app.
-   * SERIALIZATION: Mapea la relación Many-to-Many para un consumo simplificado en mobile.
-   */
   async listarMisVehiculos(documento: string) {
     const registros = await this.registroRepository.find({
       where: { idUsuario: documento },
@@ -706,13 +656,7 @@ export class VehiculosService {
     }));
   }
 
-  /**
-   * Lista todos los vehículos del sistema con paginación (Solo Admin).
-   * MOBILE_API: Usado para la gestión masiva de flota desde la consola móvil.
-   * PAGINATION: Controla el flujo de datos para evitar latencia en redes móviles.
-   */
   async findAll(page: number = 1, limit: number = 10) {
-    // PAGINATION: Offset dinámico para navegación entre páginas
     const [data, total] = await this.vehiculoRepository.findAndCount({
       skip: (page - 1) * limit,
       take: limit,
@@ -728,9 +672,6 @@ export class VehiculosService {
     };
   }
 
-  /**
-   * Detalle completo de un vehículo para el admin: datos del vehículo + propietario(s) + estado.
-   */
   async detalleVehiculoAdmin(placa: string) {
     const placaNormalizada = this.normalizarPlaca(placa);
     const vehiculo = await this.vehiculoRepository.findOne({
@@ -826,7 +767,6 @@ export class VehiculosService {
       vehiculo = await this.vehiculoRepository.save(vehiculo);
     }
 
-    // Crear vínculo
     const yaRegistrado = await this.registroRepository.findOne({
       where: { idUsuario: dto.documentoPropietario, idVehiculo: placaNormalizada },
       withDeleted: true,
@@ -840,7 +780,6 @@ export class VehiculosService {
       );
     }
 
-    // Notificar al propietario
     await this.notificacionesService.notificarUsuario({
       idUsuario: dto.documentoPropietario,
       tipo: 'VEHICULO_REGISTRADO_POR_ADMIN',
@@ -877,7 +816,6 @@ export class VehiculosService {
 
     await this.vehiculoRepository.save(vehiculo);
 
-    // Notificar a los dueños
     const registros = await this.registroRepository.find({ where: { idVehiculo: placaNormalizada } });
     for (const r of registros) {
       await this.notificacionesService.notificarUsuario({
@@ -892,9 +830,6 @@ export class VehiculosService {
     return { mensaje: 'Vehículo actualizado exitosamente' };
   }
 
-  /**
-   * Admin → elimina un vehículo. Notifica a propietarios y receptores de compartidos.
-   */
   async eliminarVehiculoPorAdmin(placa: string): Promise<{ mensaje: string }> {
     const placaNormalizada = this.normalizarPlaca(placa);
     const vehiculo = await this.vehiculoRepository.findOne({ where: { placa: placaNormalizada } });
@@ -902,7 +837,6 @@ export class VehiculosService {
 
     const registros = await this.registroRepository.find({ where: { idVehiculo: placaNormalizada } });
 
-    // Notificar a propietarios
     for (const r of registros) {
       await this.notificacionesService.notificarUsuario({
         idUsuario: r.idUsuario,
@@ -912,7 +846,6 @@ export class VehiculosService {
         metadata: { placa: placaNormalizada },
       });
 
-      // Notificar a quienes tenían compartido aceptado
       const compartidos = await this.compartirRepository.find({
         where: { idRegistroV: r.idRegistroV, estado: EstadoCompartido.ACEPTADO },
       });
@@ -989,13 +922,11 @@ export class VehiculosService {
    * Ambos pueden ser usados por el usuario para ingresar al parqueadero.
    */
   async findByUsuario(documento: string): Promise<Vehiculo[]> {
-    // 1. Vehículos propios
     const propios = await this.registroRepository.find({
       where: { idUsuario: documento },
       relations: ['vehiculo', 'vehiculo.tipoVehiculo'],
     });
 
-    // 2. Vehículos compartidos ACEPTADOS por este usuario
     const compartidos = await this.compartirRepository.find({
       where: { documento, estado: EstadoCompartido.ACEPTADO },
       relations: [
@@ -1022,16 +953,6 @@ export class VehiculosService {
     return unicos;
   }
 
-  /**
-   * RF32: Historial de uso del Aprendiz.
-   *
-   * Objetivo:
-   * - Permitir que el Aprendiz consulte sus ingresos/salidas (transparencia).
-   * - Depende de que registrarSalida cierre correctamente el movimiento (horaSalida + estado).
-   *
-   * RNF2:
-   * - Retorna solo información operativa del usuario autenticado (no expone datos de otros usuarios).
-   */
   async listarHistorialUsuario(documento: string) {
     const movimientos = await this.movimientoRepository
       .createQueryBuilder('mv')
@@ -1052,9 +973,6 @@ export class VehiculosService {
     return movimientos;
   }
 
-  /**
-   * Detalle de vehículo.
-   */
   async obtenerDetalle(documento: string, placa: string) {
     const placaNormalizada = this.normalizarPlaca(placa);
 
@@ -1103,7 +1021,6 @@ export class VehiculosService {
       throw new BadRequestException('Debes enviar al menos un campo (foto o color) para actualizar');
     }
 
-    // Cooldown de 15 días desde la última edición
     const DIAS_COOLDOWN = 15;
     const MS_15_DIAS = DIAS_COOLDOWN * 24 * 60 * 60 * 1000;
     const ahora = Date.now();
@@ -1141,9 +1058,6 @@ export class VehiculosService {
     };
   }
 
-  /**
-   * Devuelve si el vehículo se puede editar ahora, o cuánto falta para que se pueda.
-   */
   async puedeEditarVehiculo(documento: string, placa: string) {
     const placaNormalizada = this.normalizarPlaca(placa);
     const registro = await this.registroRepository.findOne({
@@ -1183,16 +1097,13 @@ export class VehiculosService {
     };
   }
 
-  /**
-   * Catálogo de tipos.
-   */
   async listarTipos(): Promise<TipoVehiculo[]> {
     return await this.tipoVehiculoRepository.find({ order: { tipoVehiculo: 'ASC' } });
   }
 
   /**
    * Desvincula usuario y vehículo.
-   * SECURITY: Borra lógicamente el vínculo (Soft Delete) para preservar historial.
+   * Borra lógicamente el vínculo (Soft Delete) para preservar historial.
    */
   async eliminarRegistro(documento: string, placa: string) {
     const placaNormalizada = this.normalizarPlaca(placa);
@@ -1202,7 +1113,7 @@ export class VehiculosService {
     });
     if (!registro) throw new NotFoundException('El vínculo no existe o ya fue eliminado');
 
-    // SECURITY: Impedir eliminar si el vehículo está dentro
+    // Impedir eliminar si el vehículo está dentro
     const estaAdentro = await this.movimientoRepository.findOne({
       where: {
         idRegistroVehiculo: registro.idRegistroV,
@@ -1242,7 +1153,6 @@ export class VehiculosService {
         }
       }
 
-      // Eliminamos los compartidos activos del vehículo
       await this.compartirRepository.remove(compartidosActivos);
     }
 

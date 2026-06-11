@@ -11,23 +11,12 @@ import { AppRole, ROLES_KEY } from '../decorators/roles.decorator';
 
 /**
  * Guard de autorización basado en roles (RBAC).
- *
- * Responsabilidad:
- * - Leer los roles requeridos desde metadata (@Roles)
- * - Compararlos contra el rol del usuario autenticado (request.user) poblado por JwtStrategy
- *
- * Seguridad:
- * - Fail-closed: si falta usuario/rol o la metadata es inválida, deniega acceso
+ * Fail-closed: si falta usuario/rol o la metadata es inválida, deniega acceso.
  */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
-  /**
-   * Determina si la petición puede continuar según los roles requeridos.
-   * @param context Contexto de ejecución de NestJS.
-   * @returns true si cumple; caso contrario lanza Unauthorized/Forbidden.
-   */
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.getAllAndOverride<AppRole[]>(
       ROLES_KEY,

@@ -16,19 +16,12 @@ import { MailModule } from './mail/mail.module';
 import { VehiculosModule } from './vehiculos/vehiculos.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
-// Módulo de auditoría (ruta correcta)
 import { AuditoriaModule } from './auditoria/auditoria.module';
 
-// Entidades adicionales
-import { Auditoria } from './auditoria/entities/auditoria.entity';
-import { Contingencia } from './contingencia/entities/contingencia.entity';
-import { Visitante } from './visitantes/entities/visitante.entity';
-import { Sensor } from './telemetria/entities/sensor.entity';
-import { TelemetriaEvento } from './telemetria/entities/telemetria-evento.entity';
-import { AlertaSistema } from './telemetria/entities/alerta-sistema.entity';
+// Entidad referenciada explícitamente en la config de TypeORM
+// (las demás entidades se cargan por glob '**/*.entity').
 import { ParqueaderoEstado } from './bahias/entities/parqueadero-estado.entity';
 
-// Módulo de WebSocket
 import { GatewayModule } from './gateway/gateway.module';
 import { OperativoModule } from './operativo/operativo.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -84,22 +77,20 @@ function validateEnv(config: Record<string, unknown>) {
       validate: validateEnv,
     }),
 
-    // Automatización de tareas (Cron Jobs)
     ScheduleModule.forRoot(),
 
-    // SEGURIDAD: Rate Limiting global (Optimizado para Mobile y Dashboards)
     ThrottlerModule.forRoot([{
       name: 'short',
       ttl: 1000,
-      limit: 30, // Incrementado de 10 a 30 para soportar ráfagas de carga masiva del dashboard (RF33)
+      limit: 30,
     }, {
       name: 'medium',
       ttl: 10000,
-      limit: 100, // Incrementado de 40 a 100 para permitir navegación rápida sin bloqueos
+      limit: 100,
     }, {
       name: 'long',
       ttl: 60000,
-      limit: 300, // Máximo 300 peticiones por minuto
+      limit: 300,
     }]),
 
     TypeOrmModule.forRootAsync({
@@ -141,15 +132,12 @@ function validateEnv(config: Record<string, unknown>) {
       },
     }),
 
-    // Módulos principales
     UsuariosModule,
     AuthModule,
     MailModule,
     VehiculosModule,
     CloudinaryModule,
-    // Módulo de WebSocket
     GatewayModule,
-    // Fase 3: Auditoría
     AuditoriaModule,
     OperativoModule,
     DashboardModule,
@@ -161,8 +149,6 @@ function validateEnv(config: Record<string, unknown>) {
 
   providers: [
     AppService,
-
-    // SEGURIDAD: ThrottlerGuard global
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

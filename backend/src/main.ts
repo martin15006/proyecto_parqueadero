@@ -21,7 +21,7 @@ async function bootstrap() {
   };
 
   const isDev = process.env.NODE_ENV !== 'production';
-  // CORRECCIÓN 1: Agregar patrones comunes de IP local o permitir la IP del Wi-Fi en desarrollo
+  // Permite la IP del Wi-Fi en desarrollo para pruebas desde móviles en la red local
   const devAllowedHosts = new Set(['localhost', '127.0.0.1', '192.168.137.225']);
 
   const corsOrigins = (process.env.CORS_ORIGINS ?? '')
@@ -53,8 +53,8 @@ async function bootstrap() {
       if (isDev) {
         try {
           const url = new URL(origin);
-          
-          // CORRECCIÓN 2: Flexibilidad total en entorno de desarrollo local para pruebas móviles
+
+          // En desarrollo se acepta cualquier host de la subred local (192.168.*) para pruebas móviles
           const hostOk = devAllowedHosts.has(url.hostname) || url.hostname.startsWith('192.168.');
           const protocolOk = url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'exp:';
 
@@ -75,14 +75,12 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'x-iot-api-key'],
   });
 
-  // Versionamiento de API
   app.setGlobalPrefix('api');
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: '1',
   });
 
-  // Filtros y Pipes globales
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(
     new LoggingInterceptor(),
@@ -101,7 +99,6 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger Documentation
   const config = new DocumentBuilder()
     .setTitle('Sistema de Parqueadero Inteligente - Backend Seguro')
     .setDescription('API endurecida para gestión de parqueaderos con auditoría y seguridad avanzada')
@@ -112,8 +109,8 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
   const port = Number(process.env.PORT ?? 3000);
-  
-  // CORRECCIÓN 3: Escuchar explícitamente en '0.0.0.0' para abrir los puertos a la red Wi-Fi
+
+  // Escucha en 0.0.0.0 para exponer la API a la red Wi-Fi local, no solo a localhost
   try {
     await app.listen(port, '0.0.0.0');
   } catch (error: any) {

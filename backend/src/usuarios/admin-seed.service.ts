@@ -93,7 +93,7 @@ export class AdminSeedService implements OnModuleInit {
 
       usuario.idFormacion = null;
       usuario.pushToken = null;
-      usuario.correoVerificado = true; // El admin del seed siempre está verificado
+      usuario.correoVerificado = true;
 
       const actualizado = await this.usuarioRepository.save(usuario);
       this.logger.log(
@@ -116,7 +116,7 @@ export class AdminSeedService implements OnModuleInit {
       idFormacion: null,
       qr: randomUUID(),
       pushToken: null,
-      correoVerificado: true, // El admin del seed siempre está verificado
+      correoVerificado: true,
     });
 
     await this.usuarioRepository.save(admin);

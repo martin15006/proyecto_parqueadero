@@ -24,13 +24,11 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Overlay */}
-      <div 
+      <div
         className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       ></div>
 
-      {/* Content */}
       <div className="relative bg-white dark:bg-[#121212] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-modal-in border border-slate-200 dark:border-white/5 transition-colors duration-500">
         <div className="px-8 py-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
           <h3 className="text-xl font-black text-[#232323] dark:text-gray-100 uppercase tracking-tight">{title}</h3>

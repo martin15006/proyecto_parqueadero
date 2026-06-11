@@ -22,7 +22,6 @@ export const AlertasView: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-500">
-      {/* Selector de Categorías Sobrio */}
       <div className="bg-white dark:bg-[#121212] p-2 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex flex-wrap gap-1 transition-colors duration-300">
         <TabButton 
           active={activeTab === 'todas'} 
@@ -53,7 +52,6 @@ export const AlertasView: React.FC = () => {
         />
       </div>
 
-      {/* Listado de Novedades */}
       <div className="space-y-3">
         {filteredAlerts.length === 0 ? (
           <div className="bg-white dark:bg-[#121212] py-20 px-6 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm text-center transition-colors duration-300">
@@ -106,7 +104,6 @@ export const AlertasView: React.FC = () => {
         )}
       </div>
 
-      {/* Paginación Sobria */}
       <div className="flex items-center justify-between px-6 py-4 bg-gray-50/50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 transition-colors duration-300">
         <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
           Historial de Seguridad

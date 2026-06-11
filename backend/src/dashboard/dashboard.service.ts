@@ -12,10 +12,6 @@ import { Response } from 'express';
 // Importación de PDFKit con manejo de tipos manual para evitar errores de compilación
 const PDFDocument = require('pdfkit');
 
-/**
- * Servicio de Dashboard y Analíticas.
- * Encargado de consolidar información estadística y generar reportes administrativos.
- */
 @Injectable()
 export class DashboardService {
   constructor(
@@ -83,11 +79,8 @@ export class DashboardService {
       parqueaderoDeshabilitado: estadoGlobal.parqueaderoDeshabilitado,
       estadoParqueadero: estadoGlobal.estadoParqueadero,
       ocupacion: {
-        /** Total de bahías registradas (cupo máximo). */
         total,
-        /** QRs escaneados activos (vehículos adentro). */
         ocupados,
-        /** total - ocupados (mínimo 0). */
         disponibles,
         porcentajeOcupacion,
       },
@@ -105,9 +98,6 @@ export class DashboardService {
     return [];
   }
 
-  /**
-   * Obtiene la tendencia de ingresos de la última semana (7 días).
-   */
   async obtenerEstadisticas() {
     const sieteDiasAtras = new Date();
     sieteDiasAtras.setDate(sieteDiasAtras.getDate() - 7);
@@ -127,9 +117,6 @@ export class DashboardService {
     }));
   }
 
-  /**
-   * Analiza el tráfico vehicular distribuido por horas para identificar picos operativos.
-   */
   async obtenerTraficoPorHoras() {
     const trafico = await this.movimientoRepository
       .createQueryBuilder('movimiento')
@@ -145,9 +132,6 @@ export class DashboardService {
     }));
   }
 
-  /**
-   * Obtiene la distribución de ocupación actual segmentada por tipo de vehículo.
-   */
   async obtenerOcupacionPorTipo() {
     return await this.movimientoRepository
       .createQueryBuilder('movimiento')
@@ -161,13 +145,7 @@ export class DashboardService {
       .getRawMany();
   }
 
-  /**
-   * Obtiene el historial de movimientos paginado.
-   * MOBILE_API: Usado para el log de actividad en tiempo real de la app.
-   * PAGINATION: Offset y límite para optimizar la carga en dispositivos móviles.
-   */
   async obtenerHistorial(page: number = 1, limit: number = 20) {
-    // PAGINATION: Búsqueda paginada de movimientos históricos
     const [data, total] = await this.movimientoRepository.findAndCount({
       relations: ['registroVehiculo', 'registroVehiculo.vehiculo', 'registroVehiculo.usuario'],
       order: { horaIngreso: 'DESC' },
@@ -183,9 +161,6 @@ export class DashboardService {
     };
   }
 
-  /**
-   * Genera y transmite un archivo Excel con el historial completo de movimientos.
-   */
   async exportarExcel(res: Response, user: any) {
     const movimientos = await this.movimientoRepository.find({
       relations: ['registroVehiculo', 'registroVehiculo.usuario', 'registroVehiculo.vehiculo'],
@@ -195,7 +170,6 @@ export class DashboardService {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Historial de Movimientos');
 
-    // Definición de columnas con anchos optimizados
     worksheet.columns = [
       { header: 'ID MOV', key: 'id', width: 10 },
       { header: 'PLACA', key: 'placa', width: 15 },
@@ -232,9 +206,6 @@ export class DashboardService {
     res.end();
   }
 
-  /**
-   * Genera y transmite un reporte PDF profesional.
-   */
   async exportarPDF(res: Response, user: any) {
     const movimientos = await this.movimientoRepository.find({
       relations: ['registroVehiculo', 'registroVehiculo.usuario', 'registroVehiculo.vehiculo'],
@@ -247,12 +218,10 @@ export class DashboardService {
 
     doc.pipe(res);
 
-    // Encabezado del reporte
     doc.fontSize(22).text('REPORTE INSTITUCIONAL DE MOVIMIENTOS', { align: 'center', underline: true });
     doc.fontSize(10).text(`Generado por: ${user.sub} el ${new Date().toLocaleString()}`, { align: 'right' });
     doc.moveDown(2);
 
-    // Listado de movimientos
     movimientos.forEach((m, index) => {
       doc.fontSize(11).fillColor('#2c3e50').text(`${index + 1}. ${m.registroVehiculo.vehiculo.placa} - ${m.registroVehiculo.usuario.nombreCompleto}`);
       doc.fontSize(9).fillColor('#7f8c8d').text(`   Ingreso: ${m.horaIngreso.toLocaleString()} | Estado: ${m.estado}`);

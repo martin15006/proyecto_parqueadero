@@ -9,13 +9,6 @@ import { UpdateOperativoDto } from './dto/update-operativo.dto';
 import { UpdateOperativoEstadoDto } from './dto/update-operativo-estado.dto';
 import { UsuarioService } from './usuario.service';
 
-/**
- * Controlador para acciones administrativas sobre usuarios (gestión de personal).
- *
- * Seguridad:
- * - Requiere JWT válido
- * - Requiere rol ADMIN
- */
 @ApiTags('admin')
 @ApiBearerAuth()
 @Controller('admin/usuarios/operativo')
@@ -24,16 +17,7 @@ import { UsuarioService } from './usuario.service';
 export class UsuariosAdminController {
   constructor(private readonly usuarioService: UsuarioService) {}
 
-  /**
-   * Crea una cuenta de usuario para personal Operativo.
-   *
-   * Reglas:
-   * - El rol se fuerza server-side a OPERATIVO (no se acepta desde el body)
-   * - Campos adicionales son rechazados por el ValidationPipe global
-   *
-   * @param dto Datos mínimos para crear el operativo.
-   * @returns Usuario creado (sin contraseña).
-   */
+  // El rol se fuerza server-side a OPERATIVO; no se acepta desde el body.
   @Post()
   @ApiOperation({ summary: 'Crear usuario Operativo (Solo ADMIN)' })
   @ApiResponse({ status: 201, description: 'Operativo creado exitosamente' })

@@ -3,26 +3,16 @@ import { Upload, X, Loader2 } from 'lucide-react';
 import { subirImagen } from '../../services/upload.service';
 
 interface Props {
-  /** URL actual de la imagen (puede venir del servidor) */
   value: string;
-  /** Callback que devuelve la URL pública tras subir */
   onChange: (url: string) => void;
-  /** Texto del label */
   label?: string;
-  /** Mensaje de error a mostrar */
   error?: string;
-  /** Texto pequeño debajo del label */
   hint?: string;
-  /** Alto del preview (px) */
   previewHeight?: number;
-  /** Texto del placeholder cuando no hay imagen */
   placeholder?: string;
 }
 
-/**
- * Componente de carga de imagen con preview.
- * Sube directamente a Cloudinary y devuelve la URL segura.
- */
+/** Sube directamente a Cloudinary y devuelve la URL segura. */
 export const ImageUpload: React.FC<Props> = ({
   value,
   onChange,

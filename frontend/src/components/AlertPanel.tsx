@@ -11,7 +11,6 @@ interface AlertPanelProps {
   alerts: Alert[];
 }
 
-// FIX: AlertPanel - Monitor de alertas realtime para el parqueadero
 export const AlertPanel: React.FC<AlertPanelProps> = ({ alerts }) => {
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden flex flex-col h-full">

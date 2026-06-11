@@ -10,11 +10,6 @@ interface ActiveVehiclesTableProps {
   onSalida: (placa: string) => void;
 }
 
-/**
- * Tabla de Control de Vehículos Activos.
- * FEATURE: Permite visualización y liberación rápida de bahías.
- * SOCKET: Se actualiza dinámicamente al detectar movimientos.
- */
 export const ActiveVehiclesTable: React.FC<ActiveVehiclesTableProps> = ({ vehiculos, onSalida }) => {
   const columns = [
     {

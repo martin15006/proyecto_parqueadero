@@ -10,11 +10,6 @@ if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
   );
 }
 
-/**
- * Sube una imagen a Cloudinary y retorna la URL segura.
- * @param localUri URI local de la imagen en el dispositivo.
- * @returns URL HTTPS pública de la imagen.
- */
 export async function subirImagen(
   localUri: string
 ): Promise<string> {

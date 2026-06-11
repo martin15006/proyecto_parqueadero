@@ -1,5 +1,3 @@
-// src/operativo/operativo.module.ts
-
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -14,10 +12,8 @@ import { BahiasModule } from '../bahias/bahias.module';
 import { MailModule } from '../mail/mail.module';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 
-// Importa el módulo que contiene y exporta EventosGateway
 import { GatewayModule } from '../gateway/gateway.module';
 
-// FIX: 0ryvli - Importadas entidades necesarias para inyección en OperativoService
 import { Vehiculo } from '../vehiculos/entities/vehiculo.entity';
 import { RegistroVehiculo } from '../vehiculos/entities/registro-vehiculo.entity';
 import { MovimientoVehiculo } from '../vehiculos/entities/movimiento-vehiculo.entity';
@@ -34,9 +30,8 @@ import { AlertaSistema } from '../telemetria/entities/alerta-sistema.entity';
     BahiasModule,
     MailModule,
     NotificacionesModule,
-    GatewayModule, // ← necesario para inyectar EventosGateway
-    // FIX: Auditoría técnica - registrado TypeOrmModule.forFeature para Vehiculo, RegistroVehiculo y MovimientoVehiculo
-    TypeOrmModule.forFeature([Vehiculo, RegistroVehiculo, MovimientoVehiculo, Contingencia, AlertaSistema]), // RF35: permite consultar alertas técnicas recientes en el resumen operativo.
+    GatewayModule,
+    TypeOrmModule.forFeature([Vehiculo, RegistroVehiculo, MovimientoVehiculo, Contingencia, AlertaSistema]),
   ],
   controllers: [OperativoController, AdminMovimientosController],
   providers: [OperativoService],

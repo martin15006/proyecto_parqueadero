@@ -1,9 +1,6 @@
 import { SetMetadata } from '@nestjs/common';
 import { TipoUsuarioEnum } from '../../common/enums/tipo-usuario.enum';
 
-/**
- * Clave de metadata usada para almacenar roles requeridos a nivel de handler/class.
- */
 export const ROLES_KEY = 'roles';
 
 /**

@@ -16,7 +16,7 @@ export class TelemetriaEvento {
   idSensor: number;
 
   @Column({ length: 30 })
-  tipoEvento: string; // OCUPADO, LIBRE, ERROR
+  tipoEvento: string;
 
   @Column({ type: 'json', nullable: true })
   payload: Record<string, any>;

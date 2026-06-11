@@ -46,9 +46,6 @@ export class AuthController {
     return this.authService.verificarRegistroOtp(dto);
   }
 
-  /**
-   * Reenvía un nuevo código OTP al correo del usuario.
-   */
   @Post('reenviar-otp')
   @HttpCode(HttpStatus.OK)
   reenviarOtp(@Body() dto: ReenviarOtpDto) {
@@ -91,7 +88,7 @@ export class AuthController {
     }
 
     await this.authService.revocarAccessToken(token);
-    
+
     return this.authService.logout(dto.refreshToken);
   }
 

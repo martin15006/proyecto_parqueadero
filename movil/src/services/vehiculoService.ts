@@ -75,8 +75,6 @@ export const vehiculoService = {
     });
   },
 
-  // ─── Solicitudes ────────────────────────────────────────────
-
   async listarMisSolicitudes(): Promise<SolicitudVehiculo[]> {
     return apiRequest<SolicitudVehiculo[]>('/vehiculos/solicitudes', {
       method: 'GET',
@@ -97,8 +95,6 @@ export const vehiculoService = {
       conAuth: true,
     });
   },
-
-  // ─── Compartir ──────────────────────────────────────────────
 
   async listarCompartidosConmigo(): Promise<VehiculoCompartido[]> {
     return apiRequest<VehiculoCompartido[]>('/vehiculos/compartidos-conmigo', {

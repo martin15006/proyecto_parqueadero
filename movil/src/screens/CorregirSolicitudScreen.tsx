@@ -42,7 +42,6 @@ export default function CorregirSolicitudScreen({ navigation, route }: any) {
 
   const debeCorregir = (campo: string) => campos.includes(campo);
 
-  // Valores pre-cargados con la solicitud original
   const [placa, setPlaca] = useState(solicitud?.placa ?? '');
   const [color, setColor] = useState(solicitud?.color ?? '');
   const [tipoSeleccionado, setTipoSeleccionado] = useState<number | null>(

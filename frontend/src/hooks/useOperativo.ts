@@ -126,7 +126,6 @@ export const useOperativo = () => {
 
     loadInitialData();
 
-    // ── Polling de respaldo ─────────────────────────────────────────────────
     let pollTimer: ReturnType<typeof window.setInterval> | null = null;
     const startPolling = () => {
       if (pollTimer) return;
@@ -141,8 +140,6 @@ export const useOperativo = () => {
       }, 4000);
     };
     startPolling();
-
-    // ── Handlers WebSocket ──────────────────────────────────────────────────
 
     const handleConteoGlobal = (data: ConteoGlobalDisponiblesPayload) => {
       setStats((prev) => ({
@@ -218,7 +215,6 @@ export const useOperativo = () => {
      * Si el fetch falla, la actualización optimista permanece.
      */
     const handleBahiaModificada = async (data: BahiaModificadaPayload) => {
-      // Fase 1: color inmediato
       const id = parseIdBahia(data.idBahia);
       if (id) {
         const estadoPanel = mapNuevoEstadoToEstadoPanel(data.nuevoEstado);
@@ -228,7 +224,6 @@ export const useOperativo = () => {
             : prev,
         );
       }
-      // Fase 2: estado completo (placa + SALIDA_PENDIENTE correcto)
       try {
         const sensorizadas = (await bahiasService.getSensorizadas()) as BahiaSensorizada[];
         setBahias(sensorizadas);
