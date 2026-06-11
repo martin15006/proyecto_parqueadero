@@ -314,12 +314,29 @@ export class OperativoService {
       limit: 50,
     });
 
+    // RF35: también las salidas del turno, para distinguir el tipo de cada movimiento.
+    const accionesSalida = await this.auditoriaService.listarAccionesPorUsuarioEnRango({
+      idUsuario: operador.sub,
+      accion: 'REGISTRAR_SALIDA',
+      desde: inicioDia,
+      hasta: new Date(),
+      limit: 50,
+    });
+
+    // Unimos ingresos y salidas etiquetando el tipo de cada acción.
+    const accionesTurno: Array<{ a: any; tipo: 'INGRESO' | 'SALIDA' }> = [
+      ...accionesIngreso.map((a: any) => ({ a, tipo: 'INGRESO' as const })),
+      ...accionesSalida.map((a: any) => ({ a, tipo: 'SALIDA' as const })),
+    ];
+
+    const normalizarPlaca = (p: any) =>
+      String(p ?? '').trim().replace(/[- ]/g, '').toUpperCase();
+
     const placasTurno = Array.from(
       new Set(
-        accionesIngreso
-          .map((a: any) => String(a?.datosNuevos?.placa ?? '').trim())
-          .filter(Boolean)
-          .map((p) => p.replace(/[- ]/g, '').toUpperCase()),
+        accionesTurno
+          .map(({ a }) => normalizarPlaca(a?.datosNuevos?.placa))
+          .filter(Boolean),
       ),
     );
 
@@ -334,17 +351,19 @@ export class OperativoService {
       vehiculosTurno.map((v) => [v.placa, v.tipoVehiculo?.tipoVehiculo ?? 'N/D'] as const),
     );
 
-    const ingresosTurno = accionesIngreso
-      .map((a: any) => {
-        const placa = String(a?.datosNuevos?.placa ?? '').trim().replace(/[- ]/g, '').toUpperCase();
+    const ingresosTurno = accionesTurno
+      .map(({ a, tipo }) => {
+        const placa = normalizarPlaca(a?.datosNuevos?.placa);
         if (!placa) return null;
         return {
           placa,
-          horaIngreso: a.createdAt,
+          horaIngreso: a.createdAt, // momento del movimiento (ingreso o salida)
           tipoVehiculo: tipoPorPlaca.get(placa) ?? 'N/D',
+          tipo, // 'INGRESO' | 'SALIDA'
         };
       })
-      .filter(Boolean)
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .sort((x, y) => new Date(y.horaIngreso).getTime() - new Date(x.horaIngreso).getTime())
       .slice(0, 50);
 
     const ingresosHoy = await this.auditoriaService.contarAccionPorUsuarioEnRango({

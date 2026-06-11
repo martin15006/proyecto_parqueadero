@@ -141,6 +141,7 @@ export interface Vehiculo {
   color: string;
   idTipoVehiculo: number;
   tipoVehiculo?: TipoVehiculo | string;
+  isAdentro?: boolean;
 }
 
 export interface AdminUsuarioItem extends User {
@@ -150,6 +151,7 @@ export interface AdminUsuarioItem extends User {
 
 export interface AdminVehiculoItem extends Vehiculo {
   isAdentro: boolean;
+  usuario?: User | null;
 }
 
 export type EstadoSolicitudVehiculo = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';

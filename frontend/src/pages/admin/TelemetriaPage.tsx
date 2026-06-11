@@ -247,7 +247,7 @@ export const TelemetriaPage: React.FC = () => {
       )}
 
       {canSeeSimulator && (
-        <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <section className="bg-white dark:bg-[#121212] p-6 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm transition-colors duration-500">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-black text-gray-900 tracking-tight">Simulador IoT / Eventos (DEMO)</h2>
@@ -293,7 +293,7 @@ export const TelemetriaPage: React.FC = () => {
       </div>
 
       {/* Mapa 2D (Bosquejo) */}
-      <section className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm space-y-6">
+      <section className="bg-white dark:bg-[#121212] p-8 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm space-y-6 transition-colors duration-500">
         <div className="flex flex-col lg:flex-row justify-between gap-4 lg:items-end">
           <div>
             <h2 className="text-xl font-black text-gray-900 tracking-tight">Mapa 2D de Bahías (30)</h2>
@@ -374,7 +374,7 @@ export const TelemetriaPage: React.FC = () => {
           return (
             <div 
               key={sensor.codigo} 
-              className="bg-white border border-slate-200 rounded-xl p-8 hover:shadow-sm transition-all duration-200 group relative overflow-hidden"
+              className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/5 rounded-xl p-8 hover:shadow-sm transition-all duration-200 group relative overflow-hidden"
             >
               {/* Status Badge */}
               <div className="absolute top-0 right-0">

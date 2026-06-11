@@ -44,12 +44,14 @@ type TurnoIngresoRow = {
   placa: string;
   horaIngreso: string;
   tipoVehiculo: string;
+  tipo?: 'INGRESO' | 'SALIDA'; // distingue si el movimiento fue ingreso o salida.
 };
 
 type VehiculoSeleccionable = {
   placa: string; // RF31: identificador mínimo para selección manual.
   tipoVehiculo: string; // RF31: muestra tipo existente en el sistema (no inventa modelo/marca).
   color: string; // RF31: apoyo visual para confirmar el vehículo observado.
+  fotoVehiculo?: string; // RF31: imagen del vehículo (el backend ya la envía) para confirmación visual.
 };
 
 type EscaneoCodigoAutoResponse = OperativoResponse & {
@@ -591,10 +593,10 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
         </button>
       </div>
 
-      {/* Actividad Reciente Compacta — Vehículos ingresados en tu turno */}
+      {/* Actividad reciente — movimientos (ingresos/salidas) del turno */}
       <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-white/5">
         <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Ingresos de tu turno</h4>
+          <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Movimientos de tu turno</h4>
           <span className={`text-[9px] font-bold uppercase tracking-widest ${turnoLoading ? 'text-orange-400 animate-pulse' : 'text-[#39B000] animate-pulse'}`}>
             {turnoLoading ? 'Cargando' : 'En vivo'}
           </span>
@@ -607,9 +609,15 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
               <p className="text-[10px] font-bold text-gray-300 dark:text-gray-700 uppercase tracking-widest">Sin registros recientes</p>
             </div>
           ) : (
-            turnoIngresos.slice(0, 6).map((ingreso, i) => (
+            turnoIngresos.slice(0, 6).map((ingreso, i) => {
+              const esSalida = ingreso.tipo === 'SALIDA';
+              return (
               <div key={`${ingreso.placa}-${i}`} className="flex items-center gap-3 p-3 bg-white dark:bg-[#121212] border border-gray-100 dark:border-white/5 rounded-xl hover:border-gray-200 dark:hover:border-white/10 transition-all group">
-                <div className="w-8 h-8 rounded-lg bg-gray-50 dark:bg-white/5 flex items-center justify-center text-[#39B000] font-bold text-[10px] group-hover:bg-[#39B000] group-hover:text-white transition-all">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[10px] transition-all ${
+                  esSalida
+                    ? 'bg-orange-50 text-orange-500 dark:bg-orange-900/20 dark:text-orange-400 group-hover:bg-orange-500 group-hover:text-white'
+                    : 'bg-gray-50 dark:bg-white/5 text-[#39B000] group-hover:bg-[#39B000] group-hover:text-white'
+                }`}>
                   {ingreso.placa.substring(0, 2)}
                 </div>
                 <div className="flex-1 overflow-hidden">
@@ -618,8 +626,16 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
                     {(ingreso.tipoVehiculo || 'N/D')} • {horaTurno(ingreso.horaIngreso)}
                   </p>
                 </div>
+                <span className={`shrink-0 px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest ${
+                  esSalida
+                    ? 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400'
+                    : 'bg-green-50 text-[#39B000] dark:bg-[#39B000]/10 dark:text-[#39B000]'
+                }`}>
+                  {esSalida ? 'Salida' : 'Ingreso'}
+                </span>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -757,7 +773,7 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
       {/* Overlay de Selección de Vehículo (RF31) */}
       {multiVehiculos && (
         <div className="fixed inset-0 z-[100] bg-[#012E25]/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-[#121212] rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl border border-gray-100 dark:border-white/5 transition-colors duration-300">
+          <div className="bg-white dark:bg-[#121212] rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl border border-gray-100 dark:border-white/5 transition-colors duration-300">
             <div className="p-6 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-bold text-[#39B000] uppercase tracking-widest mb-1">Selección de Vehículo</p>
@@ -767,20 +783,24 @@ export const MovementForm = forwardRef<MovementFormHandle, MovementFormProps>(({
                 <XCircle size={20} />
               </button>
             </div>
-            <div className="p-6 grid grid-cols-1 gap-3">
+            <div className="p-6 grid grid-cols-2 sm:grid-cols-3 gap-4">
               {multiVehiculos.map((v) => (
                 <button
                   key={v.placa}
                   onClick={() => handleConfirmarMultivehiculo(v.placa)}
                   disabled={feedback.type === 'loading'}
-                  className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 dark:border-white/5 hover:border-[#39B000] hover:bg-green-50/30 dark:hover:bg-[#39B000]/10 transition-all group text-left disabled:opacity-60"
+                  className="flex flex-col items-center text-center gap-3 p-4 rounded-2xl border border-gray-100 dark:border-white/5 hover:border-[#39B000] hover:bg-green-50/30 dark:hover:bg-[#39B000]/10 transition-all group disabled:opacity-60 active:scale-95"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-gray-50 dark:bg-white/5 flex items-center justify-center text-gray-400 group-hover:bg-[#39B000] group-hover:text-white transition-all">
-                    <Car size={20} />
+                  <div className="w-full aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-white/5 flex items-center justify-center text-gray-300 dark:text-gray-600">
+                    {v.fotoVehiculo ? (
+                      <img src={v.fotoVehiculo} alt={v.placa} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    ) : (
+                      <Car size={36} />
+                    )}
                   </div>
                   <div>
-                    <p className="text-base font-bold text-[#012E25] dark:text-white">{v.placa}</p>
-                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{v.tipoVehiculo} • {v.color}</p>
+                    <p className="text-base font-bold text-[#012E25] dark:text-white tracking-wide">{v.placa}</p>
+                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-0.5">{v.tipoVehiculo} • {v.color}</p>
                   </div>
                 </button>
               ))}

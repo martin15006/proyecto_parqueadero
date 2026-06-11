@@ -274,8 +274,8 @@ export const InformesPage: React.FC = () => { // UI: componente principal de la 
   }, [meta?.stats?.picoMaximoOcupacion, meta?.stats?.promedioEstanciaMinutos, meta?.stats?.totalIngresos, rowsFiltradas]); // RF21: dependencias.
 
   return ( // UI: inicio de layout “Suite Ejecutiva de Auditoría”.
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900"> {/* Paleta SENA/WCAG: fondo gris institucional y texto oscuro con contraste alto. */}
-      <div className="mx-auto max-w-[1600px] space-y-8 px-4 py-8 md:px-6"> {/* Layout: ancho amplio sin forzar scroll horizontal; padding responsive. */}
+    <div className="space-y-8"> {/* Layout: ancho amplio sin forzar scroll horizontal; padding responsive. */}
+      <div className="mx-auto max-w-[1600px] space-y-8 py-8"> 
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-end -mt-20 mb-10 relative z-50">
           <div className="flex items-center gap-3">
             <Badge variant="info" className="bg-white/80 backdrop-blur-sm border-slate-200 text-slate-600">ADMIN</Badge>
@@ -308,14 +308,14 @@ export const InformesPage: React.FC = () => { // UI: componente principal de la 
           <KpiCard title="Incidencias" value={String(statsKpi.incidencias)} subtitle="Contingencias + rechazos" gradient="bg-gradient-to-br from-[#003939] to-[#004d4d]" Icon={TriangleAlert} /> {/* KPI: calidad operativa (riesgo). */}
         </section> {/* UI: fin KPIs. */}
 
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)]"> {/* UI: contenedor premium (card) para filtros+tabla; sombras suaves, bordes sutiles. */}
-          <div className="border-b border-slate-200 p-6"> {/* UI: header de filtros separado por borde (mejor escaneo). */}
+        <section className="overflow-hidden rounded-3xl border border-slate-200 dark:border-white/5 bg-white dark:bg-[#121212] shadow-[0_18px_55px_rgba(15,23,42,0.06)] transition-colors duration-500"> {/* UI: contenedor premium (card) para filtros+tabla; sombras suaves, bordes sutiles. */}
+          <div className="border-b border-slate-200 dark:border-white/5 p-6 transition-colors duration-500"> {/* UI: header de filtros separado por borde (mejor escaneo). */}
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"> {/* Layout: stack en móvil, fila en pantallas grandes. */}
               <div className="flex-1"> {/* UI: búsqueda principal ocupa el espacio disponible. */}
                 <label className="sr-only" htmlFor="busqueda">Búsqueda principal</label> {/* WCAG: label accesible sin saturar la UI. */}
                 <div className="relative"> {/* UI: contenedor relativo para icono dentro del input. */}
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4"> {/* UI: icono decorativo (no interactivo). */}
-                    <Search className="h-4 w-4 text-slate-400" /> {/* UI: icono tenue para no competir con el texto. */}
+                    <Search className="h-4 w-4 text-slate-400 dark:text-slate-500" /> {/* UI: icono tenue para no competir con el texto. */}
                   </div> {/* UI: fin icono. */}
                   <input
                     id="busqueda" // WCAG: vincula input con label sr-only.
@@ -323,8 +323,8 @@ export const InformesPage: React.FC = () => { // UI: componente principal de la 
                     onChange={(e) => setBusqueda(e.target.value)} // React: actualiza estado.
                     placeholder="Buscar por documento / ID de usuario..." // UX: placeholder guía (no sustituye el label).
                     className={[ // Tailwind: input con alto contraste y foco visible.
-                      'w-full rounded-2xl border-2 border-slate-200 bg-[#F8FAFC]', // Paleta: fondo gris claro institucional.
-                      'py-3 pl-11 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-500', // Tipografía: peso suficiente para legibilidad.
+                      'w-full rounded-2xl border-2 border-slate-200 dark:border-white/10 bg-[#F8FAFC] dark:bg-black/20', // Paleta: fondo gris claro institucional.
+                      'py-3 pl-11 pr-4 text-sm font-semibold text-slate-900 dark:text-slate-200 placeholder:text-slate-500 dark:placeholder:text-slate-600', // Tipografía: peso suficiente para legibilidad.
                       'focus:border-[#39A900] focus:outline-none focus:ring-4 focus:ring-[#39A900]/15', // WCAG: foco verde SENA con halo suave.
                     ].join(' ')} // UI: fin className.
                   /> {/* UI: fin input. */}
@@ -337,8 +337,8 @@ export const InformesPage: React.FC = () => { // UI: componente principal de la 
                   onClick={() => setFiltrosAbiertos((v) => !v)} // UX: alterna panel de filtros avanzados.
                   className={[ // Tailwind: botón secundario (borde) con foco visible.
                     'inline-flex items-center gap-2 rounded-2xl border-2 px-4 py-3', // UI: hit-area amplia.
-                    'border-[#003939]/20 bg-white text-[11px] font-black uppercase tracking-widest text-[#003939]', // Paleta: verde oscuro en texto/borde.
-                    'hover:bg-[#F8FAFC]', // UX: hover sutil.
+                    'border-[#003939]/20 dark:border-white/20 bg-white dark:bg-[#121212] text-[11px] font-black uppercase tracking-widest text-[#003939] dark:text-slate-200', // Paleta: verde oscuro en texto/borde.
+                    'hover:bg-[#F8FAFC] dark:hover:bg-white/5', // UX: hover sutil.
                     'focus:outline-none focus:ring-4 focus:ring-[#003939]/15', // WCAG: foco visible.
                   ].join(' ')} // UI: fin className.
                   aria-expanded={filtrosAbiertos} // WCAG: comunica si el panel está abierto.
@@ -370,49 +370,49 @@ export const InformesPage: React.FC = () => { // UI: componente principal de la 
             {filtrosAbiertos && ( // UX: panel colapsable solo se muestra cuando el usuario lo solicita.
               <div
                 id="panel-filtros-avanzados" // WCAG: id para aria-controls.
-                className="mt-5 animate-in slide-in-from-top-2 rounded-2xl border border-slate-200 bg-[#F8FAFC] p-5 duration-200" // UX: animación suave desde arriba; fondo gris institucional; bordes sutiles.
+                className="mt-5 animate-in slide-in-from-top-2 rounded-2xl border border-slate-200 dark:border-white/10 bg-[#F8FAFC] dark:bg-black/30 p-5 duration-200 transition-colors duration-500" // UX: animación suave desde arriba; fondo gris institucional; bordes sutiles.
               >
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-5"> {/* Layout: 5 columnas en desktop para incluir “Tipo de Usuario” sin saturar. */}
                   <div className="flex flex-col gap-2"> {/* UI: filtro “Desde”. */}
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-slate-600"> {/* WCAG: label visible con tracking para legibilidad. */}
-                      <CalendarRange className="h-4 w-4 text-slate-500" /> {/* UI: icono contextual. */}
+                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-slate-600 dark:text-slate-400"> {/* WCAG: label visible con tracking para legibilidad. */}
+                      <CalendarRange className="h-4 w-4 text-slate-500 dark:text-slate-500" /> {/* UI: icono contextual. */}
                       Desde {/* UX: texto directo. */}
                     </label> {/* UI: fin label. */}
                     <input
                       type="date" // HTML: control nativo (accesible por defecto).
                       value={historicoDesde} // React: controlado.
                       onChange={(e) => setHistoricoDesde(e.target.value)} // React: actualiza estado.
-                      className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 focus:border-[#39A900] focus:outline-none focus:ring-4 focus:ring-[#39A900]/15" // WCAG: foco visible verde SENA.
+                      className="rounded-xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-[#121212] px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-200 focus:border-[#39A900] focus:outline-none focus:ring-4 focus:ring-[#39A900]/15" // WCAG: foco visible verde SENA.
                     /> {/* UI: fin input date. */}
                   </div> {/* UI: fin filtro desde. */}
 
                   <div className="flex flex-col gap-2"> {/* UI: filtro “Hasta”. */}
-                    <label className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-600">Hasta</label> {/* WCAG: label visible. */}
+                    <label className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-600 dark:text-slate-400">Hasta</label> {/* WCAG: label visible. */}
                     <input
                       type="date" // HTML: control nativo.
                       value={historicoHasta} // React: controlado.
                       onChange={(e) => setHistoricoHasta(e.target.value)} // React: actualiza estado.
-                      className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 focus:border-[#39A900] focus:outline-none focus:ring-4 focus:ring-[#39A900]/15" // WCAG: foco visible.
+                      className="rounded-xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-[#121212] px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-200 focus:border-[#39A900] focus:outline-none focus:ring-4 focus:ring-[#39A900]/15" // WCAG: foco visible.
                     /> {/* UI: fin input. */}
                   </div> {/* UI: fin filtro hasta. */}
 
                   <div className="flex flex-col gap-2"> {/* UI: filtro tipo vehículo. */}
-                    <label className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-600">Tipo de vehículo</label> {/* WCAG: label visible. */}
+                    <label className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-600 dark:text-slate-400">Tipo de vehículo</label> {/* WCAG: label visible. */}
                     <input
                       type="text" // HTML: texto libre para no imponer catálogo inexistente.
                       value={tipoVehiculo} // React: controlado.
                       onChange={(e) => setTipoVehiculo(e.target.value)} // React: actualiza estado.
                       placeholder="Ej: Moto / Carro" // UX: ejemplo.
-                      className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 placeholder:text-slate-500 focus:border-[#39A900] focus:outline-none focus:ring-4 focus:ring-[#39A900]/15" // WCAG: foco visible.
+                      className="rounded-xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-[#121212] px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-200 placeholder:text-slate-500 dark:placeholder:text-slate-600 focus:border-[#39A900] focus:outline-none focus:ring-4 focus:ring-[#39A900]/15" // WCAG: foco visible.
                     /> {/* UI: fin input. */}
                   </div> {/* UI: fin filtro tipo vehículo. */}
 
                   <div className="flex flex-col gap-2"> {/* UI: filtro “Tipo de Usuario” solicitado. */}
-                    <label className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-600">Tipo de usuario</label> {/* WCAG: label visible. */}
+                    <label className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-600 dark:text-slate-400">Tipo de usuario</label> {/* WCAG: label visible. */}
                     <select
                       value={tipoUsuario} // React: controlado.
                       onChange={(e) => setTipoUsuario(e.target.value as TipoUsuario)} // React: set tipo usuario.
-                      className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 focus:border-[#39A900] focus:outline-none focus:ring-4 focus:ring-[#39A900]/15" // WCAG: foco visible.
+                      className="rounded-xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-[#121212] px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-200 focus:border-[#39A900] focus:outline-none focus:ring-4 focus:ring-[#39A900]/15" // WCAG: foco visible.
                     >
                       <option value="TODOS">Todos</option> {/* UX: opción por defecto. */}
                       <option value="APRENDIZ">Aprendiz</option> {/* UX: rol típico del propietario (heurística). */}
@@ -455,25 +455,25 @@ export const InformesPage: React.FC = () => { // UI: componente principal de la 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"> {/* UI: header de tabla. */}
               <div> {/* UI: títulos de sección. */}
                 <p className="text-[11px] font-black uppercase tracking-[0.28em] text-slate-500">Auditoría histórica</p> {/* UX: microtítulo para jerarquía. */}
-                <p className="mt-1 text-lg font-black text-[#003939]">Resultados</p> {/* Paleta: verde oscuro como título. */}
+                <p className="mt-1 text-lg font-black text-[#003939] dark:text-[#39A900]">Resultados</p> {/* Paleta: verde oscuro como título. */}
               </div> {/* UI: fin títulos. */}
-              <div className="text-sm font-semibold text-slate-600" aria-live="polite"> {/* WCAG: aria-live para anunciar cambios de paginación/total. */}
+              <div className="text-sm font-semibold text-slate-600 dark:text-slate-400" aria-live="polite"> {/* WCAG: aria-live para anunciar cambios de paginación/total. */}
                 {meta?.pagination ? `Página ${meta.pagination.page} de ${meta.pagination.lastPage} • Total ${meta.pagination.total}` : '—'} {/* UX: resumen ejecutivo. */}
               </div> {/* UI: fin resumen. */}
             </div> {/* UI: fin header tabla. */}
 
-            <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200"> {/* UX: overflow-x solo como fallback; truncación reduce necesidad de scroll. */}
+            <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/5"> {/* UX: overflow-x solo como fallback; truncación reduce necesidad de scroll. */}
               <table className="w-full table-fixed text-sm"> {/* UX: table-fixed para controlar anchos y evitar desbordes inesperados. */}
-                <thead className="bg-[#F8FAFC]"> {/* Paleta: cabecera gris claro institucional solicitada. */}
+                <thead className="bg-[#F8FAFC] dark:bg-black/20"> {/* Paleta: cabecera gris claro institucional solicitada. */}
                   <tr className="text-left"> {/* UI: alineación a la izquierda para lectura en listas. */}
-                    <th className="w-[7rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939]">Placa</th> {/* UX: ancho fijo para estabilidad. */}
-                    <th className="w-[7rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939]">Tipo</th> {/* UX: pill corto. */}
-                    <th className="w-[14rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939]">Propietario</th> {/* UX: columna con truncación. */}
-                    <th className="w-[12rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939]">Ingreso</th> {/* UX: fecha/hora en nowrap. */}
-                    <th className="w-[12rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939]">Salida</th> {/* UX: fecha/hora en nowrap. */}
-                    <th className="w-[7rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939]">Bahía</th> {/* UX: corto. */}
-                    <th className="w-[9rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939]">Tecnología</th> {/* UX: pill. */}
-                    <th className="w-[9rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939]">Estado</th> {/* UX: pill semántica (verde/naranja/rojo). */}
+                    <th className="w-[7rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939] dark:text-slate-400">Placa</th> {/* UX: ancho fijo para estabilidad. */}
+                    <th className="w-[7rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939] dark:text-slate-400">Tipo</th> {/* UX: pill corto. */}
+                    <th className="w-[14rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939] dark:text-slate-400">Propietario</th> {/* UX: columna con truncación. */}
+                    <th className="w-[12rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939] dark:text-slate-400">Ingreso</th> {/* UX: fecha/hora en nowrap. */}
+                    <th className="w-[12rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939] dark:text-slate-400">Salida</th> {/* UX: fecha/hora en nowrap. */}
+                    <th className="w-[7rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939] dark:text-slate-400">Bahía</th> {/* UX: corto. */}
+                    <th className="w-[9rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939] dark:text-slate-400">Tecnología</th> {/* UX: pill. */}
+                    <th className="w-[9rem] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#003939] dark:text-slate-400">Estado</th> {/* UX: pill semántica (verde/naranja/rojo). */}
                   </tr> {/* UI: fin header row. */}
                 </thead> {/* UI: fin thead. */}
                 <tbody> {/* UI: cuerpo de tabla. */}
@@ -488,8 +488,14 @@ export const InformesPage: React.FC = () => { // UI: componente principal de la 
                       const tec = tecnologiaFromRow(r); // UX: tecnología por fila (proxy).
                       const estado = estadoFromRow(r); // UX: estado por fila (semántico).
                       return ( // React: retorno de fila.
-                        <tr key={r.idMovimiento} className={idx % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'}> {/* WCAG: zebra stripes mejoran seguimiento visual. */}
-                          <td className="px-4 py-3 font-black text-slate-900"> {/* UI: placa con alto peso para lectura rápida. */}
+                        <tr
+                          key={r.idMovimiento}
+                          className={[
+                            idx % 2 === 0 ? 'bg-white dark:bg-[#121212]' : 'bg-[#F8FAFC] dark:bg-black/20',
+                            'group transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/5'
+                          ].join(' ')}
+                        >
+                          <td className="px-4 py-3 font-black text-slate-900 dark:text-slate-200"> {/* UI: placa con alto peso para lectura rápida. */}
                             {r.placa} {/* UI: valor. */}
                           </td> {/* UI: fin celda placa. */}
                           <td className="px-4 py-3"> {/* UI: tipo (pill). */}
@@ -497,16 +503,16 @@ export const InformesPage: React.FC = () => { // UI: componente principal de la 
                               {r.tipoVehiculo || 'N/D'} {/* UX: fallback si falta dato. */}
                             </span> {/* UI: fin pill tipo. */}
                           </td> {/* UI: fin celda tipo. */}
-                          <td className="truncate px-4 py-3 font-semibold text-slate-800 max-w-xs" title={r.propietario}> {/* UX: truncate para evitar scroll; title conserva info completa. */}
+                          <td className="truncate px-4 py-3 font-semibold text-slate-800 dark:text-slate-200 max-w-xs" title={r.propietario}> {/* UX: truncate para evitar scroll; title conserva info completa. */}
                             {r.propietario} {/* UI: valor. */}
                           </td> {/* UI: fin celda propietario. */}
-                          <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700"> {/* UX: nowrap para fechas evita saltos de línea desordenados. */}
+                          <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300"> {/* UX: nowrap para fechas evita saltos de línea desordenados. */}
                             {formatDateTime(r.horaIngreso)} {/* UX: formatter local. */}
                           </td> {/* UI: fin celda ingreso. */}
-                          <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700"> {/* UX: nowrap. */}
+                          <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300"> {/* UX: nowrap. */}
                             {formatDateTime(r.horaSalida)} {/* UX: formatter. */}
                           </td> {/* UI: fin celda salida. */}
-                          <td className="truncate px-4 py-3 font-semibold text-slate-700 max-w-[10rem]" title={r.bahiaAsignada}> {/* UX: truncación para bahía. */}
+                          <td className="truncate px-4 py-3 font-semibold text-slate-700 dark:text-slate-300 max-w-[10rem]" title={r.bahiaAsignada}> {/* UX: truncación para bahía. */}
                             {r.bahiaAsignada} {/* UI: valor. */}
                           </td> {/* UI: fin celda bahía. */}
                           <td className="px-4 py-3"> {/* UI: tecnología (pill). */}
@@ -533,7 +539,7 @@ export const InformesPage: React.FC = () => { // UI: componente principal de la 
                   type="button" // HTML: semántica.
                   onClick={() => cargarHistorico(Math.max(1, page - 1))} // RF21: página anterior (con mínimo 1).
                   disabled={loadingHistorico || page <= 1} // UX: deshabilita si no aplica.
-                  className="rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-widest text-[#003939] hover:bg-[#F8FAFC] focus:outline-none focus:ring-4 focus:ring-[#003939]/15 disabled:cursor-not-allowed disabled:opacity-50" // WCAG: foco visible + estados claros.
+                  className="rounded-2xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-[#121212] px-4 py-3 text-[11px] font-black uppercase tracking-widest text-[#003939] dark:text-[#39A900] hover:bg-[#F8FAFC] dark:hover:bg-white/5 focus:outline-none focus:ring-4 focus:ring-[#003939]/15 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200" // WCAG: foco visible + estados claros.
                 >
                   Anterior {/* UX: etiqueta estándar. */}
                 </button> {/* UI: fin anterior. */}
@@ -541,7 +547,7 @@ export const InformesPage: React.FC = () => { // UI: componente principal de la 
                   type="button" // HTML: semántica.
                   onClick={() => cargarHistorico(page + 1)} // RF21: siguiente.
                   disabled={loadingHistorico || page >= meta.pagination.lastPage} // UX: deshabilita si es última página.
-                  className="rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-widest text-[#003939] hover:bg-[#F8FAFC] focus:outline-none focus:ring-4 focus:ring-[#003939]/15 disabled:cursor-not-allowed disabled:opacity-50" // WCAG: foco visible.
+                  className="rounded-2xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-[#121212] px-4 py-3 text-[11px] font-black uppercase tracking-widest text-[#003939] dark:text-[#39A900] hover:bg-[#F8FAFC] dark:hover:bg-white/5 focus:outline-none focus:ring-4 focus:ring-[#003939]/15 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200" // WCAG: foco visible.
                 >
                   Siguiente {/* UX: etiqueta estándar. */}
                 </button> {/* UI: fin siguiente. */}
@@ -561,7 +567,7 @@ const KpiCard: React.FC<{ // UI: tarjeta KPI reutilizable, reduce duplicación y
   gradient: string; // Paleta: gradiente institucional solicitado para look “premium”.
   Icon: React.FC<{ className?: string }>; // UI: icono lucide para marca visual (fondo, opacidad baja).
 }> = ({ title, value, subtitle, gradient, Icon }) => ( // UI: función pura (render determinista).
-  <div className={`relative overflow-hidden rounded-3xl ${gradient} border border-white/10 text-white shadow-[0_18px_55px_rgba(15,23,42,0.08)]`}> {/* UI: gradiente + borde sutil + sombra suave (ejecutivo). */}
+  <div className={`relative overflow-hidden rounded-3xl ${gradient} dark:brightness-75 dark:border-white/5 border border-white/10 text-white shadow-[0_18px_55px_rgba(15,23,42,0.08)]`}> {/* UI: gradiente + borde sutil + sombra suave (ejecutivo). */}
     <Icon className="absolute -bottom-6 -right-6 h-28 w-28 opacity-10" /> {/* UI: icono grande semitransparente (opacity-10) como marca de dashboard. */}
     <div className="p-6"> {/* UI: padding consistente (múltiplos de 8) para ritmo visual. */}
       <p className="text-[11px] font-black uppercase tracking-[0.28em] opacity-90">{title}</p> {/* WCAG: texto blanco con opacidad moderada, mantiene contraste. */}

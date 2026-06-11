@@ -60,14 +60,14 @@ export const AuditoriaPage: React.FC = () => {
       header: 'Fecha y Hora',
       accessor: (log: any) => (
         <div className="flex items-center gap-4">
-          <div className="p-2.5 bg-slate-50 rounded-xl text-slate-700 border border-slate-200">
+          <div className="p-2.5 bg-slate-50 dark:bg-white/5 rounded-xl text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 transition-colors duration-500">
             <History size={16} />
           </div>
           <div>
-            <p className="text-sm font-black text-slate-900 leading-none mb-1.5">
+            <p className="text-sm font-black text-slate-900 dark:text-white leading-none mb-1.5">
               {new Date(log.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
             </p>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </p>
           </div>
@@ -79,11 +79,11 @@ export const AuditoriaPage: React.FC = () => {
       accessor: (log: any) => (
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <User size={14} className="text-slate-500" />
-            <span className="text-sm font-semibold text-slate-700">{log.idUsuario}</span>
+            <User size={14} className="text-slate-500 dark:text-slate-400" />
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{log.idUsuario}</span>
           </div>
-          <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
-            <Globe size={12} className="text-slate-400" />
+          <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+            <Globe size={12} className="text-slate-400 dark:text-slate-500" />
             <span className="font-mono">{log.ip || '0.0.0.0'}</span>
           </div>
         </div>
@@ -100,7 +100,7 @@ export const AuditoriaPage: React.FC = () => {
     {
       header: 'Módulo',
       accessor: (log: any) => (
-        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] py-1 px-2 bg-slate-50 rounded-lg border border-slate-200">
+        <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] py-1 px-2 bg-slate-50 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 transition-colors duration-500">
           {log.modulo || 'SISTEMA'}
         </span>
       ),
@@ -108,8 +108,8 @@ export const AuditoriaPage: React.FC = () => {
     {
       header: 'Detalles',
       accessor: (log: any) => (
-        <div className="flex items-center gap-2 text-[9px] font-medium text-slate-600 max-w-[200px] truncate">
-          <Monitor size={11} className="text-slate-400 shrink-0" />
+        <div className="flex items-center gap-2 text-[9px] font-medium text-slate-600 dark:text-slate-400 max-w-[200px] truncate">
+          <Monitor size={11} className="text-slate-400 dark:text-slate-500 shrink-0" />
           <span className="truncate">{log.idEntidad || 'N/A'}</span>
         </div>
       ),
@@ -134,7 +134,7 @@ export const AuditoriaPage: React.FC = () => {
         </Button>
       </header>
 
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+      <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-white/5 grid grid-cols-1 md:grid-cols-3 gap-6 items-end transition-colors duration-500">
         <Input
           label="Búsqueda"
           icon={<Search size={20} />}
@@ -166,8 +166,8 @@ export const AuditoriaPage: React.FC = () => {
       <footer className="flex justify-between items-center px-4">
         <div className="flex items-center gap-3">
           <div className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse shadow-[0_0_10px_rgba(5,150,105,0.35)]" />
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
-            Total: <span className="text-slate-900 font-black">{total}</span> eventos registrados
+          <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em]">
+            Total: <span className="text-slate-900 dark:text-white font-black">{total}</span> eventos registrados
           </p>
         </div>
         
@@ -177,6 +177,7 @@ export const AuditoriaPage: React.FC = () => {
             size="sm" 
             disabled={page === 1 || loading}
             onClick={() => setPage(p => p - 1)}
+            className="dark:bg-white/5 dark:text-slate-300 dark:border-white/10"
           >
             Anterior
           </Button>
@@ -185,6 +186,7 @@ export const AuditoriaPage: React.FC = () => {
             size="sm" 
             disabled={page * 20 >= total || loading}
             onClick={() => setPage(p => p + 1)}
+            className="dark:bg-white/5 dark:text-slate-300 dark:border-white/10"
           >
             Siguiente
           </Button>

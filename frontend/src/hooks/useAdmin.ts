@@ -3,10 +3,7 @@ import { dashboardService } from '../services/operativo.service';
 import { socketService } from '../services/socket.service';
 import type { DashboardStats } from '../types';
 
-/**
- * Hook personalizado para encapsular la lógica del Dashboard Administrativo.
- * FEATURE: Maneja la carga de analíticas, estadísticas históricas e integración realtime.
- */
+
 export const useAdmin = () => {
   const [resumen, setResumen] = useState<DashboardStats | null>(null);
   const [trafico, setTrafico] = useState<any[]>([]);
@@ -17,10 +14,7 @@ export const useAdmin = () => {
   const [error, setError] = useState<string | null>(null);
   const isFetching = useRef(false);
 
-  /**
-   * Orquestador de carga de datos masiva desde la API de analíticas.
-   * API: Consumo de endpoints de analíticas del DashboardController.
-   */
+ 
   const loadAdminData = useCallback(async () => {
     // EVITAR CARGAS SIMULTÁNEAS
     if (isFetching.current) return;

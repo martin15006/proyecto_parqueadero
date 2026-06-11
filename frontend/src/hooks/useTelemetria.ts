@@ -2,14 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { socketService } from '../services/socket.service';
 import { telemetriaService } from '../services/telemetria.service';
 
-/**
- * Hook para la gestión de telemetría y sensores en tiempo real.
- */
+
 export const useTelemetria = () => {
-  /**
-   * Estructura mínima que consume la UI de Infraestructura.
-   * Nota: la entidad real en backend puede tener más campos; aquí solo usamos los necesarios.
-   */
+  
   const [sensores, setSensores] = useState<Array<{
     idSensor?: number;
     codigo: string;

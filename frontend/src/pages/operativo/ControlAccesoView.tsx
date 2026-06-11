@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ShieldAlert, ShieldCheck, ClipboardList,
   Car, Users, LayoutGrid, Info, LogOut
@@ -13,6 +13,12 @@ export const ControlAccesoView: React.FC = () => {
   const { stats, alerts, vehiculos, loading, refresh, handleQuickSalida } = useOperativo();
   const { showNotification } = useNotification();
   const formRef = useRef<MovementFormHandle>(null);
+
+  // El spinner a pantalla completa solo debe salir en la carga inicial. En refrescos
+  // posteriores (p. ej. tras registrar un movimiento) mantenemos el MovementForm montado
+  // para no desmontar su modal de confirmación de ingreso/salida.
+  const [yaCargo, setYaCargo] = useState(false);
+  useEffect(() => { if (!loading) setYaCargo(true); }, [loading]);
 
   const handleSalidaEmergencia = async () => {
     if (!window.confirm('¿ESTÁ SEGURO? Esta acción registrará la salida de todos los vehículos activos.')) return;
@@ -45,7 +51,7 @@ export const ControlAccesoView: React.FC = () => {
     return { bg: 'bg-[#39B000]', label: 'DISPONIBLE', color: 'text-[#39B000]' };
   }, [estadoGlobal]);
 
-  if (loading) return (
+  if (loading && !yaCargo) return (
     <div className="flex items-center justify-center min-h-[400px]">
       <div className="w-10 h-10 border-4 border-[#39B000]/20 border-t-[#39B000] rounded-full animate-spin" />
     </div>

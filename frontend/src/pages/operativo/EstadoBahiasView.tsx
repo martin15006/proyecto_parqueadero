@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useOperativo } from '../../hooks/useOperativo';
-import { RefreshCw, WifiOff, Car, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { WifiOff, Car, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 import type { BahiaSensorizada } from '../../types';
 
 /**
@@ -9,7 +9,7 @@ import type { BahiaSensorizada } from '../../types';
  * (LIBRE / OCUPADO / SALIDA_PENDIENTE / DISCREPANCIA / OFFLINE / DESHABILITADO).
  */
 export const EstadoBahiasView: React.FC = () => {
-  const { bahias, loading, refresh } = useOperativo();
+  const { bahias, loading } = useOperativo();
 
   const stats = useMemo(() => {
     const esOffline = (b: BahiaSensorizada) => b.estadoPanel === 'OFFLINE' || b.estadoPanel === 'DESHABILITADO';
@@ -32,18 +32,10 @@ export const EstadoBahiasView: React.FC = () => {
   return (
     <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in duration-500">
       {/* Resumen de Bahías Superior */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard label="Libres" value={stats.libres} icon={<CheckCircle2 size={16} />} color="text-[#39B000]" bg="bg-green-50 dark:bg-[#39B000]/10" />
         <StatCard label="Ocupadas" value={stats.ocupadas} icon={<Car size={16} />} color="text-red-600 dark:text-red-400" bg="bg-red-50 dark:bg-red-900/20" />
         <StatCard label="Offline" value={stats.offline} icon={<WifiOff size={16} />} color="text-gray-400 dark:text-gray-500" bg="bg-gray-50 dark:bg-white/5" />
-
-        <button
-          onClick={refresh}
-          className="flex items-center justify-center gap-2 bg-white dark:bg-[#121212] border border-gray-100 dark:border-white/5 text-[#012E25] dark:text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-gray-50 dark:hover:bg-white/5 transition-all shadow-sm active:scale-95 group"
-        >
-          <RefreshCw size={14} className="group-hover:rotate-180 transition-transform duration-500" />
-          Refrescar
-        </button>
       </div>
 
       {/* Grid de Bahías Sensorizadas */}

@@ -81,7 +81,7 @@ export const GraficosPage: React.FC = () => {
               label="Desde"
               type="date"
               value={desde}
-              onChange={(e) => setDesde(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDesde(e.target.value)}
             />
           </div>
 
@@ -90,7 +90,7 @@ export const GraficosPage: React.FC = () => {
               label="Hasta"
               type="date"
               value={hasta}
-              onChange={(e) => setHasta(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHasta(e.target.value)}
             />
           </div>
 
