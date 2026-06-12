@@ -1,6 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, Index } from 'typeorm';
 import { TipoBahia } from './tipo-bahia.entity';
-import { TipoControl } from './tipo-control.entity';
 import { IotStatusEnum } from '../../common/enums/iot-status.enum';
 import { BahiaReconciliacionEstadoEnum } from '../../common/enums/bahia-reconciliacion-estado.enum';
 
@@ -15,10 +14,6 @@ export class Bahia {
   @Index() // PERFORMANCE: Optimiza el filtrado por tipo de bahía (Ej. Discapacitados, Motos)
   @Column({ type: 'smallint' })
   idTipoBahia: number;
-
-  @Index() // PERFORMANCE: Optimiza el filtrado por tipo de control (Ej. Sensor, Manual)
-  @Column({ type: 'smallint' })
-  idTipoControl: number;
 
   // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
   @CreateDateColumn({ type: 'timestamptz' })
@@ -59,8 +54,4 @@ export class Bahia {
   @ManyToOne(() => TipoBahia, (tipo) => tipo.bahias)
   @JoinColumn({ name: 'id_tipo_bahia' })
   tipoBahia: TipoBahia;
-
-  @ManyToOne(() => TipoControl, (tipo) => tipo.bahias)
-  @JoinColumn({ name: 'id_tipo_control' })
-  tipoControl: TipoControl;
 }

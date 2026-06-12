@@ -4,7 +4,6 @@ import { BahiasService } from './bahias.service';
 import { Bahia } from './entities/bahia.entity';
 import { ParqueaderoEstado } from './entities/parqueadero-estado.entity';
 import { TipoBahia } from './entities/tipo-bahia.entity';
-import { TipoControl } from './entities/tipo-control.entity';
 import { MovimientoVehiculo } from '../vehiculos/entities/movimiento-vehiculo.entity';
 import { Sensor } from '../telemetria/entities/sensor.entity';
 import { RegistroVehiculo } from '../vehiculos/entities/registro-vehiculo.entity';
@@ -19,7 +18,7 @@ import { InfraestructuraSeedService } from './infraestructura-seed.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Bahia, ParqueaderoEstado, TipoBahia, TipoControl, MovimientoVehiculo, Sensor, RegistroVehiculo]),
+    TypeOrmModule.forFeature([Bahia, ParqueaderoEstado, TipoBahia, MovimientoVehiculo, Sensor, RegistroVehiculo]),
     AuditoriaModule,
     GatewayModule,
     NotificacionesModule,

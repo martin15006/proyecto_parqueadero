@@ -2,7 +2,6 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TipoBahia } from './entities/tipo-bahia.entity';
-import { TipoControl } from './entities/tipo-control.entity';
 import { Bahia } from './entities/bahia.entity';
 import { Sensor } from '../telemetria/entities/sensor.entity';
 import { IotStatusEnum } from '../common/enums/iot-status.enum';
@@ -15,8 +14,6 @@ export class InfraestructuraSeedService implements OnModuleInit {
   constructor(
     @InjectRepository(TipoBahia)
     private readonly tipoBahiaRepo: Repository<TipoBahia>,
-    @InjectRepository(TipoControl)
-    private readonly tipoControlRepo: Repository<TipoControl>,
     @InjectRepository(Bahia)
     private readonly bahiaRepo: Repository<Bahia>,
     @InjectRepository(Sensor)
@@ -40,26 +37,13 @@ export class InfraestructuraSeedService implements OnModuleInit {
         }
       }
     }
-
-    for (const nombre of ['Sensor IoT', 'Manual']) {
-      const existe = await this.tipoControlRepo.findOne({ where: { tipoControl: nombre }, withDeleted: true });
-      if (!existe) {
-        try {
-          await this.tipoControlRepo.save({ tipoControl: nombre });
-          this.logger.log(`TipoControl creado: ${nombre}`);
-        } catch {
-          this.logger.warn(`TipoControl '${nombre}' ya existe en BD, omitido`);
-        }
-      }
-    }
   }
 
   private async seedBahiasYSensores() {
     const tipoCarro = await this.tipoBahiaRepo.findOne({ where: { tipoBahia: 'Carro' } });
-    const tipoSensor = await this.tipoControlRepo.findOne({ where: { tipoControl: 'Sensor IoT' } });
 
-    if (!tipoCarro || !tipoSensor) {
-      this.logger.error('No se encontraron tipos base para crear bahías');
+    if (!tipoCarro) {
+      this.logger.error('No se encontró el tipo de bahía base para crear bahías');
       return;
     }
 
@@ -77,7 +61,6 @@ export class InfraestructuraSeedService implements OnModuleInit {
           bahia = await this.bahiaRepo.save({
             nombreBahia: config.nombre,
             idTipoBahia: tipoCarro.idTipoB,
-            idTipoControl: tipoSensor.idTipoC,
             estadoReconciliado: BahiaReconciliacionEstadoEnum.LIBRE,
           });
           this.logger.log(`Bahía creada: ${config.nombre} (id=${bahia.idBahia})`);

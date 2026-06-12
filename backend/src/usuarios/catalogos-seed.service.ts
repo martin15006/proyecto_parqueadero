@@ -10,8 +10,8 @@ import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
  *  - tipo_usuario (con IDs fijos del enum TipoUsuarioEnum)
  *  - tipo_vehiculo (sin IDs específicos)
  *
- * NOTA: tipo_bahia y tipo_control los siembra InfraestructuraSeedService
- * en el módulo de bahías, no se duplican aquí.
+ * NOTA: tipo_bahia lo siembra InfraestructuraSeedService en el módulo de
+ * bahías, no se duplica aquí.
  *
  * Idempotente: solo inserta si la fila no existe.
  * Usa el patrón ensureSeeded() para garantizar que se ejecuta una sola vez

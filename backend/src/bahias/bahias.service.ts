@@ -4,8 +4,6 @@ import { EntityManager, In, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Bahia } from './entities/bahia.entity';
 import { ParqueaderoEstado } from './entities/parqueadero-estado.entity';
-import { TipoBahia } from './entities/tipo-bahia.entity';
-import { TipoControl } from './entities/tipo-control.entity';
 import { MovimientoVehiculo, EstadoMovimiento } from '../vehiculos/entities/movimiento-vehiculo.entity';
 import { IOcupacionPayload } from '../common/interfaces/socket-payloads.interface';
 import { IotStatusEnum } from '../common/enums/iot-status.enum';
@@ -64,10 +62,6 @@ export class BahiasService implements OnModuleInit {
     private readonly bahiaRepository: Repository<Bahia>,
     @InjectRepository(ParqueaderoEstado)
     private readonly parqueaderoEstadoRepository: Repository<ParqueaderoEstado>,
-    @InjectRepository(TipoBahia)
-    private readonly tipoBahiaRepository: Repository<TipoBahia>,
-    @InjectRepository(TipoControl)
-    private readonly tipoControlRepository: Repository<TipoControl>,
     @InjectRepository(MovimientoVehiculo)
     private readonly movimientoRepository: Repository<MovimientoVehiculo>,
     private readonly auditoriaService: AuditoriaService,
@@ -95,35 +89,11 @@ export class BahiasService implements OnModuleInit {
   }
 
   /**
-   * Inicializa infraestructura mínima para entornos locales/demo:
-   * - Si la tabla `bahia` está vacía, crea 30 bahías (Bahía 01..30).
-   * - Si faltan catálogos base (tipo_bahia / tipo_control), crea registros por defecto.
-   *
-   * Importante:
-   * - NO se fuerza `estadoManual=AVAILABLE` en DB, porque ese campo es un override manual.
-   *   El estado "DISPONIBLE" se deriva automáticamente al no existir movimientos ADENTRO.
+   * Mantenimiento en el arranque: cierra movimientos ADENTRO huérfanos de sesiones
+   * anteriores. Las bahías sensorizadas (B-001..B-003) las siembra InfraestructuraSeedService.
    */
   async onModuleInit() {
     try {
-      const totalBahias = await this.bahiaRepository.count();
-      if (totalBahias === 0) {
-        const tipoBahia = await this.getOrCreateTipoBahiaDefault();
-        const tipoControl = await this.getOrCreateTipoControlDefault();
-
-        const nuevas = Array.from({ length: 30 }, (_, idx) => {
-          const numero = idx + 1;
-          return this.bahiaRepository.create({
-            nombreBahia: `Bahía ${String(numero).padStart(2, '0')}`,
-            idTipoBahia: tipoBahia.idTipoB,
-            idTipoControl: tipoControl.idTipoC,
-            estadoManual: null,
-          });
-        });
-
-        await this.bahiaRepository.save(nuevas);
-        this.logger.log('Infraestructura inicial creada: 30 bahías (Bahía 01..30).');
-      }
-
       // Cerrar movimientos ADENTRO sin bahía asignada que lleven más de 8 horas activos.
       // Estos son registros huérfanos de sesiones anteriores (reinicio del servidor,
       // salida sin escaneo de QR). Evita que bloqueen re-ingresos en la sesión actual.
@@ -154,38 +124,12 @@ export class BahiasService implements OnModuleInit {
     }
   }
 
-  private async getOrCreateTipoBahiaDefault(): Promise<TipoBahia> {
-    const defaultId = 1;
-    if (Number.isInteger(defaultId) && defaultId > 0) {
-      const byId = await this.tipoBahiaRepository.findOne({ where: { idTipoB: defaultId } });
-      if (byId) return byId;
-    }
-
-    const [first] = await this.tipoBahiaRepository.find({ take: 1, order: { idTipoB: 'ASC' } });
-    if (first) return first;
-
-    return await this.tipoBahiaRepository.save(this.tipoBahiaRepository.create({ tipoBahia: 'Estándar' }));
-  }
-
-  private async getOrCreateTipoControlDefault(): Promise<TipoControl> {
-    const defaultId = 1;
-    if (Number.isInteger(defaultId) && defaultId > 0) {
-      const byId = await this.tipoControlRepository.findOne({ where: { idTipoC: defaultId } });
-      if (byId) return byId;
-    }
-
-    const [first] = await this.tipoControlRepository.find({ take: 1, order: { idTipoC: 'ASC' } });
-    if (first) return first;
-
-    return await this.tipoControlRepository.save(this.tipoControlRepository.create({ tipoControl: 'Manual' }));
-  }
-
   /**
    * Retorna todas las bahías registradas con sus metadatos.
    */
   async findAll(): Promise<Bahia[]> {
     return await this.bahiaRepository.find({
-      relations: ['tipoBahia', 'tipoControl'],
+      relations: ['tipoBahia'],
     });
   }
 
@@ -262,7 +206,7 @@ export class BahiasService implements OnModuleInit {
   async findOne(id: number): Promise<Bahia> {
     const bahia = await this.bahiaRepository.findOne({
       where: { idBahia: id },
-      relations: ['tipoBahia', 'tipoControl'],
+      relations: ['tipoBahia'],
     });
     if (!bahia) throw new NotFoundException(`Bahía con ID ${id} no encontrada`);
     return bahia;
@@ -584,7 +528,7 @@ export class BahiasService implements OnModuleInit {
     estado: 'AVAILABLE' | 'OCCUPIED' | 'DISABLED' | 'AUTO',
     actor: { idUsuario: string; ip?: string; userAgent?: string },
   ): Promise<Bahia> {
-    const bahia = await this.bahiaRepository.findOne({ where: { idBahia }, relations: ['tipoBahia', 'tipoControl'] });
+    const bahia = await this.bahiaRepository.findOne({ where: { idBahia }, relations: ['tipoBahia'] });
     if (!bahia) throw new NotFoundException(`Bahía con ID ${idBahia} no encontrada`);
 
     const anterior = bahia.estadoManual ?? null;

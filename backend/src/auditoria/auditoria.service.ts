@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Auditoria } from './entities/auditoria.entity';
 
 export interface CreateAuditoriaDto {
@@ -76,5 +76,32 @@ export class AuditoriaService {
       .orderBy('a.created_at', 'DESC')
       .take(limit)
       .getMany();
+  }
+
+  /**
+   * Mapea el autor (idUsuario) de la acción registrada para cada entidad.
+   * Útil para saber qué operativo autorizó cada ingreso (REGISTRAR_ENTRADA).
+   * Devuelve un Map<idEntidad, idUsuario>.
+   */
+  async mapearAutoresPorEntidad(
+    accion: string,
+    entidad: string,
+    idEntidades: Array<string | number>,
+  ): Promise<Map<string, string>> {
+    const ids = [...new Set(idEntidades.map((v) => String(v)))];
+    if (ids.length === 0) return new Map();
+
+    const registros = await this.auditoriaRepository.find({
+      where: { accion, entidad, idEntidad: In(ids) },
+      order: { createdAt: 'ASC' },
+    });
+
+    const map = new Map<string, string>();
+    for (const r of registros) {
+      if (r.idEntidad && !map.has(r.idEntidad)) {
+        map.set(r.idEntidad, r.idUsuario);
+      }
+    }
+    return map;
   }
 }

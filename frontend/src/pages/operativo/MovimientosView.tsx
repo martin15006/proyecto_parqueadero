@@ -13,6 +13,7 @@ interface HistorialRow {
     vehiculo?: { placa?: string; color?: string } | null;
     usuario?: { nombreCompleto?: string; documento?: string } | null;
   } | null;
+  autorizadoPor?: { documento?: string; nombreCompleto?: string } | null;
 }
 
 const PAGE_SIZE = 20;
@@ -95,13 +96,14 @@ export const MovimientosView: React.FC = () => {
                 <th className="px-6 py-4 text-[9px] font-bold uppercase tracking-widest text-gray-400">Usuario</th>
                 <th className="px-6 py-4 text-[9px] font-bold uppercase tracking-widest text-gray-400">Vehículo</th>
                 <th className="px-6 py-4 text-[9px] font-bold uppercase tracking-widest text-gray-400">Cronología</th>
+                <th className="px-6 py-4 text-[9px] font-bold uppercase tracking-widest text-gray-400">Permitió ingreso</th>
                 <th className="px-6 py-4 text-[9px] font-bold uppercase tracking-widest text-gray-400">Estado</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-white/5">
               {filteredMovimientos.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-20 text-center">
+                  <td colSpan={5} className="px-6 py-20 text-center">
                     <p className="text-[10px] font-bold text-gray-300 dark:text-gray-700 uppercase tracking-widest">Sin resultados</p>
                   </td>
                 </tr>
@@ -150,6 +152,14 @@ export const MovimientosView: React.FC = () => {
                               </span>
                             </div>
                           )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <User size={12} className="text-gray-300 dark:text-gray-600" />
+                          <span className="font-bold text-[#012E25] dark:text-white text-[10px]">
+                            {m.autorizadoPor?.nombreCompleto || '---'}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">

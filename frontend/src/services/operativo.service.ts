@@ -79,7 +79,16 @@ export const dashboardService = {
   },
   getHistorial: async (page = 1, limit = 20) => {
     const response = await api.get('/dashboard/historial', { params: { page, limit } });
-    return (response.data && response.data.data) ? response.data.data : response.data;
+    // El ResponseInterceptor del backend deja las filas en `data` y la paginación en `meta`.
+    const env = response.data || {};
+    const filas = Array.isArray(env.data) ? env.data : (Array.isArray(env) ? env : []);
+    const meta = env.meta || {};
+    return {
+      data: filas,
+      total: meta.total ?? filas.length,
+      page: meta.page ?? page,
+      lastPage: meta.lastPage ?? 1,
+    };
   }
 };
 

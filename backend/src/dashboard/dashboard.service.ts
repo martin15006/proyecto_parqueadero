@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Vehiculo } from '../vehiculos/entities/vehiculo.entity';
 import { MovimientoVehiculo, EstadoMovimiento } from '../vehiculos/entities/movimiento-vehiculo.entity';
@@ -152,6 +152,26 @@ export class DashboardService {
       skip: (page - 1) * limit,
       take: limit,
     });
+
+    // Quién autorizó cada ingreso: la traza vive en auditoría (REGISTRAR_ENTRADA,
+    // idEntidad = idMovimiento, idUsuario = documento del operativo).
+    const autores = await this.auditoriaService.mapearAutoresPorEntidad(
+      'REGISTRAR_ENTRADA',
+      'MOVIMIENTO_VEHICULO',
+      data.map((m) => m.idMovimiento),
+    );
+    const documentos = [...new Set(autores.values())].filter((d) => d && d !== 'SISTEMA');
+    const usuarios = documentos.length
+      ? await this.usuarioRepository.find({ where: { documento: In(documentos) } })
+      : [];
+    const nombrePorDoc = new Map(usuarios.map((u) => [u.documento, u.nombreCompleto]));
+
+    for (const m of data) {
+      const doc = autores.get(String(m.idMovimiento));
+      (m as any).autorizadoPor = doc
+        ? { documento: doc, nombreCompleto: doc === 'SISTEMA' ? 'Sistema' : nombrePorDoc.get(doc) ?? doc }
+        : null;
+    }
 
     return {
       data,
