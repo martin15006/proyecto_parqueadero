@@ -148,7 +148,7 @@ body {
   background-color: var(--accent-hover);
 }
 
-/* Autocompletado del navegador en pantallas de autenticación (login/registro).
+/* Autocompletado del navegador en la pantalla de autenticación (login).
    Chrome/Edge/Safari pintan un fondo gris/lila propio al autocompletar (-webkit-autofill),
    rompiendo la estética del input. Lo neutralizamos: fondo blanco + texto del tema,
    conservando el borde verde de foco. Acotado a .auth-screen para no tocar los

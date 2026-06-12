@@ -225,7 +225,7 @@ export const OperativosPage: React.FC = () => {
       header: 'Operativo',
       accessor: (u: User) => (
         <div>
-          <p className="text-sm font-black text-gray-900 leading-tight">{u.nombreCompleto}</p>
+          <p className="text-sm font-black text-gray-900 dark:text-white leading-tight">{u.nombreCompleto}</p>
           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">DOC: {u.documento}</p>
         </div>
       ),
@@ -234,7 +234,7 @@ export const OperativosPage: React.FC = () => {
       header: 'Contacto',
       accessor: (u: User) => (
         <div className="space-y-1">
-          <p className="text-xs text-gray-600 font-semibold">{u.correo}</p>
+          <p className="text-xs text-gray-600 dark:text-slate-300 font-semibold">{u.correo}</p>
           <p className="text-xs text-gray-500 font-medium">{u.numTelf || '—'}</p>
         </div>
       ),
@@ -263,7 +263,7 @@ export const OperativosPage: React.FC = () => {
             <KeyRound size={16} />
           </button>
           <button
-            className="p-2 hover:bg-slate-50 text-slate-700 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-50 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 rounded-lg transition-colors"
             title="Editar"
             onClick={(e) => {
               e.stopPropagation();
@@ -295,7 +295,7 @@ export const OperativosPage: React.FC = () => {
         </Button>
       </header>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+      <div className="bg-white dark:bg-[#121212] p-4 rounded-xl shadow-sm border border-slate-200 dark:border-white/10">
         <Input
           icon={<Search size={20} />}
           placeholder="Buscar por nombre, documento o correo..."

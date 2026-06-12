@@ -225,7 +225,7 @@ export const TelemetriaPage: React.FC = () => {
     <div className="space-y-8">
       <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4 -mt-20 mb-10 relative z-50">
         <div className="flex gap-3">
-          <Button variant="outline" size="md" onClick={refresh} className="bg-white">
+          <Button variant="outline" size="md" onClick={refresh} className="bg-white dark:bg-[#121212]">
             <RefreshCw size={14} className="mr-2" /> Actualizar
           </Button>
           <Button variant="primary" size="md" onClick={forceCheck} className="bg-[#39A900] hover:bg-[#2F8A00] shadow-[0_8px_20px_rgba(57,169,0,0.3)]">
@@ -235,7 +235,7 @@ export const TelemetriaPage: React.FC = () => {
       </header>
 
       {error && (
-        <div className="bg-rose-50 border border-rose-200 p-6 rounded-xl flex items-center gap-4 text-rose-700 shadow-sm">
+        <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 p-6 rounded-xl flex items-center gap-4 text-rose-700 dark:text-rose-300 shadow-sm">
           <AlertTriangle size={24} />
           <p className="font-bold text-sm uppercase tracking-tight">{error}</p>
         </div>
@@ -245,7 +245,7 @@ export const TelemetriaPage: React.FC = () => {
         <section className="bg-white dark:bg-[#121212] p-6 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm transition-colors duration-500">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-black text-gray-900 tracking-tight">Simulador IoT / Eventos (DEMO)</h2>
+              <h2 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Simulador IoT / Eventos (DEMO)</h2>
               <p className="text-gray-500 text-sm font-medium uppercase tracking-widest">
                 Solo desarrollo / Admin • Sin hardware
               </p>
@@ -289,7 +289,7 @@ export const TelemetriaPage: React.FC = () => {
       <section className="bg-white dark:bg-[#121212] p-8 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm space-y-6 transition-colors duration-500">
         <div className="flex flex-col lg:flex-row justify-between gap-4 lg:items-end">
           <div>
-            <h2 className="text-xl font-black text-gray-900 tracking-tight">Mapa 2D de Bahías (30)</h2>
+            <h2 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Mapa 2D de Bahías (30)</h2>
             <p className="text-gray-500 text-sm font-medium uppercase tracking-widest">
               Infraestructura • Vista de contingencia y base para integración IoT
             </p>
@@ -297,9 +297,9 @@ export const TelemetriaPage: React.FC = () => {
 
           <div className="flex flex-wrap gap-3">
             {legend.map((l) => (
-              <div key={l.label} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50">
+              <div key={l.label} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/5">
                 <span className={`w-3 h-3 rounded-full ${l.className}`} />
-                <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">{l.label}</span>
+                <span className="text-[10px] font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest">{l.label}</span>
               </div>
             ))}
           </div>
@@ -312,7 +312,7 @@ export const TelemetriaPage: React.FC = () => {
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                 : b.estado === 'OCUPADO'
                   ? 'bg-rose-50 border-rose-200 text-rose-700'
-                  : 'bg-slate-50 border-slate-200 text-slate-700';
+                  : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/5 text-slate-700 dark:text-slate-200';
 
             const nextEstado = (estado: InfraBahiaEstado): InfraBahiaEstado => {
               if (estado === 'DISPONIBLE') return 'OCUPADO';
@@ -382,7 +382,7 @@ export const TelemetriaPage: React.FC = () => {
                     {variant === 'success' ? <Wifi size={28} /> : <WifiOff size={28} />}
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-gray-900 tracking-tight">{sensor.codigo}</h3>
+                    <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">{sensor.codigo}</h3>
                     <div className="flex items-center gap-1.5 text-gray-400 mt-1">
                       <MapPin size={12} />
                       <span className="text-[10px] font-black uppercase tracking-widest">Bahía: {sensor.idBahia}</span>
@@ -390,7 +390,7 @@ export const TelemetriaPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="pt-6 border-t border-gray-50 flex items-center justify-between">
+                <div className="pt-6 border-t border-gray-50 dark:border-white/5 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-gray-400">
                     <Clock size={14} />
                     <span className="text-[10px] font-bold uppercase tracking-widest">
@@ -408,7 +408,7 @@ export const TelemetriaPage: React.FC = () => {
       </div>
 
       {sensoresSafe.length === 0 && !loading && (
-        <div className="text-center py-32 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+        <div className="text-center py-32 bg-slate-50 dark:bg-white/5 rounded-xl border border-dashed border-slate-300 dark:border-white/10">
           <p className="text-slate-500 font-black uppercase tracking-widest text-xs">No se detectaron sensores en la red</p>
         </div>
       )}

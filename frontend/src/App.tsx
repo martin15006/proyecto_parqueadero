@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './login';
-import Registro from './registro';
 import ProtectedRoute from './ProtectedRoute';
 import { AuthProvider, useAuth } from './AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -90,8 +89,7 @@ function App() {
           <Router>
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/registro" element={<Registro />} />
-              
+
               <Route path="/" element={<ProtectedRoute><RedirectByRole /></ProtectedRoute>} />
 
               <Route path="/appadmin" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><AdminLayout /></ProtectedRoute>}>

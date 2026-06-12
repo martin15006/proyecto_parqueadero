@@ -198,11 +198,11 @@ export const UsuariosPage: React.FC = () => {
       header: 'Usuario',
       accessor: (u: AdminUsuarioItem) => (
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-slate-50 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center text-slate-700">
+          <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-white/5 overflow-hidden border border-slate-200 dark:border-white/5 shadow-sm flex items-center justify-center text-slate-700 dark:text-slate-200">
             {u.fotoPersona ? <img src={u.fotoPersona} alt={u.nombreCompleto} className="w-full h-full object-cover" /> : <UserIcon size={24} />}
           </div>
           <div>
-            <p className="text-sm font-black text-slate-900 leading-tight">{u.nombreCompleto}</p>
+            <p className="text-sm font-black text-slate-900 dark:text-white leading-tight">{u.nombreCompleto}</p>
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-tighter">DOC: {u.documento}</p>
           </div>
         </div>
@@ -220,10 +220,10 @@ export const UsuariosPage: React.FC = () => {
       header: 'Contacto',
       accessor: (u: AdminUsuarioItem) => (
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
+          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 font-medium">
             <Mail size={12} className="text-slate-500" /> {u.correo}
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
+          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 font-medium">
             <Smartphone size={12} className="text-emerald-600" /> {u.numTelf || '—'}
           </div>
         </div>
@@ -235,7 +235,7 @@ export const UsuariosPage: React.FC = () => {
         const placas = (u.vehiculos || []).map((v) => v.placa).filter(Boolean);
         const label = placas.length <= 2 ? placas.join(', ') : `${placas.slice(0, 2).join(', ')} +${placas.length - 2}`;
         return (
-          <div className="flex items-center gap-2 text-xs text-slate-700 font-semibold">
+          <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200 font-semibold">
             <Car size={12} className="text-slate-400" />
             <span>{placas.length ? label : '—'}</span>
           </div>
@@ -249,7 +249,7 @@ export const UsuariosPage: React.FC = () => {
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); abrirEditar(u); }}
-            className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
+            className="p-2 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200"
             title="Editar"
           >
             <Pencil size={14} />
@@ -282,7 +282,7 @@ export const UsuariosPage: React.FC = () => {
         </Button>
       </header>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+      <div className="bg-white dark:bg-[#121212] p-4 rounded-xl shadow-sm border border-slate-200 dark:border-white/5 space-y-3">
         <Input
           icon={<Search size={20} />}
           placeholder="Buscar por nombre, documento o correo..."
@@ -347,7 +347,7 @@ export const UsuariosPage: React.FC = () => {
               <select
                 value={form.idTipoUsr}
                 onChange={(e) => setForm((p) => ({ ...p, idTipoUsr: Number(e.target.value) }))}
-                className="w-full mt-1 p-3 border border-slate-300 rounded-xl font-medium text-sm focus:border-[#39A900] focus:outline-none"
+                className="w-full mt-1 p-3 border border-slate-300 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl font-medium text-sm focus:border-[#39A900] focus:outline-none"
               >
                 <option value={1}>Aprendiz</option>
                 <option value={3}>Operativo / Vigilante</option>
@@ -451,7 +451,7 @@ export const UsuariosPage: React.FC = () => {
           </>
         }
       >
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-slate-700 dark:text-slate-200">
           ¿Estás seguro de eliminar al usuario <b>{confirmDeleteDoc}</b>? Esta acción no se puede deshacer y
           eliminará todos sus datos asociados.
         </p>
@@ -484,8 +484,8 @@ export const UsuariosPage: React.FC = () => {
                     || '';
                 const detalle = [tipo, v.color].filter(Boolean).join(' • ');
                 return (
-                  <div key={v.placa} className="flex gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50">
-                    <div className="w-20 h-20 rounded-lg overflow-hidden bg-white border border-slate-200 flex items-center justify-center shrink-0">
+                  <div key={v.placa} className="flex gap-4 p-4 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/5">
+                    <div className="w-20 h-20 rounded-lg overflow-hidden bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/5 flex items-center justify-center shrink-0">
                       {v.fotoVehiculo ? (
                         <img src={v.fotoVehiculo} alt={v.placa} className="w-full h-full object-cover" />
                       ) : (
@@ -493,7 +493,7 @@ export const UsuariosPage: React.FC = () => {
                       )}
                     </div>
                     <div className="min-w-0 flex flex-col justify-center">
-                      <p className="text-base font-black text-slate-900 tracking-wide truncate">{v.placa}</p>
+                      <p className="text-base font-black text-slate-900 dark:text-white tracking-wide truncate">{v.placa}</p>
                       <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">
                         {detalle || 'Sin detalles'}
                       </p>

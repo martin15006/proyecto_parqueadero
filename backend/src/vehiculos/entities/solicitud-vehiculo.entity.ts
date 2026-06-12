@@ -68,7 +68,7 @@ export class SolicitudVehiculo {
   @Column({ name: 'campos_rechazados', type: 'jsonb', nullable: true })
   camposRechazados: string[] | null;
 
-  @CreateDateColumn({ name: 'creado_en', type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   creadoEn: Date;
 
   @Column({ name: 'resuelto_en', type: 'timestamptz', nullable: true })

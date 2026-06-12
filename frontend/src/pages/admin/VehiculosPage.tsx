@@ -240,11 +240,11 @@ export const VehiculosPage: React.FC = () => {
       header: 'Vehículo',
       accessor: (v: AdminVehiculoItem) => (
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => abrirDetalle(v.placa)}>
-          <div className="w-12 h-12 rounded-xl bg-slate-50 overflow-hidden border border-slate-200 flex items-center justify-center text-blue-600">
+          <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-white/5 overflow-hidden border border-slate-200 dark:border-white/5 flex items-center justify-center text-blue-600">
             {v.fotoVehiculo ? <img src={v.fotoVehiculo} alt={v.placa} className="w-full h-full object-cover" /> : <Car size={18} />}
           </div>
           <div>
-            <p className="text-sm font-black text-gray-900 tracking-tight flex items-center gap-2">
+            <p className="text-sm font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
               <Hash size={14} className="text-blue-600" /> {v.placa}
             </p>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -256,7 +256,7 @@ export const VehiculosPage: React.FC = () => {
     },
     {
       header: 'Color',
-      accessor: (v: AdminVehiculoItem) => <span className="text-xs font-bold text-gray-700">{v.color || '—'}</span>,
+      accessor: (v: AdminVehiculoItem) => <span className="text-xs font-bold text-gray-700 dark:text-slate-200">{v.color || '—'}</span>,
     },
     {
       header: 'Estado',
@@ -273,7 +273,7 @@ export const VehiculosPage: React.FC = () => {
         <div className="flex justify-end gap-2">
           <button
             type="button"
-            className="p-2 hover:bg-slate-100 text-slate-700 rounded-lg"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 rounded-lg"
             onClick={() => abrirDetalle(v.placa)}
             title="Ver detalle"
           >
@@ -281,7 +281,7 @@ export const VehiculosPage: React.FC = () => {
           </button>
           <button
             type="button"
-            className="p-2 hover:bg-slate-100 text-slate-700 rounded-lg"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 rounded-lg"
             onClick={() => abrirEditar(v)}
             title="Editar"
           >
@@ -318,14 +318,14 @@ export const VehiculosPage: React.FC = () => {
           <Button variant="primary" size="md" onClick={abrirCrear} className="bg-[#39A900] hover:bg-[#2F8A00] shadow-[0_8px_20px_rgba(57,169,0,0.3)]">
             <Plus size={16} className="mr-2" /> AGREGAR VEHÍCULO
           </Button>
-          <Button variant={soloAdentro ? 'primary' : 'outline'} size="md" onClick={() => setSoloAdentro((v) => !v)} className={soloAdentro ? '' : 'bg-white'}>
+          <Button variant={soloAdentro ? 'primary' : 'outline'} size="md" onClick={() => setSoloAdentro((v) => !v)}>
             {soloAdentro ? 'Solo ADENTRO' : 'Todos'}
           </Button>
-          <Button variant="outline" size="md" onClick={fetchVehiculos} className="bg-white">Refrescar</Button>
+          <Button variant="outline" size="md" onClick={fetchVehiculos}>Refrescar</Button>
         </div>
       </header>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+      <div className="bg-white dark:bg-[#121212] p-4 rounded-xl shadow-sm border border-slate-200 dark:border-white/5">
         <Input
           icon={<Search size={20} />}
           placeholder="Buscar por placa o tipo..."
@@ -372,9 +372,9 @@ export const VehiculosPage: React.FC = () => {
                     <img
                       src={detalle.fotoVehiculo}
                       onClick={() => setFotoAmpliada(detalle.fotoVehiculo)}
-                      className="w-full h-32 object-cover rounded-xl border border-slate-200 cursor-pointer"
+                      className="w-full h-32 object-cover rounded-xl border border-slate-200 dark:border-white/5 cursor-pointer"
                     />
-                  ) : <div className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center text-xs text-slate-400">Sin foto</div>}
+                  ) : <div className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 dark:border-white/5 flex items-center justify-center text-xs text-slate-400">Sin foto</div>}
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Tarjeta de propiedad</p>
@@ -382,9 +382,9 @@ export const VehiculosPage: React.FC = () => {
                     <img
                       src={detalle.fotoTarjetaP}
                       onClick={() => setFotoAmpliada(detalle.fotoTarjetaP)}
-                      className="w-full h-32 object-cover rounded-xl border border-slate-200 cursor-pointer"
+                      className="w-full h-32 object-cover rounded-xl border border-slate-200 dark:border-white/5 cursor-pointer"
                     />
-                  ) : <div className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center text-xs text-slate-400">Sin foto</div>}
+                  ) : <div className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 dark:border-white/5 flex items-center justify-center text-xs text-slate-400">Sin foto</div>}
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Foto de la placa</p>
@@ -392,12 +392,12 @@ export const VehiculosPage: React.FC = () => {
                     <img
                       src={detalle.fotoPlaca}
                       onClick={() => setFotoAmpliada(detalle.fotoPlaca)}
-                      className="w-full h-32 object-cover rounded-xl border border-slate-200 cursor-pointer"
+                      className="w-full h-32 object-cover rounded-xl border border-slate-200 dark:border-white/5 cursor-pointer"
                     />
-                  ) : <div className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center text-xs text-slate-400">Sin foto</div>}
+                  ) : <div className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 dark:border-white/5 flex items-center justify-center text-xs text-slate-400">Sin foto</div>}
                 </div>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 bg-slate-50 p-3 rounded-xl">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 bg-slate-50 dark:bg-white/5 p-3 rounded-xl">
                 <Dato label="Placa" valor={detalle.placa} />
                 <Dato label="Color" valor={detalle.color} />
                 <Dato label="Tipo" valor={detalle.tipoVehiculo?.tipoVehiculo || '—'} />
@@ -408,11 +408,11 @@ export const VehiculosPage: React.FC = () => {
             {detalle.propietario && (
               <section>
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Propietario</h3>
-                <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-xl">
+                <div className="flex items-center gap-4 bg-slate-50 dark:bg-white/5 p-3 rounded-xl">
                   {detalle.propietario.fotoPersona ? (
                     <img src={detalle.propietario.fotoPersona} className="w-14 h-14 rounded-xl object-cover" />
                   ) : (
-                    <div className="w-14 h-14 rounded-xl bg-slate-200 flex items-center justify-center text-slate-500 font-black">
+                    <div className="w-14 h-14 rounded-xl bg-slate-200 dark:bg-white/10 flex items-center justify-center text-slate-500 font-black">
                       {detalle.propietario.nombreCompleto?.substring(0, 2).toUpperCase() || '?'}
                     </div>
                   )}
@@ -476,7 +476,7 @@ export const VehiculosPage: React.FC = () => {
               <select
                 value={form.idTipoVehiculo}
                 onChange={(e) => setForm((p) => ({ ...p, idTipoVehiculo: Number(e.target.value) }))}
-                className="w-full mt-1 p-3 border border-slate-300 rounded-xl font-medium text-sm focus:border-[#39A900] focus:outline-none"
+                className="w-full mt-1 p-3 border border-slate-300 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl font-medium text-sm focus:border-[#39A900] focus:outline-none"
               >
                 {tipos.map((t) => (
                   <option key={t.idTipoV} value={t.idTipoV}>{t.tipoVehiculo}</option>
@@ -521,7 +521,7 @@ export const VehiculosPage: React.FC = () => {
           </>
         }
       >
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-slate-700 dark:text-slate-200">
           ¿Estás seguro de eliminar el vehículo con placa <b>{confirmEliminarPlaca}</b>? Esta acción notifica
           al propietario y a quienes lo tenían compartido, y lo retira del sistema.
         </p>
@@ -553,7 +553,7 @@ export const VehiculosPage: React.FC = () => {
             <textarea
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
-              className="w-full bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white outline-none rounded-2xl px-5 py-4 text-sm font-medium min-h-[120px]"
+              className="w-full bg-gray-50 dark:bg-white/5 dark:text-white border-2 border-transparent focus:border-blue-600 focus:bg-white dark:focus:bg-white/10 outline-none rounded-2xl px-5 py-4 text-sm font-medium min-h-[120px]"
               placeholder="Describe el motivo (obligatorio)"
             />
           </div>
@@ -587,6 +587,6 @@ export const VehiculosPage: React.FC = () => {
 const Dato: React.FC<{ label: string; valor: any }> = ({ label, valor }) => (
   <div>
     <p className="text-[10px] uppercase font-bold text-slate-500">{label}</p>
-    <p className="text-sm font-bold text-slate-900">{valor ?? '—'}</p>
+    <p className="text-sm font-bold text-slate-900 dark:text-white">{valor ?? '—'}</p>
   </div>
 );

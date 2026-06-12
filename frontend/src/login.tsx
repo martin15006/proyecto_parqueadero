@@ -484,12 +484,6 @@ function Login() {
                   </>
                 )}
               </button>
-
-              <div className="text-center pt-2">
-                <a href="/registro" className="text-[13px] font-bold text-gray-400 hover:text-[#39A900] transition-colors">
-                  ¿No tienes cuenta? <span className="text-[#39A900]">Regístrate</span>
-                </a>
-              </div>
             </form>
           ) : (
             <form onSubmit={handleVerifyOtp} className="w-full space-y-8">

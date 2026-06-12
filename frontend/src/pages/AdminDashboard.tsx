@@ -119,11 +119,11 @@ export const AdminDashboard: React.FC = () => {
 
 const DashboardSkeleton = () => (
   <div className="p-8 space-y-8 animate-pulse">
-    <div className="h-10 bg-slate-200 rounded-xl w-1/4 mb-10 ml-auto"></div>
+    <div className="h-10 bg-slate-200 dark:bg-white/10 rounded-xl w-1/4 mb-10 ml-auto"></div>
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-      {[1,2,3,4].map(i => <div key={i} className="h-32 bg-slate-200 rounded-xl"></div>)}
+      {[1,2,3,4].map(i => <div key={i} className="h-32 bg-slate-200 dark:bg-white/10 rounded-xl"></div>)}
     </div>
-    <div className="h-96 bg-slate-200 rounded-xl"></div>
+    <div className="h-96 bg-slate-200 dark:bg-white/10 rounded-xl"></div>
   </div>
 );
 
@@ -132,8 +132,8 @@ const DashboardError = ({ message, retry }: { message: string, retry: () => void
     <div className="p-6 bg-rose-50 rounded-full mb-4">
       <AlertTriangle className="text-rose-600" size={48} />
     </div>
-    <h2 className="text-2xl font-black text-slate-900 mb-2">Error de Analíticas</h2>
-    <p className="text-slate-600 mb-6 max-w-md">{message}</p>
+    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Error de Analíticas</h2>
+    <p className="text-slate-600 dark:text-slate-300 mb-6 max-w-md">{message}</p>
     <button onClick={retry} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-sm hover:bg-slate-950 transition-all duration-200 active:scale-[0.99]">
       REINTENTAR
     </button>

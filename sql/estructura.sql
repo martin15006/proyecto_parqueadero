@@ -37,14 +37,6 @@ CREATE TABLE tipo_bahia (
     deleted_at  TIMESTAMPTZ
 );
 
-CREATE TABLE tipo_control (
-    id_tipo_c    SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    tipo_control VARCHAR(30) NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    deleted_at   TIMESTAMPTZ
-);
-
 CREATE TABLE tipo_vehiculo (
     id_tipo_v    SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     tipo_vehiculo VARCHAR(30) NOT NULL,
@@ -77,7 +69,6 @@ CREATE TABLE bahia (
     id_bahia             SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     nombre_bahia         VARCHAR(20) NOT NULL,
     id_tipo_bahia        SMALLINT NOT NULL,
-    id_tipo_control      SMALLINT NOT NULL,
     estado_manual        VARCHAR(12),
     estado_reconciliado  VARCHAR(16) NOT NULL DEFAULT 'LIBRE'
         CONSTRAINT ck_bahia_estado_reconciliado
@@ -93,16 +84,10 @@ CREATE TABLE bahia (
     FOREIGN KEY (id_tipo_bahia)
         REFERENCES tipo_bahia(id_tipo_b)
         ON DELETE RESTRICT
-        ON UPDATE CASCADE,
-
-    FOREIGN KEY (id_tipo_control)
-        REFERENCES tipo_control(id_tipo_c)
-        ON DELETE RESTRICT
         ON UPDATE CASCADE
 );
 
 CREATE INDEX idx_bahia_id_tipo_bahia        ON bahia (id_tipo_bahia);
-CREATE INDEX idx_bahia_id_tipo_control      ON bahia (id_tipo_control);
 CREATE INDEX idx_bahia_deleted_at           ON bahia (deleted_at);
 CREATE INDEX idx_bahia_estado_reconciliado  ON bahia (estado_reconciliado);
 CREATE INDEX idx_bahia_transito_desde       ON bahia (transito_desde);

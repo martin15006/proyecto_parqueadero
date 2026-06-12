@@ -26,7 +26,7 @@ export class InfraestructuraSeedService implements OnModuleInit {
   }
 
   private async seedTipos() {
-    for (const nombre of ['Carro', 'Moto', 'Discapacitado']) {
+    for (const nombre of ['Carro', 'Moto']) {
       const existe = await this.tipoBahiaRepo.findOne({ where: { tipoBahia: nombre }, withDeleted: true });
       if (!existe) {
         try {

@@ -112,7 +112,7 @@ export const BahiasPage: React.FC = () => {
   const tileStyles = (estado: BahiaEstado) => {
     if (estado === 'OCCUPIED') {
       return {
-        container: 'bg-rose-50 border-rose-200',
+        container: 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30',
         pill: 'bg-white/60 border-rose-200 text-rose-800',
         dot: 'bg-rose-600',
         label: 'OCUPADA',
@@ -121,7 +121,7 @@ export const BahiasPage: React.FC = () => {
 
     if (estado === 'AVAILABLE') {
       return {
-        container: 'bg-emerald-50 border-emerald-200',
+        container: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30',
         pill: 'bg-white/60 border-emerald-200 text-emerald-800',
         dot: 'bg-emerald-600',
         label: 'DISPONIBLE',
@@ -130,7 +130,7 @@ export const BahiasPage: React.FC = () => {
 
     if (estado === 'DISABLED') {
       return {
-        container: 'bg-slate-100 border-slate-200',
+        container: 'bg-slate-100 dark:bg-white/10 border-slate-200 dark:border-white/10',
         pill: 'bg-white/60 border-slate-200 text-slate-700',
         dot: 'bg-slate-500',
         label: 'DESHABILITADA',
@@ -139,7 +139,7 @@ export const BahiasPage: React.FC = () => {
 
     if (estado === 'OFFLINE') {
       return {
-        container: 'bg-slate-100 border-slate-200',
+        container: 'bg-slate-100 dark:bg-white/10 border-slate-200 dark:border-white/10',
         pill: 'bg-white/60 border-slate-200 text-slate-700',
         dot: 'bg-amber-500',
         label: 'OFFLINE',
@@ -147,7 +147,7 @@ export const BahiasPage: React.FC = () => {
     }
 
     return {
-      container: 'bg-slate-100 border-slate-200',
+      container: 'bg-slate-100 dark:bg-white/10 border-slate-200 dark:border-white/10',
       pill: 'bg-white/60 border-slate-200 text-slate-700',
       dot: 'bg-slate-500',
       label: 'ERROR',
@@ -163,7 +163,7 @@ export const BahiasPage: React.FC = () => {
     <div className="space-y-8">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Infraestructura</h1>
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Infraestructura</h1>
           <p className="text-slate-500 text-sm font-medium uppercase tracking-widest">Mapa de bahías y control en tiempo real</p>
         </div>
         <div className="flex flex-col md:flex-row gap-3 md:items-center">
@@ -176,12 +176,12 @@ export const BahiasPage: React.FC = () => {
             type="button"
             disabled={accionLoading || loading}
             onClick={toggleParqueadero}
-            className={`inline-flex items-center gap-3 px-4 py-3 rounded-xl border bg-white border-slate-200 shadow-sm transition-all duration-200 ${
-              accionLoading ? 'opacity-60' : 'hover:bg-gray-50'
+            className={`inline-flex items-center gap-3 px-4 py-3 rounded-xl border bg-white dark:bg-[#121212] border-slate-200 dark:border-white/10 shadow-sm transition-all duration-200 ${
+              accionLoading ? 'opacity-60' : 'hover:bg-gray-50 dark:hover:bg-white/10'
             }`}
           >
-            <Power size={14} className={estadoMeta.deshabilitado ? 'text-slate-900' : 'text-slate-500'} />
-            <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
+            <Power size={14} className={estadoMeta.deshabilitado ? 'text-slate-900 dark:text-white' : 'text-slate-500'} />
+            <span className="text-[10px] font-black text-slate-700 dark:text-slate-200 uppercase tracking-widest">
               Deshabilitar parqueadero
             </span>
             <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -196,19 +196,19 @@ export const BahiasPage: React.FC = () => {
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white dark:bg-[#121212] p-6 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total de espacios</p>
-          <p className="text-3xl font-black text-slate-900 tracking-tighter">{estadoMeta.total}</p>
+          <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{estadoMeta.total}</p>
         </div>
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white dark:bg-[#121212] p-6 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Espacios ocupados</p>
-          <p className="text-3xl font-black text-slate-900 tracking-tighter">{estadoMeta.ocupados}</p>
+          <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{estadoMeta.ocupados}</p>
         </div>
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white dark:bg-[#121212] p-6 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Espacios disponibles</p>
-          <p className="text-3xl font-black text-slate-900 tracking-tighter">{estadoMeta.disponibles}</p>
+          <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{estadoMeta.disponibles}</p>
         </div>
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white dark:bg-[#121212] p-6 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Estado del parqueadero</p>
           <Badge variant={estadoMeta.estado === 'DISPONIBLE' ? 'success' : estadoMeta.estado === 'LLENO' ? 'warning' : 'neutral'}>
             {estadoMeta.estado}
@@ -236,7 +236,7 @@ export const BahiasPage: React.FC = () => {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Bahía</p>
-                  <p className="text-2xl font-black text-slate-900 tracking-tight tabular-nums">
+                  <p className="text-2xl font-black text-slate-900 dark:text-white tracking-tight tabular-nums">
                     {numero}
                   </p>
                 </div>
@@ -247,7 +247,7 @@ export const BahiasPage: React.FC = () => {
                 </span>
               </div>
 
-              <div className="mt-4 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-600">
+              <div className="mt-4 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">
                 <span className="truncate">{b.tipo || 'Estándar'}</span>
                 <span className="text-slate-400 tabular-nums">ID {b.idBahia}</span>
               </div>
@@ -267,10 +267,10 @@ export const BahiasPage: React.FC = () => {
         )}
       >
         <div className="space-y-6">
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+          <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-white/10">
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Bahía</p>
-            <p className="text-lg font-black text-slate-900">{selectedBahia?.nombreBahia}</p>
-            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-2">
+            <p className="text-lg font-black text-slate-900 dark:text-white">{selectedBahia?.nombreBahia}</p>
+            <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest mt-2">
               Estado actual: {selectedBahia?.estado}
             </p>
           </div>
@@ -296,11 +296,11 @@ export const BahiasPage: React.FC = () => {
 };
 
 const LegendItem: React.FC<{ variant: any; label: string }> = ({ variant, label }) => (
-  <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
+  <div className="bg-white dark:bg-[#121212] px-4 py-2 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm flex items-center gap-2">
     <div className={`w-2 h-2 rounded-full ${
       variant === 'success' ? 'bg-emerald-600' :
       variant === 'error' ? 'bg-rose-600' : 'bg-slate-400'
     }`}></div>
-    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{label}</span>
+    <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">{label}</span>
   </div>
 );
