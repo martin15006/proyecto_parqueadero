@@ -2,7 +2,16 @@ import { sessionService } from './sessionService';
 import axios, { type AxiosRequestConfig } from 'axios';
 import { NativeModules } from 'react-native';
 
+// URL del backend. Prioridad:
+//   1. EXPO_PUBLIC_API_URL  → override explícito y completo (p. ej. un servidor desplegado).
+//   2. IP autodetectada del host de Metro + EXPO_PUBLIC_API_PORT (3001 por defecto).
+//      En desarrollo la IP se toma sola de la red, así NO hay que editar nada al
+//      cambiar de Wi-Fi: el celular usa la misma IP del PC donde corre Metro.
+//   3. EXPO_PUBLIC_API_FALLBACK_IP → último recurso si Metro no expone host
+//      (p. ej. en una build standalone sin bundler).
 const RAW_API_URL = process.env.EXPO_PUBLIC_API_URL?.trim();
+const API_PORT = process.env.EXPO_PUBLIC_API_PORT?.trim() || '3001';
+const FALLBACK_IP = process.env.EXPO_PUBLIC_API_FALLBACK_IP?.trim() || '192.168.18.216';
 
 const stripTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 const ensureApiPrefix = (baseUrl: string) => {
@@ -27,10 +36,11 @@ const debuggerHost = (() => {
   return null;
 })();
 
-const localhostIp = extractIpFromDebuggerHost(debuggerHost) || '192.168.101.84';
+// IP del PC donde corre Metro = IP del backend en la misma red local.
+const detectedIp = extractIpFromDebuggerHost(debuggerHost) || FALLBACK_IP;
 
 const API_BASE_URL = ensureApiPrefix(
-  RAW_API_URL || `http://${localhostIp}:3000/api/v1`,
+  RAW_API_URL || `http://${detectedIp}:${API_PORT}`,
 );
 
 export { API_BASE_URL };

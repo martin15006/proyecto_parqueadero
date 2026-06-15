@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { usuariosService } from '../../services/usuarios.service';
 import type { AdminUsuarioItem } from '../../types';
-import { Plus, Search, User as UserIcon, Mail, Smartphone, Car, IdCard, Phone, Lock, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, User as UserIcon, Mail, Smartphone, Car, IdCard, Phone, Lock, Pencil, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Table } from '../../components/ui/Table';
@@ -41,6 +41,7 @@ export const UsuariosPage: React.FC = () => {
   const [usuarios, setUsuarios] = useState<AdminUsuarioItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [rol, setRol] = useState<Rol>('TODOS');
+  const [estado, setEstado] = useState<'ACTIVO' | 'INACTIVO'>('ACTIVO');
   const [q, setQ] = useState('');
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -71,6 +72,7 @@ export const UsuariosPage: React.FC = () => {
       const res = await usuariosService.listarUsuariosAdmin({
         q: q.trim() || undefined,
         rol,
+        estado,
       });
       setUsuarios(res.data || []);
     } catch (error) {
@@ -84,7 +86,7 @@ export const UsuariosPage: React.FC = () => {
     const t = window.setTimeout(fetchUsuarios, 250);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, rol]);
+  }, [q, rol, estado]);
 
   const abrirCrear = () => {
     setModalMode('crear');
@@ -185,11 +187,21 @@ export const UsuariosPage: React.FC = () => {
     if (!confirmDeleteDoc) return;
     try {
       await usuariosService.eliminarUsuarioAdmin(confirmDeleteDoc);
-      showNotification('Usuario eliminado', 'success');
+      showNotification('Usuario desactivado', 'success');
       setConfirmDeleteDoc(null);
       fetchUsuarios();
     } catch (error) {
-      showNotification(getErrorMessage(error, 'No se pudo eliminar'), 'error');
+      showNotification(getErrorMessage(error, 'No se pudo desactivar'), 'error');
+    }
+  };
+
+  const reactivar = async (documento: string) => {
+    try {
+      await usuariosService.reactivarUsuarioAdmin(documento);
+      showNotification('Usuario reactivado', 'success');
+      fetchUsuarios();
+    } catch (error) {
+      showNotification(getErrorMessage(error, 'No se pudo reactivar'), 'error');
     }
   };
 
@@ -211,9 +223,14 @@ export const UsuariosPage: React.FC = () => {
     {
       header: 'Rol',
       accessor: (u: AdminUsuarioItem) => (
-        <Badge variant={u.rol === 'ADMIN' ? 'info' : u.rol === 'OPERATIVO' ? 'warning' : 'success'}>
-          {u.rol}
-        </Badge>
+        <div className="flex flex-col items-start gap-1">
+          <Badge variant={u.rol === 'ADMIN' ? 'info' : u.rol === 'OPERATIVO' ? 'warning' : 'success'}>
+            {u.rol}
+          </Badge>
+          {u.activo === false && (
+            <Badge variant="error">Desactivado</Badge>
+          )}
+        </div>
       ),
     },
     {
@@ -245,27 +262,40 @@ export const UsuariosPage: React.FC = () => {
     {
       header: 'Acciones',
       accessor: (u: AdminUsuarioItem) => (
-        <div className="flex items-center gap-2">
+        estado === 'INACTIVO' ? (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); abrirEditar(u); }}
-            className="p-2 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200"
-            title="Editar"
+            onClick={(e) => { e.stopPropagation(); reactivar(u.documento); }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold uppercase tracking-widest"
+            title="Reactivar"
           >
-            <Pencil size={14} />
+            <RotateCcw size={14} />
+            Reactivar
           </button>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setConfirmDeleteDoc(u.documento); }}
-            className="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700"
-            title="Eliminar"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); abrirEditar(u); }}
+              className="p-2 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200"
+              title="Editar"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setConfirmDeleteDoc(u.documento); }}
+              className="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700"
+              title="Desactivar"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        )
       ),
     },
-  ]), []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ]), [estado]);
 
   return (
     <div className="space-y-8">
@@ -299,6 +329,19 @@ export const UsuariosPage: React.FC = () => {
               onClick={() => setRol(r)}
             >
               {r === 'TODOS' ? 'Todos' : r.charAt(0) + r.slice(1).toLowerCase()}
+            </Button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 mr-2">Estado:</span>
+          {([['ACTIVO', 'Activos'], ['INACTIVO', 'Desactivados']] as const).map(([value, label]) => (
+            <Button
+              key={value}
+              variant={estado === value ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setEstado(value)}
+            >
+              {label}
             </Button>
           ))}
         </div>
@@ -350,6 +393,7 @@ export const UsuariosPage: React.FC = () => {
                 className="w-full mt-1 p-3 border border-slate-300 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl font-medium text-sm focus:border-[#39A900] focus:outline-none"
               >
                 <option value={1}>Aprendiz</option>
+                <option value={4}>Personal SENA</option>
                 <option value={3}>Operativo / Vigilante</option>
                 <option value={2}>Administrador</option>
               </select>

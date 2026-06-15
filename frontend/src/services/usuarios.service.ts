@@ -72,12 +72,18 @@ export const usuariosService = {
     return response.data;
   },
 
-  listarUsuariosAdmin: async (params?: { q?: string; rol?: 'APRENDIZ' | 'ADMIN' | 'OPERATIVO' | 'TODOS' }): Promise<BackendEnvelope<AdminUsuarioItem[]>> => {
+  listarUsuariosAdmin: async (params?: { q?: string; rol?: 'APRENDIZ' | 'ADMIN' | 'OPERATIVO' | 'TODOS'; estado?: 'ACTIVO' | 'INACTIVO' | 'TODOS' }): Promise<BackendEnvelope<AdminUsuarioItem[]>> => {
     const query = new URLSearchParams();
     if (params?.q) query.set('q', params.q);
     if (params?.rol) query.set('rol', params.rol);
+    if (params?.estado) query.set('estado', params.estado);
     const suffix = query.toString() ? `?${query.toString()}` : '';
     const response = await api.get(`/admin/usuarios${suffix}`);
+    return response.data;
+  },
+
+  reactivarUsuarioAdmin: async (documento: string): Promise<BackendEnvelope<{ mensaje: string }>> => {
+    const response = await api.post(`/admin/usuarios/${documento}/reactivar`);
     return response.data;
   },
 

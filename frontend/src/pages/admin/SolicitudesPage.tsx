@@ -3,7 +3,8 @@ import { vehiculosService } from '../../services/vehiculos.service';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
-import { Check, X, Clock, Eye, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Check, X, Clock, Eye, AlertTriangle } from 'lucide-react';
+import { socketService } from '../../services/socket.service';
 import type { SolicitudVehiculoAdmin, EstadoSolicitudVehiculo } from '../../types';
 
 const CAMPOS_SOLICITUD: { key: string; label: string }[] = [
@@ -56,6 +57,13 @@ export const SolicitudesPage: React.FC = () => {
 
   useEffect(() => {
     cargarSolicitudes();
+
+    // Tiempo real: el backend emite `solicitudes_actualizadas` cuando llega una
+    // nueva solicitud desde el móvil o cuando se aprueba/rechaza una.
+    socketService.connect();
+    const handler = () => cargarSolicitudes();
+    socketService.on('solicitudes_actualizadas', handler);
+    return () => socketService.off('solicitudes_actualizadas', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEstado]);
 
@@ -194,12 +202,6 @@ export const SolicitudesPage: React.FC = () => {
             {estado === 'TODOS' ? 'Todas' : estado.toLowerCase()}
           </button>
         ))}
-        <button
-          onClick={cargarSolicitudes}
-          className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-slate-800 transition-all"
-        >
-          <RefreshCw size={14} /> Refrescar
-        </button>
       </div>
 
       {feedbackOk && (

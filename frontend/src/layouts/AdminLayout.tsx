@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
-import { 
+import {
   LayoutDashboard, Users, Car,
   LogOut,
-  Inbox, Sun, Moon, ChevronLeft, ChevronRight
+  Inbox, Sun, Moon, ChevronLeft, ChevronRight, GraduationCap, History
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -21,7 +21,9 @@ export const AdminLayout: React.FC = () => {
   const menuItems = [
     { path: '/appadmin', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/appadmin/usuarios', label: 'Usuarios', icon: Users },
+    { path: '/appadmin/fichas', label: 'Fichas', icon: GraduationCap },
     { path: '/appadmin/vehiculos', label: 'Vehículos', icon: Car },
+    { path: '/appadmin/historial', label: 'Historial', icon: History },
     { path: '/appadmin/solicitudes', label: 'Solicitudes', icon: Inbox },
   ];
 
@@ -38,7 +40,9 @@ export const AdminLayout: React.FC = () => {
     const metaMap: Record<string, { title: string; subtitle: string }> = {
       '': { title: 'Dashboard', subtitle: 'Consola ejecutiva y métricas del sistema' },
       usuarios: { title: 'Usuarios', subtitle: 'Administración de cuentas institucionales' },
+      fichas: { title: 'Fichas', subtitle: 'Gestión de fichas de formación' },
       vehiculos: { title: 'Vehículos', subtitle: 'Control de flota y contingencias' },
+      historial: { title: 'Historial', subtitle: 'Registro de ingresos: quién, cuándo y quién autorizó' },
       solicitudes: { title: 'Solicitudes', subtitle: 'Aprobación de registros de vehículos' },
     };
 

@@ -27,6 +27,9 @@ import { OperativoModule } from './operativo/operativo.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TelemetriaModule } from './telemetria/telemetria.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
+import { VisitasModule } from './visitas/visitas.module';
+import { FormacionModule } from './formacion/formacion.module';
+import { RetencionModule } from './retencion/retencion.module';
 
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
@@ -143,6 +146,9 @@ function validateEnv(config: Record<string, unknown>) {
     DashboardModule,
     TelemetriaModule,
     NotificacionesModule,
+    VisitasModule,
+    FormacionModule,
+    RetencionModule,
   ],
 
   controllers: [AppController],

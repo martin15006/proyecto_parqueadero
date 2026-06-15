@@ -518,12 +518,20 @@ export class UsuarioService {
     const nombre = query.nombre?.trim();
     const documento = query.documento?.trim();
     const rol = query.rol ?? 'TODOS';
+    const estado = query.estado ?? 'ACTIVO';
 
     const qb = this.usuarioRepository
       .createQueryBuilder('u')
       .leftJoinAndSelect('u.registrosVehiculos', 'rv')
       .leftJoinAndSelect('rv.vehiculo', 'vehiculo')
       .leftJoinAndSelect('vehiculo.tipoVehiculo', 'tipoVehiculo');
+
+    // Activos / desactivados (soft-delete). Por defecto solo activos.
+    if (estado === 'INACTIVO') {
+      qb.withDeleted().andWhere('u.deleted_at IS NOT NULL');
+    } else if (estado === 'TODOS') {
+      qb.withDeleted();
+    }
 
     if (rol === 'APRENDIZ') {
       qb.andWhere('u.id_tipo_usr = :rolId', { rolId: TipoUsuarioEnum.APRENDIZ });
@@ -553,6 +561,7 @@ export class UsuarioService {
       if (id === TipoUsuarioEnum.APRENDIZ) return 'APRENDIZ';
       if (id === TipoUsuarioEnum.ADMIN) return 'ADMIN';
       if (id === TipoUsuarioEnum.OPERATIVO) return 'OPERATIVO';
+      if (id === TipoUsuarioEnum.PERSONAL_SENA) return 'PERSONAL_SENA';
       return 'DESCONOCIDO';
     };
 
@@ -561,6 +570,7 @@ export class UsuarioService {
       return {
         ...rest,
         rol: rolNombre(u.idTipoUsr),
+        activo: !u.deletedAt,
         vehiculos: (_registros || [])
           .map((r) => r.vehiculo)
           .filter(Boolean),
@@ -613,13 +623,55 @@ export class UsuarioService {
   }
 
   /**
-   * Admin → elimina un usuario (hard delete).
+   * Admin → elimina lógicamente un usuario (soft delete).
+   *
+   * No se borra físicamente: así se conserva el historial y se evitan las
+   * violaciones de clave foránea (p. ej. `registro_vehiculo`). Al quedar marcado
+   * con `deletedAt`, TypeORM lo excluye de todas las consultas normales, por lo
+   * que el usuario desaparece del listado, no puede iniciar sesión (web ni
+   * operativo) y la validación del JWT lo rechaza en cualquier endpoint
+   * protegido, dejándolo sin acceso a ninguna función del sistema.
    */
   async eliminarUsuarioPorAdmin(documento: string): Promise<{ mensaje: string }> {
     const usuario = await this.usuarioRepository.findOne({ where: { documento } });
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
 
-    await this.usuarioRepository.remove(usuario);
+    await this.usuarioRepository.softDelete({ documento });
+
+    await this.auditoriaService.create({
+      accion: 'ELIMINAR_USUARIO',
+      entidad: 'USUARIO',
+      idEntidad: parseInt(usuario.documento),
+      idUsuario: usuario.documento,
+      datosNuevos: { eliminadoLogico: true },
+    });
+
     return { mensaje: 'Usuario eliminado exitosamente' };
+  }
+
+  /**
+   * Admin → reactiva un usuario desactivado (revierte el soft-delete).
+   */
+  async reactivarUsuarioPorAdmin(documento: string): Promise<{ mensaje: string }> {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { documento },
+      withDeleted: true,
+    });
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    if (!usuario.deletedAt) {
+      throw new BadRequestException('El usuario ya está activo');
+    }
+
+    await this.usuarioRepository.restore({ documento });
+
+    await this.auditoriaService.create({
+      accion: 'REACTIVAR_USUARIO',
+      entidad: 'USUARIO',
+      idEntidad: parseInt(usuario.documento),
+      idUsuario: usuario.documento,
+      datosNuevos: { reactivado: true },
+    });
+
+    return { mensaje: 'Usuario reactivado exitosamente' };
   }
 }

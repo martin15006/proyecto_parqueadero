@@ -7,7 +7,9 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminLayout } from './layouts/AdminLayout';
 import { UsuariosPage } from './pages/admin/UsuariosPage';
+import { FichasPage } from './pages/admin/FichasPage';
 import { VehiculosPage } from './pages/admin/VehiculosPage';
+import { HistorialPage } from './pages/admin/HistorialPage';
 import { SolicitudesPage } from './pages/admin/SolicitudesPage';
 import { BahiasPage } from './pages/admin/BahiasPage';
 import { TelemetriaPage } from './pages/admin/TelemetriaPage';
@@ -95,8 +97,10 @@ function App() {
               <Route path="/appadmin" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><AdminLayout /></ProtectedRoute>}>
                 <Route index element={<AdminDashboard />} />
                 <Route path="usuarios" element={<UsuariosPage />} />
+                <Route path="fichas" element={<FichasPage />} />
                 <Route path="operativos" element={<OperativosPage />} />
                 <Route path="vehiculos" element={<VehiculosPage />} />
+                <Route path="historial" element={<HistorialPage />} />
                 <Route path="solicitudes" element={<SolicitudesPage />} />
                 <Route path="bahias" element={<BahiasPage />} />
                 <Route path="telemetria" element={<TelemetriaPage />} />

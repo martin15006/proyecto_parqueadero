@@ -5,13 +5,14 @@ import { DashboardController } from './dashboard.controller';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Vehiculo } from '../vehiculos/entities/vehiculo.entity';
 import { MovimientoVehiculo } from '../vehiculos/entities/movimiento-vehiculo.entity';
+import { Visita } from '../visitas/entities/visita.entity';
 import { BahiasModule } from '../bahias/bahias.module';
 import { AuditoriaModule } from '../auditoria/auditoria.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Usuario, Vehiculo, MovimientoVehiculo]),
+    TypeOrmModule.forFeature([Usuario, Vehiculo, MovimientoVehiculo, Visita]),
     BahiasModule,
     AuditoriaModule,
     AuthModule,

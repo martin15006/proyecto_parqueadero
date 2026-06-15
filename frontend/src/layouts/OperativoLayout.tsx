@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { socketService } from '../services/socket.service';
 
 export const OperativoLayout: React.FC = () => {
   const { logout, user } = useAuth();
@@ -17,11 +18,28 @@ export const OperativoLayout: React.FC = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [tieneAlertas, setTieneAlertas] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
+
+  // El punto rojo de la campana solo aparece si llega una alerta nueva por socket.
+  useEffect(() => {
+    const onAlerta = () => setTieneAlertas(true);
+    socketService.on('alerta_parqueadero', onAlerta);
+    socketService.on('sensor_offline', onAlerta);
+    return () => {
+      socketService.off('alerta_parqueadero', onAlerta);
+      socketService.off('sensor_offline', onAlerta);
+    };
+  }, []);
+
+  // Al entrar a Alertas se consideran leídas y se apaga el punto.
+  useEffect(() => {
+    if (location.pathname === '/appperop/alertas') setTieneAlertas(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -220,7 +238,9 @@ export const OperativoLayout: React.FC = () => {
                 title="Notificaciones"
               >
                 <Bell size={18} />
-                <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full border border-white dark:border-[#121212]" />
+                {tieneAlertas && (
+                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full border border-white dark:border-[#121212]" />
+                )}
               </button>
 
               <button 

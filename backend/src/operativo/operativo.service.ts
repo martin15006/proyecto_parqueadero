@@ -19,6 +19,9 @@ import { NotificacionesService } from '../notificaciones/notificaciones.service'
 import { Vehiculo } from '../vehiculos/entities/vehiculo.entity';
 import { RegistroVehiculo } from '../vehiculos/entities/registro-vehiculo.entity';
 import { MovimientoVehiculo, EstadoMovimiento } from '../vehiculos/entities/movimiento-vehiculo.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
+import { Jornada } from '../usuarios/entities/formacion.entity';
+import { Visita, EstadoVisita } from '../visitas/entities/visita.entity';
 import { Contingencia } from '../contingencia/entities/contingencia.entity';
 import { AlertaSistema } from '../telemetria/entities/alerta-sistema.entity';
 import { ConfirmarIngresoMultivehiculoDto } from './dto/confirmar-ingreso-multivehiculo.dto';
@@ -320,18 +323,38 @@ export class OperativoService {
       vehiculosTurno.map((v) => [v.placa, v.tipoVehiculo?.tipoVehiculo ?? 'N/D'] as const),
     );
 
-    const ingresosTurno = accionesTurno
+    const ingresosVehiculos = accionesTurno
       .map(({ a, tipo }) => {
         const placa = normalizarPlaca(a?.datosNuevos?.placa);
         if (!placa) return null;
         return {
           placa,
-          horaIngreso: a.createdAt,
+          horaIngreso: a.createdAt as Date,
           tipoVehiculo: tipoPorPlaca.get(placa) ?? 'N/D',
           tipo,
+          esVisitante: false,
         };
       })
-      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    // Eventos de visitantes registrados/cerrados por este operativo hoy.
+    const visitasTurno = await this.movimientoRepository.manager.find(Visita, {
+      where: [{ idOperativoIngreso: operador.sub }, { idOperativoSalida: operador.sub }],
+      order: { horaIngreso: 'DESC' },
+      take: 50,
+    });
+    const eventosVisitas = visitasTurno.flatMap((v) => {
+      const eventos: typeof ingresosVehiculos = [];
+      if (v.idOperativoIngreso === operador.sub && v.horaIngreso >= inicioDia) {
+        eventos.push({ placa: v.placa, horaIngreso: v.horaIngreso, tipoVehiculo: v.tipoVehiculo || 'Visitante', tipo: 'INGRESO', esVisitante: true });
+      }
+      if (v.horaSalida && v.idOperativoSalida === operador.sub && v.horaSalida >= inicioDia) {
+        eventos.push({ placa: v.placa, horaIngreso: v.horaSalida, tipoVehiculo: v.tipoVehiculo || 'Visitante', tipo: 'SALIDA', esVisitante: true });
+      }
+      return eventos;
+    });
+
+    const ingresosTurno = [...ingresosVehiculos, ...eventosVisitas]
       .sort((x, y) => new Date(y.horaIngreso).getTime() - new Date(x.horaIngreso).getTime())
       .slice(0, 50);
 
@@ -418,6 +441,7 @@ export class OperativoService {
     return await this.movimientoRepository.manager.transaction(async (manager) => {
       const { vehiculo, registro } = await this.validarVehiculoYRegistro(placa, manager);
       await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
+      await this.verificarSinVisitaActiva(placa, manager);
 
       const vehiculoCompleto = await manager.findOne(Vehiculo, {
         where: { placa: vehiculo.placa },
@@ -451,6 +475,9 @@ export class OperativoService {
 
       // Un usuario solo puede tener UN vehículo adentro a la vez
       await this.verificarUsuarioSinIngresoActivo(documentoIngreso, manager);
+
+      // Restricción de jornada: mañana/tarde solo motos.
+      await this.validarJornadaParaVehiculo(documentoIngreso, placa, manager);
 
       const nuevoMovimiento = manager.create(MovimientoVehiculo, {
         horaIngreso: new Date(),
@@ -531,6 +558,7 @@ export class OperativoService {
 
       const { vehiculo, registro } = await this.validarVehiculoYRegistro(placaARegistrar, manager);
       await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
+      await this.verificarSinVisitaActiva(placaARegistrar, manager);
 
       // Un usuario solo puede tener UN vehículo adentro a la vez
       await this.verificarUsuarioSinIngresoActivo(registro.idUsuario, manager);
@@ -654,6 +682,66 @@ export class OperativoService {
           fotoPlaca: vehiculoCompleto?.fotoPlaca,
         },
       };
+    });
+  }
+
+  /**
+   * Revierte el último movimiento registrado (desde el modal de confirmación):
+   * - Si era un INGRESO (ADENTRO/TRANSITO) → se ANULA (el vehículo no entra).
+   * - Si era una SALIDA → se revierte a ADENTRO (el vehículo sigue dentro).
+   *
+   * Pensado para cuando el operativo cierra/niega la confirmación: la operación
+   * "no se hace".
+   */
+  async anularMovimiento(idMovimiento: number, operador: IJwtPayload & { ip: string }) {
+    return await this.movimientoRepository.manager.transaction(async (manager) => {
+      const mov = await manager.findOne(MovimientoVehiculo, {
+        where: { idMovimiento },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!mov) throw new NotFoundException('Movimiento no encontrado');
+
+      const registro = await manager.findOne(RegistroVehiculo, {
+        where: { idRegistroV: mov.idRegistroVehiculo },
+      });
+      const placa = registro?.idVehiculo ?? '';
+
+      if (mov.estado === EstadoMovimiento.ADENTRO || mov.estado === EstadoMovimiento.TRANSITO) {
+        mov.estado = EstadoMovimiento.ANULADO;
+        mov.horaSalida = new Date();
+        await manager.save(mov);
+
+        await this.auditoriaService.create({
+          accion: 'ANULAR_INGRESO',
+          entidad: 'MOVIMIENTO_VEHICULO',
+          idEntidad: mov.idMovimiento,
+          idUsuario: operador?.sub || 'SISTEMA',
+          datosNuevos: { placa },
+          ip: operador?.ip || '127.0.0.1',
+          userAgent: 'Operativo App',
+        });
+        this.eventosGateway.emitirVehiculoRetirado({ placa, fecha: mov.horaSalida });
+      } else if (mov.estado === EstadoMovimiento.SALIDA) {
+        mov.estado = EstadoMovimiento.ADENTRO;
+        mov.horaSalida = null;
+        await manager.save(mov);
+
+        await this.auditoriaService.create({
+          accion: 'REVERTIR_SALIDA',
+          entidad: 'MOVIMIENTO_VEHICULO',
+          idEntidad: mov.idMovimiento,
+          idUsuario: operador?.sub || 'SISTEMA',
+          datosNuevos: { placa },
+          ip: operador?.ip || '127.0.0.1',
+          userAgent: 'Operativo App',
+        });
+        this.eventosGateway.emitirVehiculoIngresado({ placa, fecha: mov.horaIngreso, bahia: 'LIBRE' });
+      } else {
+        throw new BadRequestException('Este movimiento ya no se puede revertir.');
+      }
+
+      await this.sincronizarEstadoGlobal();
+      return { ok: true, mensaje: 'Operación revertida correctamente', idMovimiento: mov.idMovimiento };
     });
   }
 
@@ -921,9 +1009,13 @@ export class OperativoService {
     return await this.movimientoRepository.manager.transaction(async (manager) => {
       const { vehiculo, registro } = await this.validarVehiculoYRegistro(placa, manager);
       await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
+      await this.verificarSinVisitaActiva(placa, manager);
 
       // Un usuario solo puede tener UN vehículo adentro a la vez
       await this.verificarUsuarioSinIngresoActivo(documentoUsuario, manager);
+
+      // Restricción de jornada: mañana/tarde solo motos.
+      await this.validarJornadaParaVehiculo(documentoUsuario, placa, manager);
 
       const vehiculoCompleto = await manager.findOne(Vehiculo, {
         where: { placa: vehiculo.placa },
@@ -1024,6 +1116,23 @@ export class OperativoService {
   }
 
   /**
+   * Ingreso único por placa: si la placa ya tiene una visita activa (entró como
+   * visitante), no puede ingresar también como vehículo de un usuario registrado.
+   */
+  private async verificarSinVisitaActiva(placa: string, manager: EntityManager) {
+    const placaNorm = this.normalizarPlaca(placa);
+    const visitaActiva = await manager.findOne(Visita, {
+      where: { placa: placaNorm, estado: EstadoVisita.ADENTRO },
+    });
+    if (visitaActiva) {
+      throw new BadRequestException({
+        message: 'Esta placa ya tiene un ingreso activo como visitante. Debe registrarse su salida antes de volver a ingresar.',
+        errorCode: 'PLACA_CON_VISITA_ACTIVA',
+      });
+    }
+  }
+
+  /**
    * Garantiza que el usuario que va a ingresar NO tenga otro vehículo
    * (propio o compartido) ya adentro: solo puede tener UN movimiento activo.
    *
@@ -1050,6 +1159,40 @@ export class OperativoService {
       throw new BadRequestException({
         message: `Este usuario ya tiene un vehículo dentro del parqueadero${placa ? ` (placa ${placa})` : ''}. Debe registrar la salida antes de ingresar otro.`,
         errorCode: 'USUARIO_CON_INGRESO_ACTIVO',
+      });
+    }
+  }
+
+  /**
+   * Restricción de ingreso por jornada de la ficha del usuario:
+   * - Jornada MAÑANA o TARDE → solo motos (se bloquea el ingreso de carros).
+   * - Jornada NOCHE → se permiten carros.
+   * - Jornada Única (sin jornada) o usuarios sin ficha → sin restricción.
+   */
+  private async validarJornadaParaVehiculo(
+    documentoUsuario: string,
+    placa: string,
+    manager: EntityManager,
+  ) {
+    const usuario = await manager.findOne(Usuario, {
+      where: { documento: documentoUsuario },
+      relations: ['formacion'],
+    });
+
+    const jornada = usuario?.formacion?.jornada;
+    if (jornada !== Jornada.MANANA && jornada !== Jornada.TARDE) return;
+
+    const vehiculo = await manager.findOne(Vehiculo, {
+      where: { placa: this.normalizarPlaca(placa) },
+      relations: ['tipoVehiculo'],
+    });
+    const tipo = (vehiculo?.tipoVehiculo?.tipoVehiculo ?? '').trim().toLowerCase();
+
+    if (tipo === 'carro') {
+      throw new BadRequestException({
+        message:
+          'Tu jornada (mañana/tarde) solo permite el ingreso de motos. Los carros únicamente pueden ingresar en la jornada de la noche.',
+        errorCode: 'JORNADA_NO_PERMITE_CARRO',
       });
     }
   }

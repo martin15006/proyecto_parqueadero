@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  ParseIntPipe,
   UseGuards,
   Request,
   Req,
@@ -115,6 +116,17 @@ export class OperativoController {
       dto.placa,
       { ...req.user, ip: req.ip },
     );
+  }
+
+  // Negar/revertir desde el modal de confirmación: el ingreso (o salida) "no se hace".
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
+  @Post('anular-movimiento')
+  anularMovimiento(
+    @Body('idMovimiento', ParseIntPipe) idMovimiento: number,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.operativoService.anularMovimiento(idMovimiento, { ...req.user, ip: req.ip });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

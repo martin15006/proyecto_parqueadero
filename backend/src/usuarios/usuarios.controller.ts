@@ -36,7 +36,7 @@ export class UsuariosController {
   ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(TipoUsuarioEnum.APRENDIZ)
+  @Roles(TipoUsuarioEnum.APRENDIZ, TipoUsuarioEnum.PERSONAL_SENA)
   @ApiBearerAuth()
   @Get('codigo-acceso')
   @ApiOperation({ summary: 'Obtener código de acceso vehicular (Base para Code128/QR) - RF8' })

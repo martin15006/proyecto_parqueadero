@@ -6,6 +6,7 @@ import {
 import { useOperativo } from '../../hooks/useOperativo';
 import { useNotification } from '../../contexts/NotificationContext';
 import { MovementForm } from '../../components/MovementForm';
+import { VisitantesPanel } from '../../components/VisitantesPanel';
 import { operativoService } from '../../services/operativo.service';
 
 export const ControlAccesoView: React.FC = () => {
@@ -72,12 +73,8 @@ export const ControlAccesoView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
           <div className="bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 overflow-hidden transition-colors duration-300">
-            <div className="px-6 py-4 border-b border-gray-50 dark:border-white/5 bg-gray-50/30 dark:bg-white/5 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-gray-50 dark:border-white/5 bg-gray-50/30 dark:bg-white/5">
               <h2 className="text-sm font-bold text-[#012E25] dark:text-white uppercase tracking-widest">Control de Acceso</h2>
-              <div className="flex items-center gap-2">
-                 <div className="w-1.5 h-1.5 rounded-full bg-[#39B000] animate-pulse" />
-                 <span className="text-[9px] font-bold text-gray-400 uppercase">Escáner Activo</span>
-              </div>
             </div>
             <div className="p-8">
               <MovementForm
@@ -105,6 +102,8 @@ export const ControlAccesoView: React.FC = () => {
               </div>
             </button>
           </div>
+
+          <VisitantesPanel onChange={refresh} />
 
           <div className="bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 p-6 transition-colors duration-300">
             <div className="flex items-center justify-between mb-4">

@@ -12,6 +12,7 @@ import { EventosGateway } from '../gateway/eventos.gateway';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { Sensor } from '../telemetria/entities/sensor.entity';
 import { RegistroVehiculo } from '../vehiculos/entities/registro-vehiculo.entity';
+import { Visita, EstadoVisita } from '../visitas/entities/visita.entity';
 import { BahiaReconciliacionEstadoEnum } from '../common/enums/bahia-reconciliacion-estado.enum';
 
 /**
@@ -64,6 +65,8 @@ export class BahiasService implements OnModuleInit {
     private readonly parqueaderoEstadoRepository: Repository<ParqueaderoEstado>,
     @InjectRepository(MovimientoVehiculo)
     private readonly movimientoRepository: Repository<MovimientoVehiculo>,
+    @InjectRepository(Visita)
+    private readonly visitaRepository: Repository<Visita>,
     private readonly auditoriaService: AuditoriaService,
     private readonly eventosGateway: EventosGateway,
     private readonly notificacionesService: NotificacionesService,
@@ -249,10 +252,16 @@ export class BahiasService implements OnModuleInit {
       relations: ['registroVehiculo', 'registroVehiculo.vehiculo'],
     });
 
+    // Visitantes con vehículo actualmente dentro: ocupan una bahía real, por lo
+    // que cuentan en la ocupación igual que un movimiento normal.
+    const visitasActivas = await this.visitaRepository.count({
+      where: { estado: EstadoVisita.ADENTRO },
+    });
+
     const parqueaderoDeshabilitado = Boolean(parqueadero.deshabilitado);
 
     const total = bahias.length;
-    const ocupados = movimientosActivos.length;
+    const ocupados = movimientosActivos.length + visitasActivas;
     const disponibles = Math.max(total - ocupados, 0);
 
     const estadoParqueadero: IOcupacionPayload['estadoParqueadero'] = parqueaderoDeshabilitado

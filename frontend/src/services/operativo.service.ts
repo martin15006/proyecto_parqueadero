@@ -35,6 +35,12 @@ export const operativoService = {
     return response.data.data || response.data;
   },
 
+  /** Niega/revierte un movimiento (ingreso o salida) desde el modal de confirmación. */
+  anularMovimiento: async (idMovimiento: number) => {
+    const response = await api.post('/operativo/anular-movimiento', { idMovimiento });
+    return response.data.data || response.data;
+  },
+
   salidaEmergencia: async () => {
     const response = await api.post('/operativo/salida-emergencia');
     return response.data.data || response.data;

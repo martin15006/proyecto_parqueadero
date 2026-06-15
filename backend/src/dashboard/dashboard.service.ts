@@ -4,6 +4,7 @@ import { In, Repository } from 'typeorm';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Vehiculo } from '../vehiculos/entities/vehiculo.entity';
 import { MovimientoVehiculo, EstadoMovimiento } from '../vehiculos/entities/movimiento-vehiculo.entity';
+import { Visita } from '../visitas/entities/visita.entity';
 import { BahiasService } from '../bahias/bahias.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import * as ExcelJS from 'exceljs';
@@ -21,6 +22,8 @@ export class DashboardService {
     private readonly vehiculoRepository: Repository<Vehiculo>,
     @InjectRepository(MovimientoVehiculo)
     private readonly movimientoRepository: Repository<MovimientoVehiculo>,
+    @InjectRepository(Visita)
+    private readonly visitaRepository: Repository<Visita>,
     private readonly bahiasService: BahiasService,
     private readonly auditoriaService: AuditoriaService,
   ) {}
@@ -145,40 +148,102 @@ export class DashboardService {
       .getRawMany();
   }
 
+  /**
+   * Historial unificado de ingresos: vehículos enrolados (movimiento_vehiculo) +
+   * visitantes (visita). Se trae lo más reciente de cada tabla, se normaliza a una
+   * misma forma (con bandera `esVisitante`), se mezcla por fecha y se pagina.
+   */
   async obtenerHistorial(page: number = 1, limit: number = 20) {
-    const [data, total] = await this.movimientoRepository.findAndCount({
-      relations: ['registroVehiculo', 'registroVehiculo.vehiculo', 'registroVehiculo.usuario'],
+    const take = page * limit;
+
+    const [movs, movCount] = await this.movimientoRepository.findAndCount({
+      relations: [
+        'registroVehiculo',
+        'registroVehiculo.vehiculo',
+        'registroVehiculo.vehiculo.tipoVehiculo',
+        'registroVehiculo.usuario',
+        'usuarioIngreso',
+      ],
       order: { horaIngreso: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
+      take,
     });
 
-    // Quién autorizó cada ingreso: la traza vive en auditoría (REGISTRAR_ENTRADA,
-    // idEntidad = idMovimiento, idUsuario = documento del operativo).
+    const [visitas, visitaCount] = await this.visitaRepository.findAndCount({
+      order: { horaIngreso: 'DESC' },
+      take,
+    });
+
+    // Quién autorizó: vehículos vía auditoría (REGISTRAR_ENTRADA); visitas vía id_operativo_ingreso.
     const autores = await this.auditoriaService.mapearAutoresPorEntidad(
       'REGISTRAR_ENTRADA',
       'MOVIMIENTO_VEHICULO',
-      data.map((m) => m.idMovimiento),
+      movs.map((m) => m.idMovimiento),
     );
-    const documentos = [...new Set(autores.values())].filter((d) => d && d !== 'SISTEMA');
-    const usuarios = documentos.length
-      ? await this.usuarioRepository.find({ where: { documento: In(documentos) } })
+    const docsOperativos = new Set<string>();
+    for (const d of autores.values()) if (d && d !== 'SISTEMA') docsOperativos.add(d);
+    for (const v of visitas) if (v.idOperativoIngreso) docsOperativos.add(v.idOperativoIngreso);
+    const operativos = docsOperativos.size
+      ? await this.usuarioRepository.find({ where: { documento: In([...docsOperativos]) }, withDeleted: true })
       : [];
-    const nombrePorDoc = new Map(usuarios.map((u) => [u.documento, u.nombreCompleto]));
+    const nombrePorDoc = new Map(operativos.map((u) => [u.documento, u.nombreCompleto]));
+    const autorizadoPor = (doc?: string | null) =>
+      !doc ? null : { documento: doc, nombreCompleto: doc === 'SISTEMA' ? 'Sistema' : nombrePorDoc.get(doc) ?? doc };
 
-    for (const m of data) {
-      const doc = autores.get(String(m.idMovimiento));
-      (m as any).autorizadoPor = doc
-        ? { documento: doc, nombreCompleto: doc === 'SISTEMA' ? 'Sistema' : nombrePorDoc.get(doc) ?? doc }
-        : null;
-    }
+    const filasMov = movs.map((m) => ({
+      idMovimiento: `mov-${m.idMovimiento}`,
+      esVisitante: false,
+      estado: m.estado as string,
+      esManual: m.esManual,
+      horaIngreso: m.horaIngreso,
+      horaSalida: m.horaSalida,
+      registroVehiculo: m.registroVehiculo
+        ? {
+            vehiculo: m.registroVehiculo.vehiculo
+              ? {
+                  placa: m.registroVehiculo.vehiculo.placa,
+                  color: m.registroVehiculo.vehiculo.color,
+                  tipoVehiculo: m.registroVehiculo.vehiculo.tipoVehiculo
+                    ? { tipoVehiculo: m.registroVehiculo.vehiculo.tipoVehiculo.tipoVehiculo }
+                    : null,
+                }
+              : null,
+            usuario: m.registroVehiculo.usuario
+              ? { nombreCompleto: m.registroVehiculo.usuario.nombreCompleto, documento: m.registroVehiculo.usuario.documento }
+              : null,
+          }
+        : null,
+      usuarioIngreso: m.usuarioIngreso
+        ? { nombreCompleto: m.usuarioIngreso.nombreCompleto, documento: m.usuarioIngreso.documento }
+        : null,
+      autorizadoPor: autorizadoPor(autores.get(String(m.idMovimiento))),
+    }));
 
-    return {
-      data,
-      total,
-      page,
-      lastPage: Math.ceil(total / limit),
-    };
+    const filasVis = visitas.map((v) => ({
+      idMovimiento: `vis-${v.idVisita}`,
+      esVisitante: true,
+      estado: v.estado as string,
+      esManual: false,
+      horaIngreso: v.horaIngreso,
+      horaSalida: v.horaSalida,
+      registroVehiculo: {
+        vehiculo: {
+          placa: v.placa,
+          color: null as string | null,
+          tipoVehiculo: v.tipoVehiculo ? { tipoVehiculo: v.tipoVehiculo } : null,
+        },
+        usuario: { nombreCompleto: v.nombreVisitante, documento: v.documentoVisitante },
+      },
+      usuarioIngreso: { nombreCompleto: v.nombreVisitante, documento: v.documentoVisitante },
+      autorizadoPor: autorizadoPor(v.idOperativoIngreso),
+    }));
+
+    const todas = [...filasMov, ...filasVis].sort(
+      (a, b) => new Date(b.horaIngreso).getTime() - new Date(a.horaIngreso).getTime(),
+    );
+    const total = movCount + visitaCount;
+    const data = todas.slice((page - 1) * limit, page * limit);
+
+    return { data, total, page, lastPage: Math.max(1, Math.ceil(total / limit)) };
   }
 
   async exportarExcel(res: Response, user: any) {

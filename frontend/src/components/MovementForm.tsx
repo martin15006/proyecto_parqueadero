@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Car, CheckCircle2, FileText, Hash, ScanLine, ShieldAlert, XCircle } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Car, CheckCircle2, FileText, Hash, ScanLine, ShieldAlert, XCircle, LogIn, LogOut } from 'lucide-react';
 import { operativoService } from '../services/operativo.service';
 import { socketService } from '../services/socket.service';
 
@@ -18,6 +18,7 @@ interface OperativoResponse {
   mensaje: string;
   bahia?: string;
   movimiento?: {
+    idMovimiento?: number;
     horaIngreso?: string;
     horaSalida?: string;
   };
@@ -41,6 +42,7 @@ type TurnoIngresoRow = {
   horaIngreso: string;
   tipoVehiculo: string;
   tipo?: 'INGRESO' | 'SALIDA';
+  esVisitante?: boolean;
 };
 
 type VehiculoSeleccionable = {
@@ -141,6 +143,14 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
    */
   useEffect(() => {
     const focusScanInput = () => {
+      // No robar el foco si el usuario está escribiendo en OTRO campo
+      // (p. ej. un modal abierto encima del panel, como el de visitantes).
+      const active = document.activeElement as HTMLElement | null;
+      const tag = active?.tagName?.toUpperCase() ?? '';
+      const enOtroCampo =
+        active !== inputRef.current &&
+        (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || Boolean(active?.isContentEditable));
+      if (enOtroCampo) return;
       inputRef.current?.focus();
     };
 
@@ -158,6 +168,11 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
 
       if (e.key === 'Escape') {
         e.preventDefault();
+        // Si el modal de confirmación está abierto, Esc = Negar (no se hace).
+        if (feedback.type === 'success' && lastResponse) {
+          denegarMovimiento();
+          return;
+        }
         setInputValue('');
         setFeedback({ type: null, message: '' });
         setFeedbackOverlayOpen(false);
@@ -210,7 +225,15 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
         const buffered = scannerBufferRef.current.replace(/[- ]/g, '').toUpperCase();
         scannerBufferRef.current = '';
         lastScanKeyAtRef.current = 0;
-        if (!buffered.length) return;
+        if (!buffered.length) {
+          // Enter "a secas" con el modal abierto = Autorizar.
+          // (Si venía un escaneo bufferizado, en cambio se procesa el siguiente.)
+          if (feedback.type === 'success' && lastResponse) {
+            e.preventDefault();
+            autorizarMovimiento();
+          }
+          return;
+        }
         e.preventDefault();
         focusScanInput();
         setInputValue(buffered);
@@ -250,6 +273,29 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
+  // Autorizar: recién aquí se confirma y se muestra la notificación de éxito.
+  const autorizarMovimiento = () => {
+    if (lastResponse) {
+      onSuccess(lastResponse.mensaje || 'Movimiento autorizado');
+    }
+    closeFeedback();
+  };
+
+  // Negar: revierte el movimiento recién creado (el ingreso/salida "no se hace").
+  const denegarMovimiento = async () => {
+    const idMov = lastResponse?.movimiento?.idMovimiento;
+    const esSalida = Boolean(lastResponse?.movimiento?.horaSalida);
+    if (idMov) {
+      try {
+        await operativoService.anularMovimiento(idMov);
+        onSuccess(esSalida ? 'Salida revertida' : 'Ingreso anulado');
+      } catch (error: any) {
+        onError(error?.response?.data?.message || error?.message || 'No se pudo revertir el movimiento');
+      }
+    }
+    closeFeedback();
+  };
+
   async function handleAction(action: 'entrada' | 'salida' | 'codigo', value?: string) {
     const targetValue = String(value ?? inputValue).trim();
 
@@ -281,7 +327,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
           setFeedback({ type: 'success', message: resEntrada.mensaje });
           setLastResponse(resEntrada);
           setFeedbackOverlayOpen(true);
-          onSuccess(`Ingreso: ${targetValue}`);
           loadTurnoIngresos();
           setInputValue('');
           break;
@@ -292,7 +337,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
           setFeedback({ type: 'success', message: resSalida.mensaje });
           setLastResponse(resSalida);
           setFeedbackOverlayOpen(true);
-          onSuccess(`Salida: ${targetValue}`);
           loadTurnoIngresos();
           setInputValue('');
           break;
@@ -305,7 +349,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
             setFeedback({ type: 'success', message: resCodigo.mensaje });
             setLastResponse(resCodigo);
             setFeedbackOverlayOpen(true);
-            onSuccess(resCodigo.mensaje);
             loadTurnoIngresos();
             setInputValue('');
           } else {
@@ -334,7 +377,20 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleAction('codigo');
+      // Si el modal de confirmación está abierto, Enter = Autorizar.
+      if (feedback.type === 'success' && lastResponse) {
+        autorizarMovimiento();
+        return;
+      }
+      // Una PLACA escrita (5–7 alfanuméricos) entra por el flujo de "Entrada":
+      // pregunta el usuario si el vehículo tiene varios propietarios.
+      // Un código/QR (token más largo) se resuelve automáticamente como hasta ahora.
+      const val = inputValue.trim().toUpperCase();
+      if (/^[A-Z0-9]{5,7}$/.test(val)) {
+        handleAction('entrada', val);
+      } else {
+        handleAction('codigo');
+      }
     }
   };
 
@@ -355,7 +411,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
       setFeedback({ type: 'success', message: resEntrada.mensaje });
       setLastResponse(resEntrada);
       setFeedbackOverlayOpen(true);
-      onSuccess(`Ingreso: ${placa}`);
       loadTurnoIngresos();
       setInputValue('');
     } catch (error: any) {
@@ -390,7 +445,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
       setFeedback({ type: 'success', message: res.mensaje });
       setLastResponse(res);
       setFeedbackOverlayOpen(true);
-      onSuccess(res.mensaje);
       loadTurnoIngresos();
       setInputValue('');
     } catch (error: any) {
@@ -414,6 +468,20 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
   const horaTurno = useMemo(() => (iso: string) => {
     try {
       return iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    } catch {
+      return '';
+    }
+  }, []);
+
+  const tiempoRelativo = useMemo(() => (iso: string) => {
+    try {
+      const diff = Date.now() - new Date(iso).getTime();
+      const min = Math.floor(diff / 60000);
+      if (min < 1) return 'hace un momento';
+      if (min < 60) return `hace ${min} min`;
+      const h = Math.floor(min / 60);
+      if (h < 24) return `hace ${h} h`;
+      return `hace ${Math.floor(h / 24)} d`;
     } catch {
       return '';
     }
@@ -491,21 +559,14 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
           onKeyDown={handleKeyDown}
           disabled={feedback.type === 'loading'}
           className={`
-            w-full pl-12 pr-16 py-4 bg-gray-50 dark:bg-white/5 border-2 rounded-xl
+            w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-white/5 border-2 rounded-xl
             text-lg font-bold tracking-widest transition-all outline-none disabled:opacity-60
             ${feedback.type === 'error'
               ? 'border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-900/20 text-red-600'
               : 'border-transparent focus:border-[#39B000] focus:bg-white dark:focus:bg-[#121212] text-[#012E25] dark:text-white'}
           `}
         />
-        <div className="absolute inset-y-0 right-4 flex items-center gap-2">
-          <div className="px-2 py-1 bg-gray-200 dark:bg-white/10 rounded text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase">F2</div>
-        </div>
       </div>
-
-      <p className="text-center text-[9px] font-bold text-gray-300 dark:text-gray-600 uppercase tracking-widest -mt-3">
-        Lector físico en escucha activa • F2: Enfocar • ESC: Limpiar • Enter: Enviar
-      </p>
 
       <div className="grid grid-cols-2 gap-4 max-w-xl mx-auto">
         <button
@@ -528,49 +589,66 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
 
       {/* Solo informativo: detenemos la propagación del clic para que no se reenfoque el input de escaneo. */}
       <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-white/5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Movimientos recientes</h4>
-          <span className={`text-[9px] font-bold uppercase tracking-widest ${turnoLoading ? 'text-orange-400 animate-pulse' : 'text-[#39B000] animate-pulse'}`}>
-            {turnoLoading ? 'Cargando' : 'En vivo'}
-          </span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {turnoLoading ? (
-            Array(2).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 dark:bg-white/5 rounded-xl animate-pulse" />)
-          ) : turnoIngresos.length === 0 ? (
-            <div className="col-span-full py-6 text-center border border-dashed border-gray-100 dark:border-white/5 rounded-xl">
-              <p className="text-[10px] font-bold text-gray-300 dark:text-gray-700 uppercase tracking-widest">Sin registros recientes</p>
-            </div>
-          ) : (
-            turnoIngresos.slice(0, 6).map((ingreso, i) => {
+        <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1">Movimientos recientes</h4>
+
+        {turnoLoading ? (
+          <div className="space-y-2">
+            {Array(3).fill(0).map((_, i) => <div key={i} className="h-12 bg-gray-50 dark:bg-white/5 rounded-xl animate-pulse" />)}
+          </div>
+        ) : turnoIngresos.length === 0 ? (
+          <div className="py-6 text-center border border-dashed border-gray-100 dark:border-white/5 rounded-xl">
+            <p className="text-[10px] font-bold text-gray-300 dark:text-gray-700 uppercase tracking-widest">Sin registros recientes</p>
+          </div>
+        ) : (
+          <ol className="px-1">
+            {turnoIngresos.slice(0, 8).map((ingreso, i, arr) => {
               const esSalida = ingreso.tipo === 'SALIDA';
+              const esUltimo = i === arr.length - 1;
               return (
-              <div key={`${ingreso.placa}-${i}`} className="flex items-center gap-3 p-3 bg-white dark:bg-[#121212] border border-gray-100 dark:border-white/5 rounded-xl">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[10px] ${
-                  esSalida
-                    ? 'bg-orange-50 text-orange-500 dark:bg-orange-900/20 dark:text-orange-400'
-                    : 'bg-gray-50 dark:bg-white/5 text-[#39B000]'
-                }`}>
-                  {ingreso.placa.substring(0, 2)}
-                </div>
-                <div className="flex-1 overflow-hidden">
-                  <p className="text-sm font-bold text-[#012E25] dark:text-white leading-none truncate">{ingreso.placa}</p>
-                  <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 mt-1 uppercase truncate">
-                    {(ingreso.tipoVehiculo || 'N/D')} • {horaTurno(ingreso.horaIngreso)}
-                  </p>
-                </div>
-                <span className={`shrink-0 px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest ${
-                  esSalida
-                    ? 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400'
-                    : 'bg-green-50 text-[#39B000] dark:bg-[#39B000]/10 dark:text-[#39B000]'
-                }`}>
-                  {esSalida ? 'Salida' : 'Ingreso'}
-                </span>
-              </div>
+                <li key={`${ingreso.placa}-${ingreso.horaIngreso}-${i}`} className="relative flex gap-3">
+                  {/* Eje de la línea de tiempo: punto + conector */}
+                  <div className="flex flex-col items-center">
+                    <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center shrink-0 border ${
+                      esSalida
+                        ? 'bg-orange-50 text-orange-500 border-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-900/30'
+                        : 'bg-green-50 text-[#39B000] border-green-100 dark:bg-[#39B000]/10 dark:border-[#39B000]/20'
+                    }`}>
+                      {esSalida ? <LogOut size={14} /> : <LogIn size={14} />}
+                    </div>
+                    {!esUltimo && <div className="w-px flex-1 min-h-[14px] bg-gray-100 dark:bg-white/10" />}
+                  </div>
+
+                  <div className="flex-1 flex items-start justify-between gap-2 pb-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-[#012E25] dark:text-white leading-none truncate">{ingreso.placa}</p>
+                        <span className={`shrink-0 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${
+                          esSalida
+                            ? 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400'
+                            : 'bg-green-50 text-[#39B000] dark:bg-[#39B000]/10 dark:text-[#39B000]'
+                        }`}>
+                          {esSalida ? 'Salida' : 'Ingreso'}
+                        </span>
+                        {ingreso.esVisitante && (
+                          <span className="shrink-0 px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 dark:bg-violet-900/20 dark:text-violet-300 text-[8px] font-black uppercase tracking-widest">Visitante</span>
+                        )}
+                      </div>
+                      <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 mt-1.5 uppercase tracking-wider truncate">
+                        {(ingreso.tipoVehiculo || 'N/D')} • {tiempoRelativo(ingreso.horaIngreso)}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-bold text-[#012E25] dark:text-white tabular-nums leading-none">{horaTurno(ingreso.horaIngreso)}</p>
+                      {i === 0 && (
+                        <p className="text-[8px] font-black text-[#39B000] uppercase tracking-widest mt-1">Más reciente</p>
+                      )}
+                    </div>
+                  </div>
+                </li>
               );
-            })
-          )}
-        </div>
+            })}
+          </ol>
+        )}
       </div>
 
       {infoPlaca && (
@@ -692,176 +770,87 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
       )}
 
       {showProfessionalModal && lastResponse && (
-        <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-6xl sm:rounded-[2rem] overflow-hidden shadow-[0_0_150px_rgba(0,0,0,0.9)] animate-in zoom-in duration-500 my-auto border border-white/20">
-            <div className={`p-6 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 border-b-[12px] ${lastResponse.movimiento?.horaSalida ? 'bg-orange-600 border-orange-700' : 'bg-[#012E25] border-[#39B000]'}`}>
-              <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
-                <div className="bg-white/20 p-5 rounded-[2rem] shadow-2xl backdrop-blur-xl border border-white/30">
-                  <CheckCircle2 size={60} className="text-white" />
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 mb-3">
-                    <span className={`px-8 py-3 rounded-2xl text-2xl font-black uppercase tracking-[0.5em] shadow-[0_10px_30px_rgba(0,0,0,0.3)] ${lastResponse.movimiento?.horaSalida ? 'bg-white text-orange-600' : 'bg-[#39B000] text-white'}`}>
-                      {lastResponse.movimiento?.horaSalida ? 'SALIDA' : 'INGRESO'}
+        <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#121212] w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in duration-300 border border-white/10 flex flex-col max-h-[94vh]">
+            {/* Encabezado compacto */}
+            <div className={`px-6 py-4 flex items-center justify-between gap-4 ${lastResponse.movimiento?.horaSalida ? 'bg-orange-600' : 'bg-[#012E25]'}`}>
+              <div className="flex items-center gap-4 min-w-0">
+                <CheckCircle2 size={34} className="text-white/90 shrink-0" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded-lg text-[11px] font-black uppercase tracking-[0.2em] ${lastResponse.movimiento?.horaSalida ? 'bg-white text-orange-600' : 'bg-[#39B000] text-white'}`}>
+                      {lastResponse.movimiento?.horaSalida ? 'Salida' : 'Ingreso'}
                     </span>
-                    <p className="text-white/80 text-sm font-black uppercase tracking-[0.5em] border-l-4 border-white/30 pl-4">Confirmado</p>
+                    <span className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em]">Confirmado</span>
                   </div>
-                  <h3 className="text-white text-6xl sm:text-8xl font-black uppercase tracking-tighter leading-none filter drop-shadow-2xl mb-2">
-                    {lastResponse.vehiculo?.placa}
-                  </h3>
-                  <p className="text-white/90 text-xl font-bold uppercase tracking-[0.2em]">{lastResponse.mensaje}</p>
+                  <h3 className="text-white text-3xl sm:text-4xl font-black uppercase tracking-tight leading-none mt-1.5 truncate">{lastResponse.vehiculo?.placa}</h3>
                 </div>
               </div>
               <button
-                onClick={closeFeedback}
-                className="group bg-white/10 hover:bg-white/20 p-6 rounded-[2rem] transition-all duration-300 shadow-xl border border-white/10"
+                onClick={denegarMovimiento}
+                title="Negar (no se hace el ingreso)"
+                className="shrink-0 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all"
               >
-                <XCircle size={48} className="text-white/60 group-hover:text-white group-hover:scale-110 transition-transform" />
+                <XCircle size={22} />
               </button>
             </div>
 
-            <div className="p-6 sm:p-12">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12">
-
-                <div className="lg:col-span-5 space-y-8 sm:space-y-12">
-
-                  <div className="bg-slate-50 p-8 rounded-[2rem] border-2 border-slate-100 flex items-center gap-8 shadow-inner">
-                    <div className="relative">
-                      <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-[2rem] overflow-hidden border-8 border-white shadow-2xl bg-white">
-                        {lastResponse.aprendiz?.fotoPersona ? (
-                          <img
-                            src={lastResponse.aprendiz.fotoPersona}
-                            alt={lastResponse.aprendiz?.nombreCompleto}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-slate-100 text-[#012E25]/30">
-                            <span className="text-7xl font-black">
-                              {(lastResponse.aprendiz?.nombreCompleto || 'S').charAt(0)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="absolute -bottom-3 -right-3 bg-[#39B000] text-white px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl border-4 border-white">
-                        VÁLIDO
-                      </div>
+            {/* Cuerpo: identidad + evidencia, todo a la vista */}
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto">
+              <div className="flex items-center gap-4 bg-slate-50 dark:bg-white/5 rounded-2xl p-4">
+                <div className="w-24 h-24 rounded-2xl overflow-hidden border-4 border-white dark:border-white/10 shadow bg-white shrink-0">
+                  {lastResponse.aprendiz?.fotoPersona ? (
+                    <img src={lastResponse.aprendiz.fotoPersona} alt={lastResponse.aprendiz?.nombreCompleto} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-slate-100 text-[#012E25]/30 text-3xl font-black">
+                      {(lastResponse.aprendiz?.nombreCompleto || 'S').charAt(0)}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[#39B000] text-xs font-black uppercase tracking-[0.3em] mb-2">Identidad del Usuario</p>
-                      <h4 className="text-[#012E25] text-3xl sm:text-4xl font-black truncate leading-none mb-3">
-                        {lastResponse.aprendiz?.nombreCompleto || 'USUARIO DESCONOCIDO'}
-                      </h4>
-                      <div className="inline-flex bg-slate-200/50 px-4 py-2 rounded-xl">
-                        <p className="text-slate-600 font-black text-lg tracking-wider">
-                          CC {lastResponse.aprendiz?.documento || '---'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div className="bg-slate-900 p-8 rounded-[2rem] shadow-2xl flex flex-col items-center justify-center text-center">
-                      <p className="text-[#39B000] text-xs font-black uppercase tracking-[0.3em] mb-4">Hora de Registro</p>
-                      <span className="text-white text-5xl font-black tracking-tighter tabular-nums leading-none mb-2">
-                        {new Date(lastResponse.movimiento?.horaSalida || lastResponse.movimiento?.horaIngreso || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                      </span>
-                      <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Servidor Local SENA</p>
-                    </div>
-
-                    {lastResponse.movimiento?.horaSalida && lastResponse.movimiento?.horaIngreso ? (
-                      <div className="bg-orange-50 p-8 rounded-[2rem] border-4 border-orange-100 flex flex-col items-center justify-center text-center">
-                        <p className="text-orange-600 text-xs font-black uppercase tracking-[0.3em] mb-4">Ingresó el Día</p>
-                        <span className="text-orange-950 text-4xl font-black tracking-tighter tabular-nums leading-none mb-2">
-                          {new Date(lastResponse.movimiento.horaIngreso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        <p className="text-orange-600/60 text-[10px] font-bold uppercase tracking-widest">Entrada registrada</p>
-                      </div>
-                    ) : lastResponse.bahia ? (
-                      <div className="bg-[#39B000]/10 p-8 rounded-[2rem] border-4 border-[#39B000]/20 flex flex-col items-center justify-center text-center">
-                        <p className="text-[#39B000] text-xs font-black uppercase tracking-[0.3em] mb-4">Bahía Asignada</p>
-                        <span className="text-[#012E25] text-6xl font-black tracking-tighter leading-none mb-2">{lastResponse.bahia}</span>
-                        <p className="text-[#39B000]/60 text-[10px] font-bold uppercase tracking-widest">Zona Autorizada</p>
-                      </div>
-                    ) : null}
-                  </div>
+                  )}
                 </div>
-
-                <div className="lg:col-span-7 space-y-8">
-                  <div className="flex items-center justify-between px-4">
-                    <p className="text-[#012E25] text-sm font-black uppercase tracking-[0.5em] border-l-8 border-[#39B000] pl-4">
-                      Evidencia del Registro
-                    </p>
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <ShieldAlert size={18} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Validación Requerida</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-8">
-                    <div className="col-span-2 relative group cursor-zoom-in">
-                      <div className="absolute top-6 left-6 z-10 bg-[#012E25]/90 backdrop-blur-md text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl border border-white/20">
-                        Vehículo Registrado
-                      </div>
-                      <div className="h-80 sm:h-96 rounded-[2rem] overflow-hidden border-8 border-slate-100 shadow-2xl bg-slate-100">
-                        {lastResponse.vehiculo?.fotoVehiculo ? (
-                          <img src={lastResponse.vehiculo.fotoVehiculo} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Vehículo" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-300">
-                            <Car size={100} />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="relative group cursor-zoom-in">
-                      <div className="absolute top-5 left-5 z-10 bg-black/70 backdrop-blur-md text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg">
-                        Placa Física
-                      </div>
-                      <div className="h-56 rounded-[2rem] overflow-hidden border-4 border-slate-100 shadow-xl bg-slate-100">
-                        {lastResponse.vehiculo?.fotoPlaca ? (
-                          <img src={lastResponse.vehiculo.fotoPlaca} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Placa" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-300">
-                            <Hash size={60} />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="relative group cursor-zoom-in">
-                      <div className="absolute top-5 left-5 z-10 bg-black/70 backdrop-blur-md text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg">
-                        Documento Legal
-                      </div>
-                      <div className="h-56 rounded-[2rem] overflow-hidden border-4 border-slate-100 shadow-xl bg-slate-100">
-                        {lastResponse.vehiculo?.fotoTarjetaP ? (
-                          <img src={lastResponse.vehiculo.fotoTarjetaP} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Tarjeta" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-300">
-                            <FileText size={60} />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                <div className="min-w-0">
+                  <p className="text-[#39B000] text-[9px] font-black uppercase tracking-widest mb-1">Identidad</p>
+                  <h4 className="text-[#012E25] dark:text-white text-lg font-black truncate leading-tight">{lastResponse.aprendiz?.nombreCompleto || 'DESCONOCIDO'}</h4>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs font-bold mt-0.5">CC {lastResponse.aprendiz?.documento || '---'}</p>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
+                    <ScanLine size={11} />
+                    {new Date(lastResponse.movimiento?.horaSalida || lastResponse.movimiento?.horaIngreso || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {lastResponse.bahia && !lastResponse.movimiento?.horaSalida ? ` • Bahía ${lastResponse.bahia}` : ''}
+                  </p>
                 </div>
+              </div>
+
+              <div className="rounded-2xl overflow-hidden bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 relative h-40">
+                <span className="absolute top-2 left-2 z-10 bg-black/60 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest">Vehículo</span>
+                {lastResponse.vehiculo?.fotoVehiculo ? (
+                  <img src={lastResponse.vehiculo.fotoVehiculo} className="w-full h-full object-cover" alt="Vehículo" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-300"><Car size={44} /></div>
+                )}
+              </div>
+
+              <div className="sm:col-span-2 grid grid-cols-2 gap-3">
+                <FotoMini label="Placa física" url={lastResponse.vehiculo?.fotoPlaca || null} icon={<Hash size={26} />} />
+                <FotoMini label="Tarjeta" url={lastResponse.vehiculo?.fotoTarjetaP || null} icon={<FileText size={26} />} />
               </div>
             </div>
 
-            <div className="p-10 bg-slate-50 border-t-2 border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-8">
-              <div className="flex items-center gap-5 text-slate-500 max-w-xl">
-                <div className="bg-orange-500/10 p-3 rounded-2xl text-orange-600">
-                  <ShieldAlert size={32} />
-                </div>
-                <p className="text-xs sm:text-sm font-bold uppercase tracking-wider leading-relaxed">
-                  <span className="text-orange-600 font-black block mb-1">ATENCIÓN VIGILANTE:</span>
-                  Verifique que la placa física coincida exactamente con la digital antes de permitir el movimiento.
-                </p>
+            {/* Pie compacto */}
+            <div className="px-4 py-3 bg-slate-50 dark:bg-white/5 border-t border-slate-100 dark:border-white/5 flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-2 text-slate-500 flex-1 min-w-0">
+                <ShieldAlert size={16} className="text-orange-500 shrink-0" />
+                <p className="text-[10px] font-bold uppercase tracking-wide leading-tight">Verifique que la placa coincida.</p>
               </div>
               <button
-                onClick={closeFeedback}
-                className="w-full sm:w-auto bg-[#012E25] hover:bg-[#39B000] text-white px-16 py-7 rounded-[2rem] font-black uppercase tracking-[0.3em] text-lg shadow-[0_20px_50px_rgba(1,46,37,0.3)] transition-all duration-300 hover:scale-105 active:scale-95 border-b-8 border-black/20"
+                onClick={denegarMovimiento}
+                className="shrink-0 bg-white dark:bg-white/5 border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-5 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-95"
               >
-                AUTORIZAR Y CERRAR
+                Negar
+              </button>
+              <button
+                onClick={autorizarMovimiento}
+                className="shrink-0 bg-[#012E25] hover:bg-[#39B000] text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-95"
+              >
+                Autorizar · Enter
               </button>
             </div>
           </div>
@@ -870,6 +859,17 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
     </div>
   );
 };
+
+const FotoMini = ({ label, url, icon }: { label: string; url: string | null; icon: ReactNode }) => (
+  <div className="rounded-xl overflow-hidden bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 relative h-28">
+    <span className="absolute top-1.5 left-1.5 z-10 bg-black/60 text-white px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest">{label}</span>
+    {url ? (
+      <img src={url} className="w-full h-full object-cover" alt={label} />
+    ) : (
+      <div className="w-full h-full flex items-center justify-center text-slate-300">{icon}</div>
+    )}
+  </div>
+);
 
 const FotoCard = ({ label, url }: { label: string; url: string | null }) => (
   <div className="rounded-xl overflow-hidden border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/5">

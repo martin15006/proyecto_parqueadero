@@ -145,8 +145,10 @@ export interface Vehiculo {
 }
 
 export interface AdminUsuarioItem extends User {
-  rol: 'APRENDIZ' | 'ADMIN' | 'OPERATIVO';
+  rol: 'APRENDIZ' | 'ADMIN' | 'OPERATIVO' | 'PERSONAL_SENA';
   vehiculos: Vehiculo[];
+  /** false cuando el usuario está desactivado (soft-delete). */
+  activo?: boolean;
 }
 
 export interface AdminVehiculoItem extends Vehiculo {

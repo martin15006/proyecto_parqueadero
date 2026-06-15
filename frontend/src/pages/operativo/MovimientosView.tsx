@@ -4,7 +4,8 @@ import { dashboardService } from '../../services/operativo.service';
 
 /** Fila del historial según `GET /dashboard/historial` (movimiento + registroVehiculo). */
 interface HistorialRow {
-  idMovimiento: number;
+  idMovimiento: number | string;
+  esVisitante?: boolean;
   horaIngreso: string | null;
   horaSalida: string | null;
   estado: 'TRANSITO' | 'ADENTRO' | 'SALIDA' | 'ANULADO';
@@ -119,8 +120,11 @@ export const MovimientosView: React.FC = () => {
                             {usuario?.nombreCompleto?.charAt(0) || <User size={14} />}
                           </div>
                           <div className="flex flex-col">
-                            <span className="font-bold text-[#012E25] dark:text-white text-xs">
+                            <span className="font-bold text-[#012E25] dark:text-white text-xs flex items-center gap-1.5">
                               {usuario?.nombreCompleto || '---'}
+                              {m.esVisitante && (
+                                <span className="px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 text-[8px] font-black uppercase tracking-widest">Visitante</span>
+                              )}
                             </span>
                             <span className="text-[9px] text-gray-400 dark:text-gray-500 font-bold uppercase">
                               {usuario?.documento || '---'}

@@ -45,8 +45,14 @@ export class AdminUsuariosController {
   }
 
   @Delete(':documento')
-  @ApiOperation({ summary: 'Eliminar un usuario (Admin)' })
+  @ApiOperation({ summary: 'Desactivar un usuario — soft delete (Admin)' })
   async eliminar(@Param('documento') documento: string) {
     return await this.usuarioService.eliminarUsuarioPorAdmin(documento);
+  }
+
+  @Post(':documento/reactivar')
+  @ApiOperation({ summary: 'Reactivar un usuario desactivado (Admin)' })
+  async reactivar(@Param('documento') documento: string) {
+    return await this.usuarioService.reactivarUsuarioPorAdmin(documento);
   }
 }

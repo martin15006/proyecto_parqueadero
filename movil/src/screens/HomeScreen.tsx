@@ -62,6 +62,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const { esOscuro } = useTheme();
 
   const esAprendiz = Number(usuario?.idTipoUsr ?? 0) === 1;
+  // Personal SENA (tipo 4) opera como aprendiz para el acceso vehicular (QR + credencial).
+  const puedeAcceso = esAprendiz || Number(usuario?.idTipoUsr ?? 0) === 4;
 
   const T = useMemo(() => ({
     fondo: esOscuro ? '#0B1410' : COLORS.fondoBase,
@@ -105,6 +107,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     if (idRol === 1) return 'APRENDIZ ACTIVO';
     if (idRol === 2) return 'ADMINISTRADOR';
     if (idRol === 3) return 'OPERATIVO';
+    if (idRol === 4) return 'PERSONAL SENA';
     return 'USUARIO';
   }, [usuario?.idTipoUsr]);
 
@@ -179,7 +182,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       if (!usuario) return;
       setCargando(true);
       try {
-        if (esAprendiz) {
+        if (puedeAcceso) {
           let codigo: CodigoAccesoResponse | null = null;
           try {
             codigo = await apiRequest<CodigoAccesoResponse>('/usuarios/codigo-acceso', { conAuth: true });
@@ -201,7 +204,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     })();
 
     return () => { activo = false; };
-  }, [usuario, esAprendiz, cargarLiveData]);
+  }, [usuario, puedeAcceso, cargarLiveData]);
 
   // Refresco en tiempo real mientras la pantalla está visible: polling cada 10s + refresco al recibir foco.
   useFocusEffect(
@@ -286,7 +289,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   const codigoAccesoBarras = String(codigoAcceso ?? '').trim();
   const codigoAccesoQrSeguro = String(codigoAccesoQr ?? '').trim();
-  const tieneCodigoAcceso = Boolean(esAprendiz && (codigoAccesoBarras || codigoAccesoQrSeguro));
+  const tieneCodigoAcceso = Boolean(puedeAcceso && (codigoAccesoBarras || codigoAccesoQrSeguro));
   const pulseOpacity = animPulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
 
   return (
@@ -361,7 +364,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               <Animated.View style={[styles.codeInner, { opacity: animSwitch, transform: [{ scale: animSwitch.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] }) }] }]}>
                 {cargando ? (
                   <ActivityIndicator color={COLORS.verdeActivo} />
-                ) : !esAprendiz ? (
+                ) : !puedeAcceso ? (
                   <Text style={[styles.codeUnavailable, { color: T.textoSecundario }]}>Disponible solo para Aprendiz</Text>
                 ) : tieneCodigoAcceso ? (
                   <QRCode

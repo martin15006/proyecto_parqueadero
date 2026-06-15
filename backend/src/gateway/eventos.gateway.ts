@@ -235,6 +235,15 @@ export class EventosGateway
     this.emitirEvento('conteo_global_disponibles', payload, this.ROOMS.ADMINS_FULL);
   }
 
+  /**
+   * Notifica a los administradores que la lista de solicitudes cambió
+   * (nueva solicitud desde el móvil, o una aprobada/rechazada). El panel
+   * de Solicitudes escucha este evento y recarga en tiempo real.
+   */
+  emitirSolicitudesActualizadas(payload: { tipo: 'NUEVA' | 'RESUELTA'; idSolicitud?: number }) {
+    this.emitirEvento('solicitudes_actualizadas', payload, this.ROOMS.ADMINS_FULL);
+  }
+
   emitirBahiaModificada(payload: IBahiaModificadaPayload, opts?: { source?: 'IOT' | 'PORTERIA' | 'ADMIN' }) {
     const key = payload.idBahia;
     const current = this.bahiaDebounce.get(key);

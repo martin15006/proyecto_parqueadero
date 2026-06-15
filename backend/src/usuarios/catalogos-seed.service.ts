@@ -52,9 +52,10 @@ export class CatalogosSeedService {
    */
   private async seedTipoUsuario() {
     const tipos = [
-      { id: TipoUsuarioEnum.APRENDIZ,  nombre: 'APRENDIZ'  },
-      { id: TipoUsuarioEnum.ADMIN,     nombre: 'ADMIN'     },
-      { id: TipoUsuarioEnum.OPERATIVO, nombre: 'OPERATIVO' },
+      { id: TipoUsuarioEnum.APRENDIZ,      nombre: 'APRENDIZ'      },
+      { id: TipoUsuarioEnum.ADMIN,         nombre: 'ADMIN'         },
+      { id: TipoUsuarioEnum.OPERATIVO,     nombre: 'OPERATIVO'     },
+      { id: TipoUsuarioEnum.PERSONAL_SENA, nombre: 'PERSONAL_SENA' },
     ];
 
     for (const t of tipos) {

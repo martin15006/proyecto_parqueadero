@@ -7,6 +7,30 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { usuariosService } from '../../services/usuarios.service';
+
+/** Mismas reglas que el validador `ContrasenaSegura` del backend (RF3). */
+const isPasswordSecure = (value: string) => {
+  const check = {
+    tieneMinimo: value.length >= 8,
+    tieneMayuscula: /[A-Z]/.test(value),
+    tieneMinuscula: /[a-z]/.test(value),
+    tieneNumero: /[0-9]/.test(value),
+    tieneEspecial: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>\/?¿¡~`]/.test(value),
+  };
+  return { isValid: Object.values(check).every(Boolean), check };
+};
+
+/** Extrae el mensaje real del backend; class-validator envía `message` como array. */
+const mensajeDeError = (e: any, fallback: string): string => {
+  const raw = e?.response?.data?.message ?? e?.message;
+  if (Array.isArray(raw)) {
+    const textos = raw.filter((m) => typeof m === 'string' && m.trim());
+    if (textos.length) return textos.join(' • ');
+  }
+  if (typeof raw === 'string' && raw.trim()) return raw;
+  return fallback;
+};
 
 export const ConfiguracionView: React.FC = () => {
   const { user } = useAuth();
@@ -28,7 +52,6 @@ export const ConfiguracionView: React.FC = () => {
   const [profileData, setProfileData] = useState({
     nombre: user?.usuario?.nombreCompleto || 'Juan Carlos Operativo',
     correo: user?.usuario?.correo || 'j.operativo@misena.edu.co',
-    cargo: 'Operador de Turno'
   });
 
   const [securityData, setSecurityData] = useState({
@@ -37,6 +60,8 @@ export const ConfiguracionView: React.FC = () => {
     confirmPassword: ''
   });
   const [showPass, setShowPass] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const [prefs, setPrefs] = useState({
     sonido: true,
@@ -45,12 +70,56 @@ export const ConfiguracionView: React.FC = () => {
     autoRefresh: true
   });
 
-  const handleSave = () => {
-    setSaving(true);
-    setTimeout(() => {
+  const handleSave = async () => {
+    // El cambio de contraseña sí persiste contra el backend; el perfil y las
+    // preferencias todavía son locales, así que mantienen el guardado simulado.
+    if (activeSection !== 'seguridad') {
+      setSaving(true);
+      setTimeout(() => {
+        setSaving(false);
+        showNotification('Configuración actualizada correctamente', 'success');
+      }, 1000);
+      return;
+    }
+
+    const { currentPassword, newPassword, confirmPassword } = securityData;
+
+    // Validamos en cliente para avisar al operador en vez de simular éxito.
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showNotification('Completa todos los campos de contraseña', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showNotification('La nueva contraseña y su confirmación no coinciden', 'error');
+      return;
+    }
+    if (currentPassword === newPassword) {
+      showNotification('La nueva contraseña no puede ser igual a la actual', 'error');
+      return;
+    }
+    const { isValid, check } = isPasswordSecure(newPassword);
+    if (!isValid) {
+      const faltantes: string[] = [];
+      if (!check.tieneMinimo) faltantes.push('mínimo 8 caracteres');
+      if (!check.tieneMayuscula) faltantes.push('una mayúscula');
+      if (!check.tieneMinuscula) faltantes.push('una minúscula');
+      if (!check.tieneNumero) faltantes.push('un número');
+      if (!check.tieneEspecial) faltantes.push('un carácter especial');
+      showNotification(`La contraseña requiere: ${faltantes.join(', ')}`, 'error');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await usuariosService.cambiarContrasena(currentPassword, newPassword);
+      setSecurityData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      showNotification('Contraseña actualizada correctamente', 'success');
+    } catch (e: any) {
+      // El backend rechaza, p. ej., cuando la contraseña actual es incorrecta.
+      showNotification(mensajeDeError(e, 'No se pudo cambiar la contraseña. Verifica tus datos.'), 'error');
+    } finally {
       setSaving(false);
-      showNotification('Configuración actualizada correctamente', 'success');
-    }, 1000);
+    }
   };
 
   const handleRevert = () => {
@@ -87,16 +156,11 @@ export const ConfiguracionView: React.FC = () => {
                 value={profileData.nombre} 
                 onChange={(e) => setProfileData({...profileData, nombre: e.target.value})}
               />
-              <InputGroup 
-                label="Correo MiSena" 
-                value={profileData.correo} 
+              <InputGroup
+                label="Correo"
+                value={profileData.correo}
                 type="email"
                 onChange={(e) => setProfileData({...profileData, correo: e.target.value})}
-              />
-              <InputGroup 
-                label="Cargo / Rol" 
-                value={profileData.cargo} 
-                onChange={(e) => setProfileData({...profileData, cargo: e.target.value})}
               />
             </div>
           </div>
@@ -131,18 +195,34 @@ export const ConfiguracionView: React.FC = () => {
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              <InputGroup 
-                label="Nueva Contraseña" 
-                type="password" 
-                value={securityData.newPassword}
-                onChange={(e) => setSecurityData({...securityData, newPassword: e.target.value})}
-              />
-              <InputGroup 
-                label="Confirmar Nueva Contraseña" 
-                type="password" 
-                value={securityData.confirmPassword}
-                onChange={(e) => setSecurityData({...securityData, confirmPassword: e.target.value})}
-              />
+              <div className="relative">
+                <InputGroup
+                  label="Nueva Contraseña"
+                  type={showNew ? "text" : "password"}
+                  value={securityData.newPassword}
+                  onChange={(e) => setSecurityData({...securityData, newPassword: e.target.value})}
+                />
+                <button
+                  onClick={() => setShowNew(!showNew)}
+                  className="absolute right-4 bottom-3 text-gray-400 hover:text-[#39B000]"
+                >
+                  {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <div className="relative">
+                <InputGroup
+                  label="Confirmar Nueva Contraseña"
+                  type={showConfirm ? "text" : "password"}
+                  value={securityData.confirmPassword}
+                  onChange={(e) => setSecurityData({...securityData, confirmPassword: e.target.value})}
+                />
+                <button
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  className="absolute right-4 bottom-3 text-gray-400 hover:text-[#39B000]"
+                >
+                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
           </div>
         );

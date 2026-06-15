@@ -22,6 +22,7 @@ import { CorregirSolicitudDto } from './dto/corregir-solicitud.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { EventosGateway } from '../gateway/eventos.gateway';
 
 @Injectable()
 export class VehiculosService {
@@ -41,6 +42,7 @@ export class VehiculosService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly auditoriaService: AuditoriaService,
     private readonly notificacionesService: NotificacionesService,
+    private readonly eventosGateway: EventosGateway,
   ) {}
 
   private normalizarPlaca(placa: string): string {
@@ -113,6 +115,8 @@ export class VehiculosService {
       metadata: { idSolicitud: guardada.idSolicitud, placa: placaNormalizada, documento },
     });
 
+    this.eventosGateway.emitirSolicitudesActualizadas({ tipo: 'NUEVA', idSolicitud: guardada.idSolicitud });
+
     return {
       mensaje: 'Solicitud enviada correctamente. El administrador la revisará pronto.',
       idSolicitud: guardada.idSolicitud,
@@ -165,6 +169,8 @@ export class VehiculosService {
         actorNombre: adminDocumento,
         metadata: { placa: solicitud.placa, motivo: motivo ?? null, camposRechazados: solicitud.camposRechazados },
       });
+
+      this.eventosGateway.emitirSolicitudesActualizadas({ tipo: 'RESUELTA', idSolicitud: solicitud.idSolicitud });
 
       return { mensaje: 'Solicitud rechazada y usuario notificado.' };
     }
@@ -231,6 +237,8 @@ export class VehiculosService {
       actorNombre: adminDocumento,
       metadata: { placa: solicitud.placa },
     });
+
+    this.eventosGateway.emitirSolicitudesActualizadas({ tipo: 'RESUELTA', idSolicitud: solicitud.idSolicitud });
 
     return { mensaje: 'Solicitud aprobada. Vehículo registrado exitosamente.' };
   }

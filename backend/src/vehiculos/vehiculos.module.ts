@@ -13,6 +13,7 @@ import { UsuariosModule } from '../usuarios/usuarios.module';
 import { AuditoriaModule } from '../auditoria/auditoria.module';
 import { AuthModule } from '../auth/auth.module';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
+import { GatewayModule } from '../gateway/gateway.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { NotificacionesModule } from '../notificaciones/notificaciones.module';
     AuditoriaModule,
     AuthModule,
     NotificacionesModule,
+    GatewayModule,
   ],
   controllers: [VehiculosController, AdminVehiculosController],
   providers: [VehiculosService],

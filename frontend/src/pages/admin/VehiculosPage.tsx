@@ -35,7 +35,7 @@ export const VehiculosPage: React.FC = () => {
   const [vehiculos, setVehiculos] = useState<AdminVehiculoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [soloAdentro, setSoloAdentro] = useState(false);
+  const [filtro, setFiltro] = useState<'TODOS' | 'ADENTRO' | 'AFUERA' | `tipo:${number}`>('TODOS');
   const [tipos, setTipos] = useState<TipoVehiculo[]>([]);
 
   const [detalleOpen, setDetalleOpen] = useState(false);
@@ -102,8 +102,12 @@ export const VehiculosPage: React.FC = () => {
   }, [searchTerm]);
 
   const filteredVehiculos = useMemo(() => {
-    return soloAdentro ? vehiculos.filter((v) => v.isAdentro) : vehiculos;
-  }, [vehiculos, soloAdentro]);
+    if (filtro === 'TODOS') return vehiculos;
+    if (filtro === 'ADENTRO') return vehiculos.filter((v) => v.isAdentro);
+    if (filtro === 'AFUERA') return vehiculos.filter((v) => !v.isAdentro);
+    const tipoId = Number(filtro.split(':')[1]);
+    return vehiculos.filter((v) => v.idTipoVehiculo === tipoId);
+  }, [vehiculos, filtro]);
 
   const abrirDetalle = async (placa: string) => {
     setDetalleOpen(true);
@@ -318,20 +322,42 @@ export const VehiculosPage: React.FC = () => {
           <Button variant="primary" size="md" onClick={abrirCrear} className="bg-[#39A900] hover:bg-[#2F8A00] shadow-[0_8px_20px_rgba(57,169,0,0.3)]">
             <Plus size={16} className="mr-2" /> AGREGAR VEHÍCULO
           </Button>
-          <Button variant={soloAdentro ? 'primary' : 'outline'} size="md" onClick={() => setSoloAdentro((v) => !v)}>
-            {soloAdentro ? 'Solo ADENTRO' : 'Todos'}
-          </Button>
-          <Button variant="outline" size="md" onClick={fetchVehiculos}>Refrescar</Button>
         </div>
       </header>
 
-      <div className="bg-white dark:bg-[#121212] p-4 rounded-xl shadow-sm border border-slate-200 dark:border-white/5">
+      <div className="bg-white dark:bg-[#121212] p-4 rounded-xl shadow-sm border border-slate-200 dark:border-white/5 space-y-3">
         <Input
           icon={<Search size={20} />}
           placeholder="Buscar por placa o tipo..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 mr-2">Filtrar:</span>
+          {([['TODOS', 'Todos'], ['ADENTRO', 'Adentro'], ['AFUERA', 'Afuera']] as const).map(([value, label]) => (
+            <Button
+              key={value}
+              variant={filtro === value ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setFiltro(value)}
+            >
+              {label}
+            </Button>
+          ))}
+          {tipos.map((t) => {
+            const value = `tipo:${t.idTipoV}` as const;
+            return (
+              <Button
+                key={t.idTipoV}
+                variant={filtro === value ? 'primary' : 'outline'}
+                size="sm"
+                onClick={() => setFiltro(value)}
+              >
+                {t.tipoVehiculo}
+              </Button>
+            );
+          })}
+        </div>
       </div>
 
       <Table
