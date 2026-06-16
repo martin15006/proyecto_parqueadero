@@ -7,13 +7,6 @@ import {
 } from 'class-validator';
 import { ContrasenaSegura } from '../../common/validators/contrasena-segura.validator';
 
-/**
- * DTO estricto para creación de cuentas de personal Operativo desde el panel Administrador.
- *
- * Nota:
- * - Se limita deliberadamente a los campos mínimos solicitados por requerimiento.
- * - Propiedades extra en el body serán rechazadas por ValidationPipe global (whitelist + forbidNonWhitelisted).
- */
 export class CreateOperativoDto {
   @IsString()
   @IsNotEmpty({ message: 'El documento es obligatorio' })

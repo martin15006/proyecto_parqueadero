@@ -15,24 +15,14 @@ export enum EstadoCompartido {
   RECHAZADO  = 'RECHAZADO',
 }
 
-/**
- * Representa la vinculación de un vehículo compartido con otro usuario.
- * Reglas de negocio:
- *  - Un vehículo solo puede ser compartido 1 vez con un receptor (estado PENDIENTE o ACEPTADO).
- *  - Un usuario receptor puede tener máximo 2 vehículos compartidos ACEPTADOS.
- *  - Solo el propietario del registro puede compartir.
- *  - Al compartir, queda en estado PENDIENTE hasta que el receptor lo ACEPTE o RECHACE.
- */
 @Entity({ name: 'compartir' })
 export class Compartir {
   @PrimaryGeneratedColumn({ name: 'id_compartir', type: 'smallint' })
   idCompartir: number;
 
-  /** Documento del usuario que RECIBE el vehículo compartido */
   @Column({ name: 'documento', type: 'varchar', length: 10 })
   documento: string;
 
-  /** Registro (propietario + vehículo) que se está compartiendo */
   @Column({ name: 'id_registro_v', type: 'int' })
   idRegistroV: number;
 

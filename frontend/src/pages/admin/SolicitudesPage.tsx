@@ -19,12 +19,6 @@ const CAMPOS_SOLICITUD: { key: string; label: string }[] = [
 const etiquetaCampo = (key: string) =>
   CAMPOS_SOLICITUD.find((c) => c.key === key)?.label ?? key;
 
-/**
- * Gestión de solicitudes de registro de vehículo (Admin).
- * Permite aprobar o rechazar las solicitudes enviadas por los aprendices desde el móvil.
- *  - Si se aprueba: el vehículo queda registrado y aparece en "Mis Vehículos" del usuario.
- *  - Si se rechaza: el admin marca qué campos están mal y el usuario los corrige desde el móvil.
- */
 export const SolicitudesPage: React.FC = () => {
   const [solicitudes, setSolicitudes] = useState<SolicitudVehiculoAdmin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,8 +52,6 @@ export const SolicitudesPage: React.FC = () => {
   useEffect(() => {
     cargarSolicitudes();
 
-    // Tiempo real: el backend emite `solicitudes_actualizadas` cuando llega una
-    // nueva solicitud desde el móvil o cuando se aprueba/rechaza una.
     socketService.connect();
     const handler = () => cargarSolicitudes();
     socketService.on('solicitudes_actualizadas', handler);

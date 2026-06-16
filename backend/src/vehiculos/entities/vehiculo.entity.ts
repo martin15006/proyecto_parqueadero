@@ -1,12 +1,12 @@
-import { 
-  Entity, 
-  PrimaryColumn, 
-  Column, 
-  ManyToOne, 
-  JoinColumn, 
-  OneToMany, 
-  CreateDateColumn, 
-  UpdateDateColumn, 
+import {
+  Entity,
+  PrimaryColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+  CreateDateColumn,
+  UpdateDateColumn,
   DeleteDateColumn,
   Index,
   BeforeInsert,
@@ -45,10 +45,6 @@ export class Vehiculo {
   @DeleteDateColumn({ type: 'timestamptz', nullable: true })
   deletedAt: Date | null;
 
-  /**
-   * Fecha de la última edición de los datos editables (foto vehículo / color).
-   * Sirve para forzar el cooldown de 15 días entre ediciones.
-   */
   @Column({ name: 'ultima_edicion_at', type: 'timestamptz', nullable: true })
   ultimaEdicionAt: Date | null;
 

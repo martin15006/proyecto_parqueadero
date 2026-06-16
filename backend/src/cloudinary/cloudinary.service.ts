@@ -18,17 +18,9 @@ export class CloudinaryService implements OnModuleInit {
     this.logger.log('Cloudinary configurado correctamente');
   }
 
-  /**
-   * Extrae el public_id de una URL de Cloudinary.
-   * Ejemplo de URL:
-   *   https://res.cloudinary.com/dxlgoeqih/image/upload/v1778616935/k8zgr0m42vvw5hfuia43.jpg
-   * El public_id es: k8zgr0m42vvw5hfuia43
-   * Si la imagen está en una carpeta, será: carpeta/k8zgr0m42vvw5hfuia43
-   */
   extraerPublicId(url: string): string | null {
     if (!url || typeof url !== 'string') return null;
     try {
-      // Buscar el patrón /upload/.../public_id.ext
       const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-zA-Z]+$/);
       if (!match || !match[1]) return null;
       return match[1];
@@ -37,10 +29,6 @@ export class CloudinaryService implements OnModuleInit {
     }
   }
 
-  /**
-   * Borra una imagen de Cloudinary usando su URL.
-   * No lanza error si falla, solo lo loguea (para no bloquear el flujo principal).
-   */
   async borrarPorUrl(url: string): Promise<void> {
     const publicId = this.extraerPublicId(url);
     if (!publicId) {
@@ -59,7 +47,6 @@ export class CloudinaryService implements OnModuleInit {
       }
     } catch (error) {
       this.logger.error(`Error al borrar imagen ${publicId}`, error);
-      // No lanzamos el error para no bloquear el borrado del registro
     }
   }
 

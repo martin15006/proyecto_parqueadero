@@ -3,11 +3,6 @@ import { useOperativo } from '../../hooks/useOperativo';
 import { Car, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 import type { BahiaSensorizada } from '../../types';
 
-/**
- * Estado de bahías sensorizadas en tiempo real.
- * RF15: la fuente de verdad es `estadoPanel` calculado por el backend
- * (LIBRE / OCUPADO / SALIDA_PENDIENTE / DISCREPANCIA / OFFLINE / DESHABILITADO).
- */
 export const EstadoBahiasView: React.FC = () => {
   const { bahias, loading } = useOperativo();
 

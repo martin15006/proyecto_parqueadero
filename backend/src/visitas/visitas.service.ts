@@ -15,7 +15,6 @@ import { IJwtPayload } from '../common/interfaces/auth.interface';
 import { MovimientoVehiculo, EstadoMovimiento } from '../vehiculos/entities/movimiento-vehiculo.entity';
 import { RegistroVehiculo } from '../vehiculos/entities/registro-vehiculo.entity';
 
-/** Vista de una visita lista para el panel (sin exponer columnas internas). */
 export interface VisitaDto {
   idVisita: number;
   codigo: string;
@@ -29,7 +28,6 @@ export interface VisitaDto {
   horaSalida: Date | null;
   expiraEn: Date;
   estado: EstadoVisita;
-  /** `true` cuando la visita superó su tiempo permitido y sigue activa. */
   vencida: boolean;
 }
 
@@ -47,14 +45,6 @@ export class VisitasService {
     private readonly eventosGateway: EventosGateway,
   ) {}
 
-  /**
-   * Registra el ingreso de un visitante (registro temporal).
-   *
-   * Seguridad/consistencia:
-   * - Respeta el aforo y el estado del parqueadero (`validarIngresoPermitido`).
-   * - Evita visitas duplicadas abiertas con la misma placa o documento.
-   * - Queda auditado (operativo + IP) y suma a la ocupación.
-   */
   async registrarVisita(
     dto: RegistrarVisitaDto,
     operador: IJwtPayload & { ip: string },
@@ -75,11 +65,8 @@ export class VisitasService {
       });
     }
 
-    // Aforo + parqueadero habilitado (misma puerta que los ingresos normales).
     await this.bahiasService.validarIngresoPermitido();
 
-    // Anti-duplicado: no puede haber dos visitas activas con la misma placa o
-    // documento — primero hay que registrar la salida de la anterior.
     const abierta = await this.visitaRepository.findOne({
       where: [
         { placa, estado: EstadoVisita.ADENTRO },
@@ -94,9 +81,6 @@ export class VisitasService {
       });
     }
 
-    // Ingreso único por placa: si la placa pertenece a un vehículo enrolado que
-    // ya está dentro (movimiento ADENTRO/TRANSITO), no puede entrar como visitante.
-    // (Si está enrolado pero AFUERA, sí se permite el ingreso como visita.)
     const movimientoActivo = await this.movimientoRepository
       .createQueryBuilder('mv')
       .innerJoin(RegistroVehiculo, 'rv', 'rv.id_registro_v = mv.id_registro_vehiculo')
@@ -145,16 +129,12 @@ export class VisitasService {
       ip: operador.ip,
     });
 
-    // Mismo canal que los vehículos enrolados: refresca historial y "movimientos recientes".
     this.eventosGateway.emitirVehiculoIngresado({ placa, fecha: ahora, bahia: 'LIBRE' });
     await this.sincronizarOcupacion();
 
     return this.toDto(guardada);
   }
 
-  /**
-   * Cierra una visita activa (salida del visitante).
-   */
   async registrarSalida(
     idVisita: number,
     operador: IJwtPayload & { ip: string },
@@ -187,9 +167,6 @@ export class VisitasService {
     return this.toDto(guardada);
   }
 
-  /**
-   * Lista las visitas activas (dentro de las instalaciones), las vencidas primero.
-   */
   async listarActivas(): Promise<VisitaDto[]> {
     const visitas = await this.visitaRepository.find({
       where: { estado: EstadoVisita.ADENTRO },
@@ -200,7 +177,6 @@ export class VisitasService {
       .sort((a, b) => Number(b.vencida) - Number(a.vencida));
   }
 
-  /** Emite el conteo global y reevalúa las alertas de ocupación (en vivo). */
   private async sincronizarOcupacion(): Promise<void> {
     const conteo = await this.bahiasService.obtenerConteoGlobal();
     this.eventosGateway.emitirConteoGlobalDisponibles({
@@ -213,7 +189,6 @@ export class VisitasService {
     try {
       await this.bahiasService.evaluarAlertasOcupacion();
     } catch {
-      /* no bloquear el flujo por un fallo de notificación */
     }
   }
 

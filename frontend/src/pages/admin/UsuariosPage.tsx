@@ -10,7 +10,7 @@ import { Modal } from '../../components/ui/Modal';
 import { ImageUpload } from '../../components/ui/ImageUpload';
 import { useNotification } from '../../contexts/NotificationContext';
 
-type Rol = 'APRENDIZ' | 'ADMIN' | 'OPERATIVO' | 'TODOS';
+type Rol = 'APRENDIZ' | 'ADMIN' | 'OPERATIVO' | 'PERSONAL_SENA' | 'TODOS';
 
 interface FormUsuario {
   documento: string;
@@ -321,14 +321,14 @@ export const UsuariosPage: React.FC = () => {
         />
         <div className="flex flex-wrap gap-2 items-center">
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 mr-2">Filtrar por rol:</span>
-          {(['TODOS', 'APRENDIZ', 'OPERATIVO', 'ADMIN'] as Rol[]).map((r) => (
+          {(['TODOS', 'APRENDIZ', 'PERSONAL_SENA', 'OPERATIVO', 'ADMIN'] as Rol[]).map((r) => (
             <Button
               key={r}
               variant={rol === r ? 'primary' : 'outline'}
               size="sm"
               onClick={() => setRol(r)}
             >
-              {r === 'TODOS' ? 'Todos' : r.charAt(0) + r.slice(1).toLowerCase()}
+              {r === 'TODOS' ? 'Todos' : r === 'PERSONAL_SENA' ? 'Personal SENA' : r.charAt(0) + r.slice(1).toLowerCase()}
             </Button>
           ))}
         </div>
@@ -487,17 +487,18 @@ export const UsuariosPage: React.FC = () => {
       <Modal
         isOpen={!!confirmDeleteDoc}
         onClose={() => setConfirmDeleteDoc(null)}
-        title="Eliminar usuario"
+        title="Desactivar usuario"
         footer={
           <>
             <Button type="button" variant="outline" onClick={() => setConfirmDeleteDoc(null)}>Cancelar</Button>
-            <Button type="button" variant="danger" onClick={eliminar}>Eliminar definitivamente</Button>
+            <Button type="button" variant="danger" onClick={eliminar}>Desactivar usuario</Button>
           </>
         }
       >
         <p className="text-sm text-slate-700 dark:text-slate-200">
-          ¿Estás seguro de eliminar al usuario <b>{confirmDeleteDoc}</b>? Esta acción no se puede deshacer y
-          eliminará todos sus datos asociados.
+          ¿Estás seguro de desactivar al usuario <b>{confirmDeleteDoc}</b>? No podrá acceder al sistema mientras
+          esté desactivado. Si permanece desactivado durante <b>3 meses</b>, se eliminará definitivamente junto con
+          todos sus datos asociados.
         </p>
       </Modal>
 

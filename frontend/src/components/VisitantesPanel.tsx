@@ -4,7 +4,6 @@ import { visitasService, type Visita, type RegistrarVisitaPayload } from '../ser
 import { useNotification } from '../contexts/NotificationContext';
 
 interface VisitantesPanelProps {
-  /** Se invoca tras registrar o cerrar una visita para refrescar los KPIs del panel. */
   onChange?: () => void;
 }
 
@@ -14,10 +13,8 @@ const FORM_INICIAL: RegistrarVisitaPayload = {
   placa: '',
   tipoVehiculo: 'Carro',
   motivo: '',
-  duracionMinutos: 240,
 };
 
-/** Extrae el mensaje real del backend (class-validator envía `message` como array). */
 const mensajeDeError = (e: any, fallback: string): string => {
   const raw = e?.response?.data?.message ?? e?.message;
   if (Array.isArray(raw)) {
@@ -50,7 +47,6 @@ export const VisitantesPanel: React.FC<VisitantesPanelProps> = ({ onChange }) =>
       const data = await visitasService.listarActivas();
       setVisitas(data);
     } catch {
-      /* fallo silencioso: el panel principal ya reporta errores de conexión */
     } finally {
       setLoading(false);
     }
@@ -58,7 +54,6 @@ export const VisitantesPanel: React.FC<VisitantesPanelProps> = ({ onChange }) =>
 
   useEffect(() => {
     cargarActivas();
-    // Refresco periódico para detectar visitas vencidas sin recargar la página.
     const t = window.setInterval(cargarActivas, 15000);
     return () => window.clearInterval(t);
   }, [cargarActivas]);
@@ -239,31 +234,18 @@ export const VisitantesPanel: React.FC<VisitantesPanelProps> = ({ onChange }) =>
                 </Campo>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <Campo label="Tipo de vehículo">
-                  <select
-                    value={form.tipoVehiculo}
-                    onChange={(e) => setForm({ ...form, tipoVehiculo: e.target.value })}
-                    className={inputClass}
-                  >
-                    <option value="Carro">Carro</option>
-                    <option value="Moto">Moto</option>
-                    <option value="Bicicleta">Bicicleta</option>
-                    <option value="Otro">Otro</option>
-                  </select>
-                </Campo>
-                <Campo label="Duración">
-                  <select
-                    value={form.duracionMinutos}
-                    onChange={(e) => setForm({ ...form, duracionMinutos: Number(e.target.value) })}
-                    className={inputClass}
-                  >
-                    <option value={120}>2 horas</option>
-                    <option value={240}>4 horas</option>
-                    <option value={480}>8 horas</option>
-                  </select>
-                </Campo>
-              </div>
+              <Campo label="Tipo de vehículo">
+                <select
+                  value={form.tipoVehiculo}
+                  onChange={(e) => setForm({ ...form, tipoVehiculo: e.target.value })}
+                  className={inputClass}
+                >
+                  <option value="Carro">Carro</option>
+                  <option value="Moto">Moto</option>
+                  <option value="Bicicleta">Bicicleta</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </Campo>
 
               <Campo label="Motivo (opcional)">
                 <input

@@ -20,11 +20,6 @@ import {
 } from 'lucide-react';
 import senaLogo from './assets/sena.registro.png';
 
-/**
- * Requisitos de contraseña — espejo exacto del decorador @ContrasenaSegura()
- * del backend, para poder decirle al usuario QUÉ condición le falta en lugar
- * de un error genérico.
- */
 const REQUISITOS_CONTRASENA: Array<{ id: string; label: string; falta: string; test: (p: string) => boolean }> = [
   { id: 'longitud', label: 'Mínimo 8 caracteres', falta: 'mínimo 8 caracteres', test: (p) => p.length >= 8 },
   { id: 'mayuscula', label: 'Una letra mayúscula (A-Z)', falta: 'una letra mayúscula', test: (p) => /[A-Z]/.test(p) },
@@ -33,13 +28,6 @@ const REQUISITOS_CONTRASENA: Array<{ id: string; label: string; falta: string; t
   { id: 'especial', label: 'Un carácter especial (!@#$%…)', falta: 'un carácter especial (por ejemplo ! @ # $ %)', test: (p) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?¿¡~`]/.test(p) },
 ];
 
-/**
- * Extrae el mensaje real de un error del backend.
- * OJO: el interceptor de api/axios.ts NO propaga el error de axios, sino un
- * objeto plano { statusCode, message, ... } — por eso el mensaje puede venir
- * en error.message y no en error.response.data.message. Además, cuando falla
- * la validación de un DTO (class-validator), `message` puede ser un ARRAY.
- */
 const extraerMensajeError = (error: any, fallback: string): string => {
   const candidatos = [error?.response?.data?.message, error?.message, error?.mensaje];
   for (const raw of candidatos) {
@@ -63,8 +51,6 @@ function Login() {
 
   const [codigoOtp, setCodigoOtp] = useState('');
   const [mostrarOtp, setMostrarOtp] = useState(false);
-  // 'login': OTP del flujo normal (2FA). 'verificacion': cuenta sin verificar,
-  // el código activa el correo vía /auth/verificar-registro.
   const [otpMode, setOtpMode] = useState<'login' | 'verificacion'>('login');
 
   const [status, setStatus] = useState('');
@@ -101,8 +87,6 @@ function Login() {
       } else if (idRol === 3) {
         navigate('/appperop');
       } else if (idRol === 1) {
-        // La plataforma web es para personal administrativo/operativo; los
-        // aprendices usan la app móvil. Cerramos la sesión web e informamos.
         logout();
         setStatus('Esta plataforma web es para personal administrativo y operativo. Usa la app móvil.');
         setStatusType('error');
@@ -147,8 +131,6 @@ function Login() {
   const handleRestablecerContrasena = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validación en el cliente con la razón exacta: en vez de un error genérico,
-    // se informa qué condición de seguridad falta (misma regla que el backend).
     const requisitosFaltantes = REQUISITOS_CONTRASENA.filter((r) => !r.test(recoveryPass));
     if (requisitosFaltantes.length > 0) {
       setRecoveryStatus(`La contraseña no cumple las condiciones. Le falta: ${requisitosFaltantes.map((r) => r.falta).join(', ')}.`);
@@ -213,9 +195,6 @@ function Login() {
 
       const backendMsg = extraerMensajeError(error, '');
 
-      // Cuenta sin verificar: el backend ya reenvió el código, así que
-      // pasamos a la pantalla de código en modo verificación en lugar de
-      // dejar al usuario atascado en el formulario.
       if (backendMsg.toLowerCase().includes('verificar tu correo')) {
         setOtpMode('verificacion');
         setMostrarOtp(true);
@@ -240,8 +219,6 @@ function Login() {
     setStatusType('loading');
 
     try {
-      // En modo verificación se usa /auth/verificar-registro: valida el código,
-      // marca el correo como verificado y emite tokens (login automático).
       const endpoint = otpMode === 'verificacion' ? '/auth/verificar-registro' : '/auth/verificar-otp';
       const response = await api.post(endpoint, {
         correo: formData.correo,
@@ -249,13 +226,11 @@ function Login() {
       });
 
       if (response.status === 200 && response.data) {
-        // El backend usa un ResponseInterceptor que envuelve la data en { success, data, ... }
         const userData = response.data.data !== undefined ? response.data.data : response.data;
 
         setStatus('¡Verificación exitosa! Redirigiendo...');
         setStatusType('success');
 
-        // La redirección por rol la realiza el efecto de sesión activa
         setTimeout(() => {
           login(userData);
         }, 500);

@@ -1,4 +1,3 @@
-// Sincronizado con el backend.
 export const UserRole = {
   APRENDIZ: 1,
   ADMIN: 2,

@@ -67,7 +67,6 @@ export const OperativosPage: React.FC = () => {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
 
-  // El endpoint retorna operativos incluyendo inactivos (withDeleted) para permitir activación/desactivación.
   const fetchOperativos = async () => {
     try {
       setLoading(true);
@@ -124,7 +123,6 @@ export const OperativosPage: React.FC = () => {
     setIsResetOpen(true);
   };
 
-  // El backend fuerza de forma estricta idTipoUsr=3 (OPERATIVO) y rechaza duplicados (correo/documento).
   const handleCreate = async () => {
     setActionError(null);
     setActionSuccess(null);
@@ -170,7 +168,6 @@ export const OperativosPage: React.FC = () => {
     }
   };
 
-  // Soft-delete: mantiene trazabilidad sin eliminar físicamente la cuenta.
   const toggleEstado = async (u: User) => {
     setActionError(null);
     setActionSuccess(null);

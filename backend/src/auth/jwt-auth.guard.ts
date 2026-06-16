@@ -12,7 +12,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const canActivate = await super.canActivate(context);
     if (!canActivate) return false;
 
-    // Verificar si el token está en la lista negra (logout)
     const request = context.switchToHttp().getRequest();
     if (!request?.headers) {
       throw new UnauthorizedException('Token inválido');

@@ -23,7 +23,7 @@ export class AdminListUsuariosQueryDto {
 
   @IsString()
   @IsOptional()
-  @IsIn(['APRENDIZ', 'ADMIN', 'OPERATIVO', 'TODOS'])
-  rol?: 'APRENDIZ' | 'ADMIN' | 'OPERATIVO' | 'TODOS';
+  @IsIn(['APRENDIZ', 'ADMIN', 'OPERATIVO', 'PERSONAL_SENA', 'TODOS'])
+  rol?: 'APRENDIZ' | 'ADMIN' | 'OPERATIVO' | 'PERSONAL_SENA' | 'TODOS';
 }
 

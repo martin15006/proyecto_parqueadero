@@ -4,7 +4,7 @@ import { telemetriaService } from '../services/telemetria.service';
 
 
 export const useTelemetria = () => {
-  
+
   const [sensores, setSensores] = useState<Array<{
     idSensor?: number;
     codigo: string;
@@ -34,11 +34,6 @@ export const useTelemetria = () => {
     loadSensores();
     socketService.connect();
 
-    /**
-     * Realtime: actualizaciones emitidas por el Gateway principal (/socket.io).
-     * - bahia_actualizada: cuando el backend procesa telemetría real o forzados manuales
-     * - sensor_offline: cuando un dispositivo deja de reportar
-     */
     const handleBahiaModificada = (payload: { idBahia: string; nuevoEstado: string; actualizadoEn: string }) => {
       const match = String(payload?.idBahia || '').match(/(\d+)/);
       const idBahia = match ? Number(match[1]) : null;
@@ -90,11 +85,11 @@ export const useTelemetria = () => {
     }
   };
 
-  return { 
-    sensores, 
-    loading, 
-    error, 
+  return {
+    sensores,
+    loading,
+    error,
     forceCheck,
-    refresh: loadSensores 
+    refresh: loadSensores
   };
 };

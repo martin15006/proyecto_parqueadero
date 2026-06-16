@@ -2,7 +2,6 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import type { ReactNode } from 'react';
 
-// FIX: corregido tipado JSX.Element a ReactNode para compatibilidad con TS strict mode
 const ProtectedRoute = ({ children, allowedRoles }: { children: ReactNode; allowedRoles?: number[] }) => {
   const { isAuthenticated, user, logout } = useAuth();
 

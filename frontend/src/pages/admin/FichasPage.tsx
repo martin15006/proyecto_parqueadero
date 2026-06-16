@@ -166,7 +166,7 @@ export const FichasPage: React.FC = () => {
       header: 'Jornada',
       accessor: (f: Ficha) => (
         <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-          <Clock size={12} className="text-slate-400" /> {f.jornada || 'Única'}
+          <Clock size={12} className="text-slate-400" /> {(f.jornada || 'Única').toUpperCase()}
         </div>
       ),
     },

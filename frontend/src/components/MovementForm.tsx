@@ -106,7 +106,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
   const [infoPlaca, setInfoPlaca] = useState<InfoPlacaResponse | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
-  // buffer local para capturar ráfagas del lector (keyboard wedge) cuando el foco se pierde.
   const scannerBufferRef = useRef<string>('');
   const lastScanKeyAtRef = useRef<number>(0);
   const lastInputChangeAtRef = useRef<number>(0);
@@ -137,14 +136,8 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
     };
   }, []);
 
-  /**
-   * Auto-foco permanente para operación manos libres.
-   * Los lectores físicos USB emulan un teclado rápido + 'Enter'.
-   */
   useEffect(() => {
     const focusScanInput = () => {
-      // No robar el foco si el usuario está escribiendo en OTRO campo
-      // (p. ej. un modal abierto encima del panel, como el de visitantes).
       const active = document.activeElement as HTMLElement | null;
       const tag = active?.tagName?.toUpperCase() ?? '';
       const enOtroCampo =
@@ -168,7 +161,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
 
       if (e.key === 'Escape') {
         e.preventDefault();
-        // Si el modal de confirmación está abierto, Esc = Negar (no se hace).
         if (feedback.type === 'success' && lastResponse) {
           denegarMovimiento();
           return;
@@ -226,8 +218,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
         scannerBufferRef.current = '';
         lastScanKeyAtRef.current = 0;
         if (!buffered.length) {
-          // Enter "a secas" con el modal abierto = Autorizar.
-          // (Si venía un escaneo bufferizado, en cambio se procesa el siguiente.)
           if (feedback.type === 'success' && lastResponse) {
             e.preventDefault();
             autorizarMovimiento();
@@ -242,11 +232,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
     };
 
     window.addEventListener('keydown', handleGlobalKeys);
-
-    // Los overlays NO se cierran solos por tiempo. Solo se cierran cuando:
-    //  - El operativo presiona "Autorizar y cerrar" / clic en el aviso
-    //  - El operativo presiona ESC
-    //  - Se inicia una nueva acción (handleAction) que limpia el estado al comenzar
 
     return () => {
       window.removeEventListener('focus', handleWindowFocus);
@@ -273,7 +258,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
-  // Autorizar: recién aquí se confirma y se muestra la notificación de éxito.
   const autorizarMovimiento = () => {
     if (lastResponse) {
       onSuccess(lastResponse.mensaje || 'Movimiento autorizado');
@@ -281,7 +265,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
     closeFeedback();
   };
 
-  // Negar: revierte el movimiento recién creado (el ingreso/salida "no se hace").
   const denegarMovimiento = async () => {
     const idMov = lastResponse?.movimiento?.idMovimiento;
     const esSalida = Boolean(lastResponse?.movimiento?.horaSalida);
@@ -322,7 +305,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
             return;
           }
 
-          // Un solo usuario o ya hay movimiento activo → ingreso directo (sin documentoIngreso → backend asume propietario)
           const resEntrada: OperativoResponse = await operativoService.registrarEntrada(upper);
           setFeedback({ type: 'success', message: resEntrada.mensaje });
           setLastResponse(resEntrada);
@@ -377,14 +359,10 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      // Si el modal de confirmación está abierto, Enter = Autorizar.
       if (feedback.type === 'success' && lastResponse) {
         autorizarMovimiento();
         return;
       }
-      // Una PLACA escrita (5–7 alfanuméricos) entra por el flujo de "Entrada":
-      // pregunta el usuario si el vehículo tiene varios propietarios.
-      // Un código/QR (token más largo) se resuelve automáticamente como hasta ahora.
       const val = inputValue.trim().toUpperCase();
       if (/^[A-Z0-9]{5,7}$/.test(val)) {
         handleAction('entrada', val);
@@ -394,7 +372,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
     }
   };
 
-  // Flag para evitar dobles confirmaciones por clicks rápidos
   const procesandoMultiRef = useRef<boolean>(false);
 
   async function handleConfirmarUsuarioManual(documento: string) {
@@ -433,8 +410,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
     if (procesandoMultiRef.current) return;
     procesandoMultiRef.current = true;
 
-    // Cerramos el modal de selección INMEDIATAMENTE para que no se pueda
-    // seleccionar otro vehículo mientras se procesa el primero.
     setMultiVehiculos(null);
     setCodigoPendiente('');
     setAprendizPendiente('');
@@ -533,13 +508,6 @@ export const MovementForm = ({ onSuccess, onError }: MovementFormProps) => {
           autoComplete="off"
           value={inputValue}
           onChange={(e) => {
-            // Distinguir entre escritura humana y ráfaga del lector físico:
-            //  - Lector físico: dispara MUCHOS caracteres muy rápido (>= 4 chars
-            //    de diferencia en un único onChange).
-            //  - Humano: escribe 1 char por tecla.
-            //
-            // Solo cuando el lector envía una ráfaga grande mientras ya había contenido
-            // (sobre-escribir un resultado previo), reemplazamos en vez de concatenar.
             const now = Date.now();
             const gap = now - lastInputChangeAtRef.current;
             const valorAnterior = inputValue;

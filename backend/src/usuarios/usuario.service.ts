@@ -26,11 +26,6 @@ import { AuthService } from '../auth/auth.service';
 import { AdminListUsuariosQueryDto } from './dto/admin-list-usuarios.query.dto';
 import { RegistroVehiculo } from '../vehiculos/entities/registro-vehiculo.entity';
 
-/**
- * Servicio de Gestión de Usuarios.
- * Maneja el ciclo de vida del usuario, perfiles, seguridad de cuentas (OTP)
- * y vinculación con infraestructura institucional (QR).
- */
 @Injectable()
 export class UsuarioService {
   constructor(
@@ -44,11 +39,6 @@ export class UsuarioService {
     private readonly auditoriaService: AuditoriaService,
   ) {}
 
-  /**
-   * Registra un nuevo usuario y le envía un OTP al correo para verificarlo.
-   * El usuario NO puede iniciar sesión hasta completar la verificación (correoVerificado = false).
-   * Retorna { mensaje, correo } para que el frontend redirija a la pantalla de verificación OTP.
-   */
   async create(createUsuarioDto: CreateUsuarioDto | CreateUsuarioAdminDto): Promise<{ mensaje: string; correo: string }> {
     const { documento, correo, contra } = createUsuarioDto;
     const correoNormalizado = String(correo ?? '').trim().toLowerCase();
@@ -108,10 +98,6 @@ export class UsuarioService {
     }
   }
 
-  /**
-   * Crea usuario administrativo/operativo (ya verificado, sin OTP).
-   * Solo usable desde el panel admin.
-   */
   async createAdmin(createUsuarioDto: CreateUsuarioAdminDto): Promise<Omit<Usuario, 'contra'>> {
     const { documento, correo, contra } = createUsuarioDto;
     const correoNormalizado = String(correo ?? '').trim().toLowerCase();
@@ -160,9 +146,6 @@ export class UsuarioService {
     }
   }
 
-  /**
-   * Actualiza la contraseña de un usuario validando la anterior.
-   */
   async cambiarContrasena(documento: string, contraActual: string, contraNueva: string): Promise<{ mensaje: string }> {
     const usuario = await this.findOneByDocumento(documento);
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
@@ -181,9 +164,6 @@ export class UsuarioService {
     return { mensaje: 'Contraseña actualizada exitosamente' };
   }
 
-  /**
-   * Búsqueda por documento (Requerido por Auth y Operativo).
-   */
   async findOneByDocumento(documento: string): Promise<Usuario | null> {
     return await this.usuarioRepository.findOne({ where: { documento } });
   }
@@ -192,9 +172,6 @@ export class UsuarioService {
     return await this.usuarioRepository.findOne({ where: { documento }, withDeleted: true });
   }
 
-  /**
-   * Búsqueda detallada por documento (Alias de findOne para compatibilidad).
-   */
   async findOne(documento: string): Promise<Usuario> {
     const usuario = await this.usuarioRepository.findOne({
       where: { documento },
@@ -215,7 +192,7 @@ export class UsuarioService {
   async actualizarTokenPush(documento: string, token: string) {
     const usuario = await this.findOneByDocumento(documento);
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
-    
+
     usuario.pushToken = token;
     await this.usuarioRepository.save(usuario);
     return { ok: true, mensaje: 'Token push actualizado' };
@@ -248,27 +225,12 @@ export class UsuarioService {
     };
   }
 
-  /**
-   * Búsqueda institucional unificada por QR, documento o placa de vehículo.
-   *
-   * Estrategia de resolución en cascada (RF31/RF33):
-   * 1. Token QR — soporta UUID con guiones y hex-32 sin guiones (lectores Code128).
-   * 2. Documento numérico — 6 a 12 dígitos.
-   * 3. Placa de vehículo — normalizada (sin guiones/espacios, mayúsculas).
-   *
-   * @param token - Valor escaneado o ingresado en portería.
-   * @throws {BadRequestException} Si el token está vacío.
-   * @throws {BadRequestException} Si el usuario existe pero fue desactivado (soft-delete).
-   * @throws {NotFoundException} Si ninguna estrategia resuelve una identidad activa.
-   */
   async buscarIdentidadUnificada(token: string) {
     const entrada = String(token ?? '').trim();
     if (!entrada) throw new BadRequestException('El código es obligatorio');
 
     let placaDetectada: string | null = null;
 
-    // Estrategia 1 — QR/Token UUID.
-    // Soporta hex-32 sin guiones (Code128) reconvirtiéndolo al formato estándar de la BD.
     const esHex32 = /^[0-9a-fA-F]{32}$/.test(entrada);
     const normalizado = (esHex32
       ? `${entrada.slice(0, 8)}-${entrada.slice(8, 12)}-${entrada.slice(12, 16)}-${entrada.slice(16, 20)}-${entrada.slice(20)}`
@@ -280,7 +242,6 @@ export class UsuarioService {
       relations: ['tipoUsuario', 'formacion'],
     });
 
-    // Estrategia 2 — Documento numérico.
     if (!usuario && /^[0-9]{6,12}$/.test(entrada)) {
       usuario = await this.usuarioRepository.findOne({
         where: { documento: entrada },
@@ -288,7 +249,6 @@ export class UsuarioService {
       });
     }
 
-    // Estrategia 3 — Placa de vehículo vinculada a un usuario.
     if (!usuario) {
       const placaNormal = entrada.replace(/[- ]/g, '').toUpperCase();
       const registro = await this.usuarioRepository.manager.findOne(RegistroVehiculo, {
@@ -302,8 +262,6 @@ export class UsuarioService {
     }
 
     if (!usuario) {
-      // Diagnóstico diferenciado: distingue "nunca existió" de "fue desactivado".
-      // Evita exponer datos sensibles al exterior; solo mejora la trazabilidad interna.
       const existeInactivo = await this.usuarioRepository.findOne({
         where: { qr: normalizado },
         withDeleted: true,
@@ -348,9 +306,6 @@ export class UsuarioService {
     return { usuario: perfil, vehiculos };
   }
 
-  /**
-   * Actualización de perfil y limpieza de fotos en Cloudinary.
-   */
   async actualizarPerfil(documento: string, dto: ActualizarPerfilDto): Promise<Omit<Usuario, 'contra'>> {
     const usuario = await this.usuarioRepository.findOne({ where: { documento } });
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
@@ -526,7 +481,6 @@ export class UsuarioService {
       .leftJoinAndSelect('rv.vehiculo', 'vehiculo')
       .leftJoinAndSelect('vehiculo.tipoVehiculo', 'tipoVehiculo');
 
-    // Activos / desactivados (soft-delete). Por defecto solo activos.
     if (estado === 'INACTIVO') {
       qb.withDeleted().andWhere('u.deleted_at IS NOT NULL');
     } else if (estado === 'TODOS') {
@@ -539,6 +493,8 @@ export class UsuarioService {
       qb.andWhere('u.id_tipo_usr = :rolId', { rolId: TipoUsuarioEnum.ADMIN });
     } else if (rol === 'OPERATIVO') {
       qb.andWhere('u.id_tipo_usr = :rolId', { rolId: TipoUsuarioEnum.OPERATIVO });
+    } else if (rol === 'PERSONAL_SENA') {
+      qb.andWhere('u.id_tipo_usr = :rolId', { rolId: TipoUsuarioEnum.PERSONAL_SENA });
     }
 
     if (documento) {
@@ -578,11 +534,6 @@ export class UsuarioService {
     });
   }
 
-  /**
-   * Admin → crea cualquier tipo de usuario.
-   * Si idTipoUsr == APRENDIZ → manda OTP al correo para verificar
-   * Si es ADMIN/OPERATIVO → ya queda verificado
-   */
   async crearUsuarioPorAdmin(dto: CreateUsuarioAdminDto): Promise<{ mensaje: string; usuario?: Omit<Usuario, 'contra'> }> {
     if (dto.idTipoUsr === TipoUsuarioEnum.APRENDIZ) {
       const respuesta = await this.create(dto);
@@ -592,9 +543,6 @@ export class UsuarioService {
     return { mensaje: 'Usuario creado exitosamente', usuario };
   }
 
-  /**
-   * Admin → actualiza cualquier campo de un usuario (excepto contraseña, esa va por reset).
-   */
   async actualizarUsuarioPorAdmin(
     documento: string,
     dto: Partial<Pick<Usuario, 'nombreCompleto' | 'correo' | 'numTelf' | 'contactoEmerg' | 'fotoPersona' | 'idTipoUsr' | 'idFormacion'>>,
@@ -622,16 +570,6 @@ export class UsuarioService {
     return rest;
   }
 
-  /**
-   * Admin → elimina lógicamente un usuario (soft delete).
-   *
-   * No se borra físicamente: así se conserva el historial y se evitan las
-   * violaciones de clave foránea (p. ej. `registro_vehiculo`). Al quedar marcado
-   * con `deletedAt`, TypeORM lo excluye de todas las consultas normales, por lo
-   * que el usuario desaparece del listado, no puede iniciar sesión (web ni
-   * operativo) y la validación del JWT lo rechaza en cualquier endpoint
-   * protegido, dejándolo sin acceso a ninguna función del sistema.
-   */
   async eliminarUsuarioPorAdmin(documento: string): Promise<{ mensaje: string }> {
     const usuario = await this.usuarioRepository.findOne({ where: { documento } });
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
@@ -649,9 +587,6 @@ export class UsuarioService {
     return { mensaje: 'Usuario eliminado exitosamente' };
   }
 
-  /**
-   * Admin → reactiva un usuario desactivado (revierte el soft-delete).
-   */
   async reactivarUsuarioPorAdmin(documento: string): Promise<{ mensaje: string }> {
     const usuario = await this.usuarioRepository.findOne({
       where: { documento },

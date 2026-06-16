@@ -9,7 +9,6 @@ export class TipoUsuario {
   @Column({ length: 20, unique: true })
   tipoUsr: string;
 
-  // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

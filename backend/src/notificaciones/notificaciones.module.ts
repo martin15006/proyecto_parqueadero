@@ -9,7 +9,6 @@ import { AuthModule } from '../auth/auth.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([NotificacionUsuario, Usuario]),
-    // JwtAuthGuard depende de AuthService (blacklist). Sin esto, puede inyectarse undefined y responder 401.
     AuthModule,
   ],
   controllers: [NotificacionesController],

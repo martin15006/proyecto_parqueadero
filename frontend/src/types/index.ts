@@ -46,13 +46,9 @@ export interface DashboardStats {
   parqueaderoDeshabilitado?: boolean;
   estadoParqueadero?: 'DISPONIBLE' | 'LLENO' | 'DESHABILITADO';
   ocupacion: {
-    /** Total de bahías con sensor activo (≠ total bahías en DB). */
     total: number;
-    /** Bahías en estado OCUPADO o DISCREPANCIA. */
     ocupados: number;
-    /** Bahías en estado LIBRE o TRANSITO. */
     disponibles: number;
-    /** (ocupados / total) × 100, 1 decimal. Undefined en respuestas antiguas. */
     porcentajeOcupacion?: number;
   };
   ingresosHoy: number;
@@ -69,7 +65,6 @@ export type BahiaEstado =
   | 'ERROR'
   | 'DISABLED';
 
-/** Espejo del `EstadoPanelEnum` del backend — estado visual calculado por el servidor. */
 export type EstadoPanel =
   | 'LIBRE'
   | 'OCUPADO'
@@ -78,16 +73,13 @@ export type EstadoPanel =
   | 'OFFLINE'
   | 'DESHABILITADO';
 
-/** Shape de cada bahía devuelta por `GET /api/bahias/sensorizadas`. */
 export interface BahiaSensorizada {
   idBahia: number;
   nombreBahia: string;
   tipoBahia: string;
   estadoPanel: EstadoPanel;
   estadoSensor: string;
-  /** Placa del vehículo con movimiento activo (null si libre). */
   placa: string | null;
-  /** Estado del movimiento vigente (`ADENTRO`, `TRANSITO`, etc.). */
   estadoMovimiento: string | null;
   ultimaTelemetriaAt: string | null;
 }
@@ -104,6 +96,31 @@ export interface OcupacionPayload {
     estado: BahiaEstado;
     tipo: string;
   }>;
+}
+
+export interface TipoBahia {
+  idTipoB: number;
+  tipoBahia: string;
+}
+
+export interface BahiaAdmin {
+  idBahia: number;
+  nombreBahia: string;
+  idTipoBahia: number;
+  estadoManual: string | null;
+  estadoReconciliado: string;
+  ultimaTelemetriaAt: string | null;
+  tipoBahia?: TipoBahia;
+}
+
+export interface SensorAdmin {
+  idSensor: number;
+  codigo: string;
+  idBahia: number;
+  activo: boolean;
+  estadoActual: string;
+  bateria?: number | null;
+  ultimaLectura?: string | null;
 }
 
 export type BahiaModificadaPayload = {
@@ -147,7 +164,6 @@ export interface Vehiculo {
 export interface AdminUsuarioItem extends User {
   rol: 'APRENDIZ' | 'ADMIN' | 'OPERATIVO' | 'PERSONAL_SENA';
   vehiculos: Vehiculo[];
-  /** false cuando el usuario está desactivado (soft-delete). */
   activo?: boolean;
 }
 

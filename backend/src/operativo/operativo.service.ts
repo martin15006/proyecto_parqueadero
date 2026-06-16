@@ -47,16 +47,6 @@ export class OperativoService {
     private readonly notificacionesService: NotificacionesService,
   ) {}
 
-  /**
-   * Flujo unificado de escaneo (Code128 / QR).
-   *
-   * Routing de acción por estado del movimiento activo:
-   * - `TRANSITO` sin bahía → vehículo ya autorizado en ingreso; rechaza doble scan.
-   * - `TRANSITO` con bahía o `ADENTRO` → registra salida definitiva (portería confirma).
-   * - Sin movimiento activo → inicia tránsito de ingreso (`iniciarTransitoIngreso`).
-   *
-   * El ingreso ya **no asigna bahía**: eso es responsabilidad del sensor físico.
-   */
   async escanearCodigo(codigo: string, operador: (IJwtPayload & { ip: string }) | null) {
     const token = String(codigo ?? '').trim();
 
@@ -89,8 +79,6 @@ export class OperativoService {
       });
     }
 
-    // Si el usuario YA tiene un movimiento activo (con cualquiera de sus vehículos),
-    // la acción es siempre SALIDA de ese vehículo — no mostramos modal de selección.
     const placas = vehiculos.map((v) => v.placa);
     const movimientoActivoMio = await this.movimientoRepository
       .createQueryBuilder('mv')
@@ -172,21 +160,12 @@ export class OperativoService {
     };
   }
 
-  /**
-   * Lógica de portería simplificada:
-   * - Si el vehículo NO tiene movimiento activo → ingreso (ADENTRO, sin bahía).
-   * - Si el vehículo ya está ADENTRO → salida.
-   *
-   * El sensor es independiente: solo gestiona el estado visual de las bahías.
-   * La portería no asigna ni libera bahías.
-   */
   private async resolverAccionPorEstado(
     placa: string,
     documentoUsuario: string,
     operador: IJwtPayload & { ip: string },
     usuarioInfo?: any,
   ) {
-    // Sin filtrar por usuario, ya que el vehículo puede ser compartido.
     const registro = await this.movimientoRepository.manager.findOne(RegistroVehiculo, {
       where: { idVehiculo: placa },
     });
@@ -203,8 +182,6 @@ export class OperativoService {
     });
 
     if (movimientoActivo) {
-      // Solo quien hizo el ingreso puede registrar la salida.
-      // Si `documentoIngreso` está vacío (movimientos antiguos), permitimos al propietario.
       const quienIngresó = movimientoActivo.documentoIngreso ?? registro.idUsuario;
       if (quienIngresó !== documentoUsuario) {
         throw new BadRequestException({
@@ -218,11 +195,6 @@ export class OperativoService {
     return await this.iniciarTransitoIngreso(placa, documentoUsuario, operador, usuarioInfo);
   }
 
-  /**
-   * Confirmación secundaria cuando el aprendiz posee múltiples vehículos.
-   * Revalida el `codigo` (token opaco) y verifica que la placa seleccionada
-   * pertenezca a ese usuario antes de registrar el ingreso.
-   */
   async confirmarIngresoMultivehiculo(
     dto: ConfirmarIngresoMultivehiculoDto,
     operador: IJwtPayload & { ip: string },
@@ -266,15 +238,7 @@ export class OperativoService {
     };
   }
 
-  /**
-   * Resumen operativo para sincronización inicial del dashboard, restringido
-   * por mínimo privilegio (no expone datos administrativos).
-   */
   async obtenerResumenTurno(operador: IJwtPayload & { ip: string }) {
-    // obtenerOcupacion devuelve:
-    //   total       = bahías con sensor activo (físicas reales)
-    //   ocupados    = QRs escaneados activos (movimientos ADENTRO/TRANSITO)
-    //   disponibles = total - ocupados
     const estadoGlobal = await this.bahiasService.obtenerOcupacion();
 
     const inicioDia = new Date();
@@ -337,7 +301,6 @@ export class OperativoService {
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
 
-    // Eventos de visitantes registrados/cerrados por este operativo hoy.
     const visitasTurno = await this.movimientoRepository.manager.find(Visita, {
       where: [{ idOperativoIngreso: operador.sub }, { idOperativoSalida: operador.sub }],
       order: { horaIngreso: 'DESC' },
@@ -428,10 +391,6 @@ export class OperativoService {
     };
   }
 
-  /**
-   * Registra el ingreso de un vehículo identificado por placa.
-   * Sin asignación de bahía: el sensor gestiona el estado visual de forma independiente.
-   */
   async registrarEntrada(
     placa: string,
     operador: IJwtPayload & { ip: string },
@@ -448,9 +407,6 @@ export class OperativoService {
         relations: ['tipoVehiculo'],
       });
 
-      // Si se especificó un documentoIngreso, validar que sea autorizado:
-      // - el propietario del registro, o
-      // - un usuario con compartido ACEPTADO sobre este vehículo
       let documentoIngreso = registro.idUsuario;
       if (documentoIngresoExplicito && documentoIngresoExplicito.trim()) {
         const doc = documentoIngresoExplicito.trim();
@@ -473,10 +429,8 @@ export class OperativoService {
         }
       }
 
-      // Un usuario solo puede tener UN vehículo adentro a la vez
       await this.verificarUsuarioSinIngresoActivo(documentoIngreso, manager);
 
-      // Restricción de jornada: mañana/tarde solo motos.
       await this.validarJornadaParaVehiculo(documentoIngreso, placa, manager);
 
       const nuevoMovimiento = manager.create(MovimientoVehiculo, {
@@ -517,10 +471,6 @@ export class OperativoService {
     });
   }
 
-  /**
-   * Registro Manual de Contingencia: permite el ingreso cuando fallan los
-   * sistemas automáticos o por casos especiales.
-   */
   async registrarIngresoManual(dto: RegistrarIngresoManualDto, operador: IJwtPayload & { ip: string }) {
     await this.bahiasService.validarIngresoPermitido();
     return await this.movimientoRepository.manager.transaction(async (manager) => {
@@ -560,7 +510,6 @@ export class OperativoService {
       await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
       await this.verificarSinVisitaActiva(placaARegistrar, manager);
 
-      // Un usuario solo puede tener UN vehículo adentro a la vez
       await this.verificarUsuarioSinIngresoActivo(registro.idUsuario, manager);
 
       const vehiculoCompleto = await manager.findOne(Vehiculo, {
@@ -617,16 +566,6 @@ export class OperativoService {
     });
   }
 
-  /**
-   * Cierra formalmente el ciclo de vida de un movimiento vehicular.
-   *
-   * Prioridad de búsqueda (flujo IoT normal):
-   * 1. `TRANSITO` **con** bahía asignada → el sensor ya detectó que el vehículo
-   *    se retiró físicamente; el operario en portería confirma la salida definitiva.
-   * 2. `ADENTRO` → salida directa (sin fase sensor, ej. contingencia o bahía manual).
-   *
-   * No cierra movimientos `TRANSITO` sin bahía (tránsito de ingreso activo).
-   */
   async registrarSalida(placa: string, operador: IJwtPayload & { ip: string }) {
     return await this.movimientoRepository.manager.transaction(async (manager) => {
       const { vehiculo, registro } = await this.validarVehiculoYRegistro(placa, manager);
@@ -655,7 +594,6 @@ export class OperativoService {
 
       await this.ejecutarPostSalida(movimientoActivo, placa, operador);
 
-      // Usuario que efectivamente ingresó (puede ser propietario o receptor compartido)
       const docQuienIngreso = movimientoActivo.documentoIngreso ?? registro.idUsuario;
       const usuarioIngreso = await this.usuarioService.findOneByDocumento(docQuienIngreso);
 
@@ -685,14 +623,6 @@ export class OperativoService {
     });
   }
 
-  /**
-   * Revierte el último movimiento registrado (desde el modal de confirmación):
-   * - Si era un INGRESO (ADENTRO/TRANSITO) → se ANULA (el vehículo no entra).
-   * - Si era una SALIDA → se revierte a ADENTRO (el vehículo sigue dentro).
-   *
-   * Pensado para cuando el operativo cierra/niega la confirmación: la operación
-   * "no se hace".
-   */
   async anularMovimiento(idMovimiento: number, operador: IJwtPayload & { ip: string }) {
     return await this.movimientoRepository.manager.transaction(async (manager) => {
       const mov = await manager.findOne(MovimientoVehiculo, {
@@ -745,11 +675,6 @@ export class OperativoService {
     });
   }
 
-  /**
-   * Procedimiento de emergencia global. Cierra todos los movimientos `ADENTRO`
-   * y los `TRANSITO` (ingreso sin bahía y salida con bahía) dejando el
-   * parqueadero limpio.
-   */
   async salidaEmergencia(operador: IJwtPayload & { ip: string }) {
     const ahora = new Date();
     const movimientosActivos = await this.movimientoRepository.find({
@@ -876,17 +801,6 @@ export class OperativoService {
     });
   }
 
-  /**
-   * Punto de entrada del flujo IoT. El QR se escanea en portería y el vehículo
-   * queda en {@link EstadoMovimiento.TRANSITO} **sin bahía asignada**. La
-   * asignación física es responsabilidad exclusiva del {@link SerialBridgeService}:
-   * cuando el sensor detecta presencia (<umbral cm) en la bahía, llama a
-   * `BahiasService.procesarTelemetriaSensor` que vincula el movimiento y lo
-   * promueve a {@link EstadoMovimiento.ADENTRO}.
-   *
-   * Flujo multi-vehículo: si el aprendiz tiene más de un vehículo registrado
-   * se devuelve `modo: 'SELECCION'` igual que en `escanearCodigo`.
-   */
   async escanearQr(qr: string, operador: IJwtPayload & { ip: string }) {
     const token = String(qr ?? '').trim();
     if (!token.length) {
@@ -907,8 +821,6 @@ export class OperativoService {
       });
     }
 
-    // Si el usuario YA tiene un movimiento activo con cualquiera de sus vehículos,
-    // la acción es siempre SALIDA — no se le consulta cuál usar.
     const placas = vehiculos.map((v) => v.placa);
     const movimientoActivoMio = await this.movimientoRepository
       .createQueryBuilder('mv')
@@ -993,11 +905,6 @@ export class OperativoService {
     };
   }
 
-  /**
-   * Registra el ingreso de un vehículo con estado ADENTRO e idBahia=null.
-   * El sensor gestiona el estado visual de las bahías de forma completamente
-   * independiente — la portería no asigna ni conoce la bahía donde se estacionará.
-   */
   private async iniciarTransitoIngreso(
     placa: string,
     documentoUsuario: string,
@@ -1011,10 +918,8 @@ export class OperativoService {
       await this.verificarVehiculoAfuera(registro.idRegistroV, manager);
       await this.verificarSinVisitaActiva(placa, manager);
 
-      // Un usuario solo puede tener UN vehículo adentro a la vez
       await this.verificarUsuarioSinIngresoActivo(documentoUsuario, manager);
 
-      // Restricción de jornada: mañana/tarde solo motos.
       await this.validarJornadaParaVehiculo(documentoUsuario, placa, manager);
 
       const vehiculoCompleto = await manager.findOne(Vehiculo, {
@@ -1049,7 +954,6 @@ export class OperativoService {
       });
       await this.sincronizarEstadoGlobal();
 
-      // Usuario que efectivamente ingresó (puede ser receptor de un compartido).
       const usuario = usuarioInfo
         ?? await this.usuarioService.findOneByDocumento(documentoUsuario);
 
@@ -1115,10 +1019,6 @@ export class OperativoService {
     if (activo) throw new BadRequestException('El vehículo ya se encuentra dentro de las instalaciones');
   }
 
-  /**
-   * Ingreso único por placa: si la placa ya tiene una visita activa (entró como
-   * visitante), no puede ingresar también como vehículo de un usuario registrado.
-   */
   private async verificarSinVisitaActiva(placa: string, manager: EntityManager) {
     const placaNorm = this.normalizarPlaca(placa);
     const visitaActiva = await manager.findOne(Visita, {
@@ -1132,14 +1032,6 @@ export class OperativoService {
     }
   }
 
-  /**
-   * Garantiza que el usuario que va a ingresar NO tenga otro vehículo
-   * (propio o compartido) ya adentro: solo puede tener UN movimiento activo.
-   *
-   * NOTA técnica: PostgreSQL no permite `FOR UPDATE` con LEFT JOIN, por eso
-   * primero bloqueamos solo la tabla movimiento_vehiculo y luego, si hay
-   * registro activo, hacemos un fetch separado para obtener la placa.
-   */
   private async verificarUsuarioSinIngresoActivo(documentoUsuario: string, manager: EntityManager) {
     const activo = await manager
       .createQueryBuilder(MovimientoVehiculo, 'mv')
@@ -1163,12 +1055,6 @@ export class OperativoService {
     }
   }
 
-  /**
-   * Restricción de ingreso por jornada de la ficha del usuario:
-   * - Jornada MAÑANA o TARDE → solo motos (se bloquea el ingreso de carros).
-   * - Jornada NOCHE → se permiten carros.
-   * - Jornada Única (sin jornada) o usuarios sin ficha → sin restricción.
-   */
   private async validarJornadaParaVehiculo(
     documentoUsuario: string,
     placa: string,
@@ -1228,10 +1114,6 @@ export class OperativoService {
   }
 
   private async sincronizarEstadoGlobal() {
-    // Conteo unificado:
-    //  - total       = bahías sensorizadas (físicas)
-    //  - ocupados    = QRs escaneados activos (movimientos ADENTRO/TRANSITO)
-    //  - disponibles = total - ocupados
     const conteo = await this.bahiasService.obtenerConteoGlobal();
 
     this.eventosGateway.emitirConteoGlobalDisponibles({
@@ -1244,11 +1126,6 @@ export class OperativoService {
     await this.bahiasService.evaluarAlertasOcupacion();
   }
 
-  /**
-   * Información de una placa para registro manual: datos y fotos del vehículo,
-   * usuarios autorizados (propietario + receptores con compartido ACEPTADO) y,
-   * si tiene un movimiento activo, quién lo ingresó.
-   */
   async obtenerInfoPlacaParaRegistroManual(placa: string) {
     const placaNormalizada = this.normalizarPlaca(placa);
 

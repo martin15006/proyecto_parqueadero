@@ -11,19 +11,31 @@ export const telemetriaService = {
     return response.data.data;
   },
 
-  /**
-   * Solo está disponible en ambiente NO productivo y para ADMIN.
-   */
   simularIngresoQr: async (params?: { idBahia?: number; placa?: string }) => {
     const response = await api.post('/telemetria/simulador/qr-ingreso', params ?? {});
     return response.data.data ?? response.data;
   },
 
-  /**
-   * Solo está disponible en ambiente NO productivo y para ADMIN.
-   */
   simularAlerta: async (params: { tipo?: string; mensaje: string }) => {
     const response = await api.post('/telemetria/simulador/alerta', params);
+    return response.data.data ?? response.data;
+  },
+
+  crearSensor: async (payload: { codigo: string; idBahia: number; activo?: boolean }) => {
+    const response = await api.post('/telemetria/sensores', payload);
+    return response.data.data ?? response.data;
+  },
+
+  actualizarSensor: async (
+    idSensor: number,
+    payload: { codigo?: string; idBahia?: number; activo?: boolean },
+  ) => {
+    const response = await api.patch(`/telemetria/sensores/${idSensor}`, payload);
+    return response.data.data ?? response.data;
+  },
+
+  eliminarSensor: async (idSensor: number) => {
+    const response = await api.delete(`/telemetria/sensores/${idSensor}`);
     return response.data.data ?? response.data;
   },
 };
@@ -34,9 +46,6 @@ export const bahiasService = {
     return response.data.data;
   },
 
-  /**
-   * Reutiliza la lógica del dashboard.
-   */
   getOcupacion: async () => {
     const response = await api.get('/bahias/ocupacion');
     return response.data.data;

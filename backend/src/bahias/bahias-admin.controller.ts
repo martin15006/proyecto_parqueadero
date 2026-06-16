@@ -1,4 +1,4 @@
-import { Body, Controller, Param, ParseIntPipe, Patch, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Param, ParseIntPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -6,6 +6,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { BahiasService } from './bahias.service';
 import { UpdateParqueaderoEstadoDto } from './dto/update-parqueadero-estado.dto';
 import { ForzarEstadoBahiaDto } from './dto/forzar-estado-bahia.dto';
+import { CrearBahiaDto } from './dto/crear-bahia.dto';
 import type { AuthenticatedRequest } from '../common/interfaces/auth.interface';
 import { UsuarioService } from '../usuarios/usuario.service';
 
@@ -51,6 +52,28 @@ export class BahiasAdminController {
     @Req() req: AuthenticatedRequest,
   ) {
     return await this.bahiasService.forzarEstadoBahia(id, dto.estado, {
+      idUsuario: req.user?.sub || 'SISTEMA',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  @Post('bahia')
+  @ApiOperation({ summary: 'Crear una nueva bahía' })
+  @ApiResponse({ status: 201, description: 'Bahía creada' })
+  async crearBahia(@Body() dto: CrearBahiaDto, @Req() req: AuthenticatedRequest) {
+    return await this.bahiasService.crearBahia(dto, {
+      idUsuario: req.user?.sub || 'SISTEMA',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  @Delete('bahia/:id')
+  @ApiOperation({ summary: 'Eliminar (soft-delete) una bahía' })
+  @ApiResponse({ status: 200, description: 'Bahía eliminada' })
+  async eliminarBahia(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest) {
+    return await this.bahiasService.eliminarBahia(id, {
       idUsuario: req.user?.sub || 'SISTEMA',
       ip: req.ip,
       userAgent: req.headers['user-agent'],

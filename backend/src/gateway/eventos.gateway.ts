@@ -1,4 +1,4 @@
-import { 
+import {
   WebSocketGateway,
   WebSocketServer,
   OnGatewayConnection,
@@ -8,10 +8,10 @@ import {
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
-import type { 
-  IVehiculoEventoPayload, 
-  IOcupacionPayload, 
-  IAlertaPayload, 
+import type {
+  IVehiculoEventoPayload,
+  IOcupacionPayload,
+  IAlertaPayload,
   ISensorOfflinePayload,
   IBahiaActualizadaPayload,
   IParqueaderoEstadoPayload,
@@ -40,10 +40,6 @@ const buildCorsOriginsSet = () => {
   return new Set(corsOrigins);
 };
 
-/**
- * Gateway central de WebSockets.
- * MOBILE_API: Configurado con Heartbeat agresivo para detectar cambios de red (WiFi/Datos) en milisegundos.
- */
 @WebSocketGateway({
   cors: {
     origin: (origin, callback) => {
@@ -104,7 +100,6 @@ export class EventosGateway
   } as const;
 
   constructor(private readonly jwtService: JwtService) {
-    // MOBILE_API: Limpieza de clientes inactivos para optimizar memoria en el servidor
     setInterval(() => {
       const now = Date.now();
       this.clients.forEach((val, id) => {
@@ -115,10 +110,6 @@ export class EventosGateway
     }, 30000);
   }
 
-  /**
-   * MOBILE_API: Gestiona la conexión inicial del dispositivo móvil.
-   * El cliente debe enviar el token en el objeto 'auth' de la configuración de Socket.io.
-   */
   async handleConnection(client: Socket) {
     const token =
       this.extraerTokenDeHandshake(client) ??
@@ -159,7 +150,6 @@ export class EventosGateway
     this.clients.delete(client.id);
   }
 
-  // FIX: Heartbeat listener decorado correctamente
   @SubscribeMessage('heartbeat')
   handleHeartbeat(client: Socket) {
     if (this.clients.has(client.id)) {
@@ -216,6 +206,10 @@ export class EventosGateway
     this.emitirEvento('alerta_parqueadero', payload, this.ROOMS.OPERATIVOS_ALERTAS);
   }
 
+  emitirAlertaAprendices(payload: IAlertaPayload) {
+    this.emitirEvento('alerta_parqueadero', payload, this.ROOMS.APRENDICES_CONTEO);
+  }
+
   emitirSensorOffline(payload: ISensorOfflinePayload) {
     this.emitirEvento('sensor_offline', payload, this.ROOMS.OPERATIVOS_ALERTAS);
   }
@@ -235,11 +229,6 @@ export class EventosGateway
     this.emitirEvento('conteo_global_disponibles', payload, this.ROOMS.ADMINS_FULL);
   }
 
-  /**
-   * Notifica a los administradores que la lista de solicitudes cambió
-   * (nueva solicitud desde el móvil, o una aprobada/rechazada). El panel
-   * de Solicitudes escucha este evento y recarga en tiempo real.
-   */
   emitirSolicitudesActualizadas(payload: { tipo: 'NUEVA' | 'RESUELTA'; idSolicitud?: number }) {
     this.emitirEvento('solicitudes_actualizadas', payload, this.ROOMS.ADMINS_FULL);
   }
@@ -249,7 +238,6 @@ export class EventosGateway
     const current = this.bahiaDebounce.get(key);
     const lastEmitState = current?.lastEmitState ?? null;
 
-    // Si el estado no cambió respecto al último emitido, ignorar
     if (lastEmitState === payload.nuevoEstado) return;
 
     if (current?.timer) {

@@ -1,10 +1,11 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, Not } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Sensor } from './entities/sensor.entity';
 import { TelemetriaEvento } from './entities/telemetria-evento.entity';
 import { AlertaSistema } from './entities/alerta-sistema.entity';
+import { Bahia } from '../bahias/entities/bahia.entity';
 import { EventosGateway } from '../gateway/eventos.gateway';
 import { BahiasService } from '../bahias/bahias.service';
 import { TelemetryPayloadDto } from './dto/telemetry-payload.dto';
@@ -14,7 +15,6 @@ import { IotStatusEnum } from '../common/enums/iot-status.enum';
 export class TelemetriaService {
   private readonly logger = new Logger(TelemetriaService.name);
 
-  // Almacena en memoria el último estado reportado por cada sensor (anti-saturación)
   private cacheLecturas: Map<string, { status: IotStatusEnum; timestamp: number }> = new Map();
 
   constructor(
@@ -28,21 +28,6 @@ export class TelemetriaService {
     private readonly bahiasService: BahiasService,
   ) {}
 
-  /**
-   * Procesa la telemetría enviada por el hardware.
-   *
-   * ### Separación throttle / lógica de negocio (FIX crítico)
-   *
-   * El throttle **solo suprime la escritura del sensor en DB** cuando el estado
-   * no cambia en menos de 30 s.  La llamada a `gestionarImpactoOperativo` ocurre
-   * **siempre**, porque el estado de la bahía puede haber cambiado a nivel lógico
-   * (p. ej. QR escaneado mientras el sensor ya estaba en OCCUPIED en caché) y la
-   * máquina de estados de `BahiasService` necesita verlo para vincular el movimiento
-   * flotante al espacio físico.
-   *
-   * Sin esta separación el pipeline queda mudo en cualquier test repetido dentro de
-   * la ventana de 30 s.
-   */
   async procesarLectura(dto: TelemetryPayloadDto) {
     const { sensorId, status, battery, rssi } = dto;
 
@@ -79,12 +64,9 @@ export class TelemetriaService {
       });
       await this.eventoRepository.save(evento);
     } else {
-      // Actualizamos el objeto en memoria para que gestionarImpactoOperativo tenga el estado correcto
       sensor.estadoActual = status;
     }
 
-    // Lógica de negocio SIEMPRE: permite detectar nuevos movimientos flotantes
-    // incluso cuando el status del sensor no cambió (OCCUPIED repetido con nuevo QR escaneado)
     await this.gestionarImpactoOperativo(sensor, status);
 
     return { ok: true, mensaje: omitirDbSensor ? 'Telemetría procesada (DB omitida por throttle)' : 'Telemetría procesada exitosamente' };
@@ -116,10 +98,6 @@ export class TelemetriaService {
     await this.alertaRepository.save(alerta);
   }
 
-  /**
-   * Simulador (DEMO): registra una alerta y la emite en tiempo real.
-   * Se utiliza para presentaciones locales cuando no hay hardware conectado.
-   */
   async simularAlertaSistema(tipo: string, mensaje: string) {
     await this.registrarAlertaSistema(tipo, mensaje);
     this.gateway.emitirAlertaParqueadero({
@@ -185,5 +163,134 @@ export class TelemetriaService {
 
   async findAllSensores() {
     return await this.sensorRepository.find();
+  }
+
+  private async emitirConteoGlobal() {
+    const conteo = await this.bahiasService.obtenerConteoGlobal();
+    this.gateway.emitirConteoGlobalDisponibles({
+      total: conteo.total,
+      ocupados: conteo.ocupados,
+      disponibles: conteo.disponibles,
+      estadoParqueadero: conteo.estadoParqueadero,
+      actualizadoEn: new Date(),
+    });
+  }
+
+  private async asegurarBahiaSinOtroSensorActivo(idBahia: number, exceptoIdSensor?: number) {
+    const otro = await this.sensorRepository.findOne({
+      where: exceptoIdSensor
+        ? { idBahia, activo: true, idSensor: Not(exceptoIdSensor) }
+        : { idBahia, activo: true },
+    });
+    if (otro) {
+      throw new BadRequestException({
+        message: `La bahía ya tiene un sensor activo (${otro.codigo}). Desactívalo o reasígnalo primero.`,
+        errorCode: 'BAHIA_CON_SENSOR_ACTIVO',
+      });
+    }
+  }
+
+  async crearSensor(dto: { codigo: string; idBahia: number; activo?: boolean }) {
+    const codigo = String(dto.codigo ?? '').trim();
+    if (!codigo) {
+      throw new BadRequestException({
+        message: 'El código del sensor es obligatorio.',
+        errorCode: 'CODIGO_OBLIGATORIO',
+      });
+    }
+
+    const existe = await this.sensorRepository.findOne({ where: { codigo }, withDeleted: true });
+    if (existe) {
+      throw new BadRequestException({
+        message: `Ya existe un sensor con el código "${codigo}".`,
+        errorCode: 'SENSOR_DUPLICADO',
+      });
+    }
+
+    const bahia = await this.sensorRepository.manager.findOne(Bahia, {
+      where: { idBahia: dto.idBahia },
+    });
+    if (!bahia) {
+      throw new BadRequestException({
+        message: 'La bahía indicada no existe.',
+        errorCode: 'BAHIA_INVALIDA',
+      });
+    }
+
+    const activo = dto.activo ?? true;
+    if (activo) {
+      await this.asegurarBahiaSinOtroSensorActivo(dto.idBahia);
+    }
+
+    const creado = await this.sensorRepository.save(
+      this.sensorRepository.create({
+        codigo,
+        idBahia: dto.idBahia,
+        activo,
+        estadoActual: IotStatusEnum.OFFLINE,
+      }),
+    );
+
+    await this.emitirConteoGlobal();
+    return creado;
+  }
+
+  async actualizarSensor(id: number, dto: { codigo?: string; idBahia?: number; activo?: boolean }) {
+    const sensor = await this.sensorRepository.findOne({ where: { idSensor: id } });
+    if (!sensor) throw new NotFoundException('Sensor no encontrado');
+
+    if (dto.codigo !== undefined) {
+      const codigo = String(dto.codigo).trim();
+      if (!codigo) {
+        throw new BadRequestException({
+          message: 'El código del sensor no puede quedar vacío.',
+          errorCode: 'CODIGO_OBLIGATORIO',
+        });
+      }
+      if (codigo !== sensor.codigo) {
+        const dup = await this.sensorRepository.findOne({ where: { codigo }, withDeleted: true });
+        if (dup) {
+          throw new BadRequestException({
+            message: `Ya existe un sensor con el código "${codigo}".`,
+            errorCode: 'SENSOR_DUPLICADO',
+          });
+        }
+        sensor.codigo = codigo;
+      }
+    }
+
+    if (dto.idBahia !== undefined && dto.idBahia !== sensor.idBahia) {
+      const bahia = await this.sensorRepository.manager.findOne(Bahia, {
+        where: { idBahia: dto.idBahia },
+      });
+      if (!bahia) {
+        throw new BadRequestException({
+          message: 'La bahía indicada no existe.',
+          errorCode: 'BAHIA_INVALIDA',
+        });
+      }
+      sensor.idBahia = dto.idBahia;
+    }
+
+    if (dto.activo !== undefined) {
+      sensor.activo = Boolean(dto.activo);
+    }
+
+    if (sensor.activo) {
+      await this.asegurarBahiaSinOtroSensorActivo(sensor.idBahia, sensor.idSensor);
+    }
+
+    const guardado = await this.sensorRepository.save(sensor);
+    await this.emitirConteoGlobal();
+    return guardado;
+  }
+
+  async eliminarSensor(id: number) {
+    const sensor = await this.sensorRepository.findOne({ where: { idSensor: id } });
+    if (!sensor) throw new NotFoundException('Sensor no encontrado');
+
+    await this.sensorRepository.softDelete(id);
+    await this.emitirConteoGlobal();
+    return { ok: true, idSensor: id };
   }
 }

@@ -13,8 +13,6 @@ export class BahiasController {
   @Get('estado-aprendiz')
   @Roles(TipoUsuarioEnum.APRENDIZ)
   async obtenerEstadoParaAprendiz() {
-    // Ocupación basada en QRs escaneados activos (movimientos ADENTRO/TRANSITO)
-    // total = bahías registradas, ocupados = QR activos, disponibles = total - ocupados
     const ocupacion = await this.bahiasService.obtenerOcupacion();
 
     return {
@@ -37,18 +35,19 @@ export class BahiasController {
   @Get('ocupacion')
   @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
   async getOcupacion() {
-    // Conteo único: QRs activos / total de bahías registradas
     return await this.bahiasService.obtenerOcupacion();
   }
 
-  /**
-   * Devuelve únicamente las bahías que tienen un sensor activo asociado,
-   * enriquecidas con `estadoPanel` calculado listo para el Panel Operativo.
-   */
   @Get('sensorizadas')
   @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
   async getSensorizadas() {
     return await this.bahiasService.obtenerBahiasSensorizadas();
+  }
+
+  @Get('tipos')
+  @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
+  async getTipos() {
+    return await this.bahiasService.obtenerTiposBahia();
   }
 
   @Get(':id')

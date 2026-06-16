@@ -17,7 +17,6 @@ import { UsuarioService } from './usuario.service';
 export class UsuariosAdminController {
   constructor(private readonly usuarioService: UsuarioService) {}
 
-  // El rol se fuerza server-side a OPERATIVO; no se acepta desde el body.
   @Post()
   @ApiOperation({ summary: 'Crear usuario Operativo (Solo ADMIN)' })
   @ApiResponse({ status: 201, description: 'Operativo creado exitosamente' })

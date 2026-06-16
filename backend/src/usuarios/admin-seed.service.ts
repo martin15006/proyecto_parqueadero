@@ -18,8 +18,6 @@ export class AdminSeedService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // CRÍTICO: garantizar que los catálogos (tipo_usuario, etc.) existan
-    // antes de intentar crear el admin, que depende de la FK id_tipo_usr.
     await this.catalogosSeed.ensureSeeded();
 
     const correoAdmin = 'ymgg231@gmail.com';
@@ -33,7 +31,6 @@ export class AdminSeedService implements OnModuleInit {
     });
 
     if (existente) {
-      // Si el documento coincide pero el correo cambió, actualizamos al correo por defecto del sistema
       if (existente.correo !== correoAdmin) {
         this.logger.warn(`Sincronizando correo de ADMIN (${existente.documento}) a ${correoAdmin}.`);
         existente.correo = correoAdmin;

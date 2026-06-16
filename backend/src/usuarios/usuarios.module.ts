@@ -23,8 +23,6 @@ import { AuditoriaModule } from '../auditoria/auditoria.module';
     AuditoriaModule,
   ],
   controllers: [UsuariosController, UsuariosAdminController, AdminUsuariosController],
-  // IMPORTANTE: CatalogosSeedService DEBE ir antes de AdminSeedService
-  // para que existan los tipos de usuario antes de crear el admin.
   providers: [UsuarioService, CatalogosSeedService, AdminSeedService],
   exports: [UsuarioService],
 })

@@ -17,7 +17,6 @@ const isPasswordSecure = (value: string) => {
   return { isValid, check };
 };
 
-/** Extrae el mensaje real del backend; class-validator envía `message` como array. */
 const mensajeDeError = (e: any, fallback: string): string => {
   const raw = e?.response?.data?.message ?? e?.message;
   if (Array.isArray(raw)) {
@@ -134,7 +133,7 @@ export const ConfiguracionAdminPage: React.FC = () => {
         <div className="xl:col-span-8">
           <div className="bg-white dark:bg-[#121212] rounded-[2.5rem] p-10 shadow-sm border border-slate-100 dark:border-white/5 relative overflow-hidden transition-colors duration-500">
             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#39A900] to-[#007832]" />
-            
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-[#39A900]/10 text-[#39A900] flex items-center justify-center border border-[#39A900]/20">
@@ -212,10 +211,10 @@ export const ConfiguracionAdminPage: React.FC = () => {
               </div>
 
               <div className="md:col-span-2 pt-6">
-                <Button 
-                  variant="primary" 
-                  size="lg" 
-                  type="submit" 
+                <Button
+                  variant="primary"
+                  size="lg"
+                  type="submit"
                   isLoading={loading}
                   className="w-full md:w-auto px-12 py-5 rounded-[22px] shadow-[0_12px_24px_rgba(57,169,0,0.25)] hover:shadow-[0_12px_30px_rgba(57,169,0,0.35)]"
                 >

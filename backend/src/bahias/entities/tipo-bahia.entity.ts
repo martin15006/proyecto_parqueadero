@@ -9,7 +9,6 @@ export class TipoBahia {
   @Column({ length: 50 })
   tipoBahia: string;
 
-  // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

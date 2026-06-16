@@ -73,7 +73,7 @@ export const AdminLayout: React.FC = () => {
           </div>
         </div>
 
-        <nav className="flex-1 px-4 py-8 space-y-3 overflow-y-auto overflow-x-hidden scrollbar-hide">
+        <nav className="flex-1 px-4 py-8 space-y-3 overflow-hidden">
           {menuItems.map((item, idx) => {
             const isActive = location.pathname === item.path;
             return (

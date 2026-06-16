@@ -9,10 +9,6 @@ import { Reflector } from '@nestjs/core';
 import { TipoUsuarioEnum } from '../../common/enums/tipo-usuario.enum';
 import { AppRole, ROLES_KEY } from '../decorators/roles.decorator';
 
-/**
- * Guard de autorización basado en roles (RBAC).
- * Fail-closed: si falta usuario/rol o la metadata es inválida, deniega acceso.
- */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}

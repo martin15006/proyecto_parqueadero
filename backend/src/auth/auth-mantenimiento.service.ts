@@ -18,7 +18,6 @@ export class AuthMantenimientoService {
     private readonly otpRepository: Repository<CodigoOtp>,
   ) {}
 
-  // Evita el crecimiento infinito de las tablas de seguridad eliminando registros expirados.
   async ejecutarLimpieza() {
     try {
       const ahora = new Date();
@@ -27,9 +26,9 @@ export class AuthMantenimientoService {
         this.blacklistRepository.delete({ expiraEn: LessThan(ahora) }),
         this.otpRepository.delete({ expiraEn: LessThan(ahora) }),
       ]);
-      
+
       const totalEliminados = results.reduce((acc, curr) => acc + (curr.affected || 0), 0);
-      
+
       if (totalEliminados > 0) {
         this.logger.log(`[Mantenimiento Auth] Registros expirados eliminados: ${totalEliminados}`);
       }

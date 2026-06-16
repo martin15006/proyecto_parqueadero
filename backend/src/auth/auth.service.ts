@@ -74,6 +74,7 @@ export class AuthService implements OnModuleInit {
     const correoNormalizado = String(loginDto?.correo ?? '').trim().toLowerCase();
     const usuario = await this.usuarioRepository
       .createQueryBuilder('usuario')
+      .withDeleted()
       .where('LOWER(usuario.correo) = :correo', { correo: correoNormalizado })
       .getOne();
 
@@ -86,8 +87,15 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    // El usuario existe y la contraseña es correcta, pero fue desactivado
+    // (soft-delete). Se le informa en lugar de mostrar "Credenciales inválidas".
+    if (usuario.deletedAt) {
+      throw new UnauthorizedException(
+        'Tu usuario se encuentra desactivado. Contáctate con un administrador.',
+      );
+    }
+
     if (!usuario.correoVerificado) {
-      // Reenviar OTP para que pueda verificar y activar su cuenta
       try {
         await this.generarYEnviarOtp(usuario);
       } catch (_) { /* ignorar rate-limit aquí */ }
@@ -121,6 +129,7 @@ export class AuthService implements OnModuleInit {
       const correoNormalizado = String(dto?.correo ?? '').trim().toLowerCase();
       const usuario = await manager
         .createQueryBuilder(Usuario, 'usuario')
+        .withDeleted()
         .where('LOWER(usuario.correo) = :correo', { correo: correoNormalizado })
         .getOne();
 
@@ -128,7 +137,12 @@ export class AuthService implements OnModuleInit {
         throw new NotFoundException('Usuario no encontrado');
       }
 
-      // Bloqueo pesimista para evitar que dos hilos procesen el mismo OTP simultáneamente
+      if (usuario.deletedAt) {
+        throw new UnauthorizedException(
+          'Tu usuario se encuentra desactivado. Contáctate con un administrador.',
+        );
+      }
+
       const otp = await manager.findOne(CodigoOtp, {
         where: { documento: usuario.documento, usado: false },
         order: { createdAt: 'DESC' },
@@ -136,15 +150,12 @@ export class AuthService implements OnModuleInit {
       });
 
       if (!otp) {
-        // Si no hay OTP activo, verificamos si se usó uno hace menos de 3 segundos
-        // para mitigar el error 400 en peticiones duplicadas del frontend (doble submit).
         const otpReciente = await manager.findOne(CodigoOtp, {
           where: { documento: usuario.documento, usado: true },
           order: { updatedAt: 'DESC' },
         });
 
         if (otpReciente && (new Date().getTime() - otpReciente.updatedAt.getTime() < 3000)) {
-          // RNF2 (Privacidad): prohibido loguear documento/cédula (PII). Registramos solo el evento técnico.
           this.logger.warn('Petición de verificación OTP duplicada detectada (posible doble submit).');
           throw new BadRequestException('Petición duplicada procesada exitosamente.');
         }
@@ -198,13 +209,11 @@ export class AuthService implements OnModuleInit {
     };
 
     const access_token = await this.jwtService.signAsync(payload);
-    // Refresh token opaco, largo y seguro para almacenamiento en Keychain/SecureStorage
     const refresh_token = crypto.randomBytes(64).toString('hex');
 
     const expiraEn = new Date();
     expiraEn.setDate(expiraEn.getDate() + 7);
 
-    // Si hay un manager, usamos su repositorio para participar en la transacción
     const sesionRepo = manager ? manager.getRepository(SesionActiva) : this.sesionRepository;
 
     await sesionRepo.save({
@@ -230,7 +239,6 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Sesión expirada o inválida');
     }
 
-    // Marcamos el token anterior como usado para evitar ataques de repetición
     sesion.revocado = true;
     await this.sesionRepository.save(sesion);
 
@@ -262,7 +270,6 @@ export class AuthService implements OnModuleInit {
   async revocarAccessToken(token: string): Promise<void> {
     const payload = this.jwtService.decode(token) as IJwtPayload;
     if (payload?.exp) {
-      // Se guarda solo si el token no ha expirado naturalmente
       await this.blacklistRepository.save({
         token,
         expiraEn: new Date(payload.exp * 1000),
@@ -406,10 +413,6 @@ export class AuthService implements OnModuleInit {
     return this.generarYEnviarOtp(usuario);
   }
 
-  /**
-   * Verifica el OTP enviado al registrar un usuario.
-   * Si es válido → marca correoVerificado = true y emite tokens (login automático).
-   */
   async verificarRegistroOtp(dto: VerificarOtpDto): Promise<{
     access_token: string;
     refresh_token: string;

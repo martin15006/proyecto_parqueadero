@@ -9,7 +9,6 @@ export class TipoVehiculo {
   @Column({ length: 30 })
   tipoVehiculo: string;
 
-  // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

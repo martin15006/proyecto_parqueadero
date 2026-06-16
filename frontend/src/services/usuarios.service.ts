@@ -60,10 +60,6 @@ export const usuariosService = {
     return response.data;
   },
 
-  /**
-   * Restablece la contraseña de un Operativo desde el Panel Administrador (RF28).
-   * Operación crítica: el backend valida RF3 (contraseña segura) y evita reutilizar la anterior.
-   */
   resetPasswordOperativoAdmin: async (
     documento: string,
     contra: string,
@@ -72,7 +68,7 @@ export const usuariosService = {
     return response.data;
   },
 
-  listarUsuariosAdmin: async (params?: { q?: string; rol?: 'APRENDIZ' | 'ADMIN' | 'OPERATIVO' | 'TODOS'; estado?: 'ACTIVO' | 'INACTIVO' | 'TODOS' }): Promise<BackendEnvelope<AdminUsuarioItem[]>> => {
+  listarUsuariosAdmin: async (params?: { q?: string; rol?: 'APRENDIZ' | 'ADMIN' | 'OPERATIVO' | 'PERSONAL_SENA' | 'TODOS'; estado?: 'ACTIVO' | 'INACTIVO' | 'TODOS' }): Promise<BackendEnvelope<AdminUsuarioItem[]>> => {
     const query = new URLSearchParams();
     if (params?.q) query.set('q', params.q);
     if (params?.rol) query.set('rol', params.rol);
@@ -87,7 +83,6 @@ export const usuariosService = {
     return response.data;
   },
 
-  /** Crea un usuario desde el panel admin (cualquier tipo). Si es APRENDIZ envía OTP al correo */
   crearUsuarioAdmin: async (datos: any): Promise<BackendEnvelope<{ mensaje: string; usuario?: User }>> => {
     const response = await api.post('/admin/usuarios', datos);
     return response.data;

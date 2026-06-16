@@ -30,7 +30,6 @@ export class CodigoOtp {
   @DeleteDateColumn({ type: 'timestamptz', nullable: true })
   deletedAt: Date;
 
-  // FIX: zj9up6 - agregada relación bidireccional faltante usuario <-> codigoOtp
   @ManyToOne(() => Usuario, (usuario) => usuario.otps)
   @JoinColumn({ name: 'documento' })
   usuario: Usuario;

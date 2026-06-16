@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Search, RefreshCw, ChevronLeft, ChevronRight, User, Clock } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, User, Clock } from 'lucide-react';
 import { dashboardService } from '../../services/operativo.service';
+import { FiltroFechaHistorial } from '../../components/common/FiltroFechaHistorial';
+import type { RangoFecha } from '../../components/common/FiltroFechaHistorial';
 
-/** Fila del historial según `GET /dashboard/historial` (movimiento + registroVehiculo). */
 interface HistorialRow {
   idMovimiento: number | string;
   esVisitante?: boolean;
@@ -26,11 +27,12 @@ export const MovimientosView: React.FC = () => {
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [rango, setRango] = useState<RangoFecha>({});
 
-  const loadHistorial = useCallback(async (targetPage: number) => {
+  const loadHistorial = useCallback(async (targetPage: number, r: RangoFecha) => {
     try {
       setLoading(true);
-      const res: any = await dashboardService.getHistorial(targetPage, PAGE_SIZE);
+      const res: any = await dashboardService.getHistorial(targetPage, PAGE_SIZE, r.desde, r.hasta);
       setMovimientos(Array.isArray(res?.data) ? res.data : []);
       setLastPage(Number(res?.lastPage) || 1);
       setTotal(Number(res?.total) || 0);
@@ -42,8 +44,13 @@ export const MovimientosView: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadHistorial(page);
-  }, [page, loadHistorial]);
+    loadHistorial(page, rango);
+  }, [page, rango, loadHistorial]);
+
+  const handleRango = (r: RangoFecha) => {
+    setPage(1);
+    setRango(r);
+  };
 
   const filteredMovimientos = movimientos.filter(m =>
     (m.registroVehiculo?.vehiculo?.placa || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -65,8 +72,8 @@ export const MovimientosView: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in duration-500">
-      <div className="bg-white dark:bg-[#121212] p-6 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex flex-col md:flex-row items-end gap-4 transition-colors duration-300">
-        <div className="flex-1 w-full space-y-1.5">
+      <div className="bg-white dark:bg-[#121212] p-6 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm space-y-4 transition-colors duration-300">
+        <div className="w-full space-y-1.5">
           <label className="text-[9px] font-bold uppercase tracking-widest text-gray-400 ml-1">Búsqueda de Registros</label>
           <div className="relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 dark:text-gray-600 group-focus-within:text-[#39B000] transition-colors" size={16} />
@@ -80,13 +87,7 @@ export const MovimientosView: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={() => loadHistorial(page)}
-          className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-[#012E25] dark:bg-[#39B000] text-white rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-black dark:hover:bg-[#007832] transition-all shadow-sm active:scale-95 group"
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'} />
-          <span>Actualizar</span>
-        </button>
+        <FiltroFechaHistorial onChange={handleRango} />
       </div>
 
       <div className="bg-white dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-white/5 shadow-sm overflow-hidden transition-colors duration-300">

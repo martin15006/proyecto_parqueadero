@@ -40,7 +40,6 @@ export class RegistrarVisitaDto {
   @MinLength(3, { message: 'El motivo debe ser más descriptivo (mínimo 3 caracteres)' })
   motivo?: string;
 
-  /** Duración permitida en minutos (15 min – 24 h). Por defecto 240 (4 h). */
   @IsOptional()
   @IsInt()
   @Min(15)

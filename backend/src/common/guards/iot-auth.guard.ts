@@ -6,11 +6,6 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-/**
- * Guard de Seguridad para Dispositivos IoT.
- * Valida que la trama de hardware incluya una API Key válida en los headers.
- * SECURITY: Previene que atacantes externos inyecten telemetría falsa.
- */
 @Injectable()
 export class IotAuthGuard implements CanActivate {
   constructor(private readonly configService: ConfigService) {}

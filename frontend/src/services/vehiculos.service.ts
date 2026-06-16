@@ -99,10 +99,6 @@ export const vehiculosService = {
     return response.data;
   },
 
-  /**
-   * Aprueba o rechaza una solicitud de registro.
-   * Si estado = 'RECHAZADO', motivoRechazo es obligatorio.
-   */
   resolverSolicitud: async (
     idSolicitud: number,
     estado: 'APROBADO' | 'RECHAZADO',

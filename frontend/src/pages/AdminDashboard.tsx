@@ -1,28 +1,23 @@
 import React, { useMemo } from 'react';
-import { 
+import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
-import { 
+import {
   MapPin, Activity, TrendingUp, AlertTriangle,
-  RefreshCcw, Percent
+  Percent
 } from 'lucide-react';
 import { useAdmin } from '../hooks/useAdmin';
 import { StatCard } from '../components/common/StatCard';
 import { ChartHeader } from '../components/common/ChartHeader';
 import { ExportButton } from '../components/admin/ExportButton';
 
-/**
- * Dashboard Administrativo (Business Intelligence).
- * Proporciona una visión gerencial del estado del parqueadero mediante
- * visualizaciones de datos, KPIs y mapas de calor históricos.
- */
 export const AdminDashboard: React.FC = () => {
-  const { 
-    resumen, 
-    tendencia, 
-    loading, 
-    error, 
-    refresh 
+  const {
+    resumen,
+    tendencia,
+    loading,
+    error,
+    refresh
   } = useAdmin();
 
   const porcentajeOcupacion = useMemo(() => {
@@ -40,23 +35,16 @@ export const AdminDashboard: React.FC = () => {
     <div className="space-y-8 animate-in fade-in duration-700">
       <header className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4 -mt-20 mb-10 relative z-50">
         <div className="flex flex-wrap gap-3">
-          <ExportButton 
-            label="EXCEL" 
-            url={`${API_URL}/api/v1/dashboard/exportar/excel`} 
+          <ExportButton
+            label="EXCEL"
+            url={`${API_URL}/api/v1/dashboard/exportar/excel`}
             color="!bg-[#39A900] !text-white !border-transparent hover:!bg-[#2F8A00] shadow-[#39A900]/20"
           />
-          <ExportButton 
-            label="PDF" 
-            url={`${API_URL}/api/v1/dashboard/exportar/pdf`} 
+          <ExportButton
+            label="PDF"
+            url={`${API_URL}/api/v1/dashboard/exportar/pdf`}
             color="!bg-[#39A900] !text-white !border-transparent hover:!bg-[#2F8A00] shadow-[#39A900]/20"
           />
-          <button 
-            onClick={refresh}
-            className="p-2.5 bg-[#39A900] text-white rounded-xl hover:bg-[#2F8A00] transition-all duration-200 shadow-[0_8px_20px_rgba(57,169,0,0.25)]"
-            title="Refrescar Analíticas"
-          >
-            <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
-          </button>
         </div>
       </header>
 
@@ -89,19 +77,19 @@ export const AdminDashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 gap-8 mb-12">
         <div className="bg-white dark:bg-[#121212] p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-white/5 transition-all duration-500 hover:dark:shadow-[0_0_40px_rgba(0,0,0,0.3)]">
-          <ChartHeader 
-            title="Rendimiento Semanal" 
-            subtitle="Tendencia de los últimos 7 días" 
-            icon={<TrendingUp className="text-slate-700 dark:text-slate-300" />} 
+          <ChartHeader
+            title="Rendimiento Semanal"
+            subtitle="Tendencia de los últimos 7 días"
+            icon={<TrendingUp className="text-slate-700 dark:text-slate-300" />}
           />
           <div className="h-[300px] md:h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={tendenciaSafe}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis 
-                  dataKey="fecha" 
-                  axisLine={false} 
-                  tickLine={false} 
+                <XAxis
+                  dataKey="fecha"
+                  axisLine={false}
+                  tickLine={false}
                   tick={{fontSize: 10, fontWeight: 'bold', fill: '#94a3b8'}}
                   tickFormatter={(val) => new Date(val).toLocaleDateString('es-ES', {weekday: 'short'})}
                 />

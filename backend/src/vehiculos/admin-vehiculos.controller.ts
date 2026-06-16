@@ -37,7 +37,6 @@ export class AdminVehiculosController {
     return this.vehiculosService.crearVehiculoPorAdmin(dto);
   }
 
-  // Editar cualquier campo de un vehículo sin aplicar el cooldown del flujo de usuario
   @Patch(':placa')
   @ApiOperation({ summary: 'Editar vehículo (Admin)' })
   editar(@Param('placa') placa: string, @Body() dto: any) {

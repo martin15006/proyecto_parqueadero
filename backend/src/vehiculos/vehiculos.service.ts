@@ -49,17 +49,10 @@ export class VehiculosService {
     return String(placa ?? '').replace(/[- ]/g, '').toUpperCase().trim();
   }
 
-  /**
-   * Crea una SOLICITUD de registro de vehículo.
-   * El vehículo NO se registra de inmediato; queda pendiente de aprobación del administrador.
-   */
   async solicitarRegistroVehiculo(documento: string, dto: CreateVehiculoDto): Promise<{ mensaje: string; idSolicitud: number }> {
     const tipo = await this.tipoVehiculoRepository.findOne({ where: { idTipoV: dto.idTipoVehiculo } });
     if (!tipo) throw new BadRequestException('Tipo de vehículo no válido');
 
-    // Límite de negocio: máximo 3 vehículos por usuario. Se cuentan los ya
-    // registrados + las solicitudes pendientes para que no superen el tope
-    // acumulando solicitudes sin aprobar.
     const MAX_VEHICULOS_POR_USUARIO = 3;
     const [registrados, pendientes] = await Promise.all([
       this.registroRepository.count({ where: { idUsuario: documento } }),
@@ -175,7 +168,6 @@ export class VehiculosService {
       return { mensaje: 'Solicitud rechazada y usuario notificado.' };
     }
 
-    // APROBADO: crear Vehiculo + RegistroVehiculo
     let vehiculo = await this.vehiculoRepository.findOne({
       where: { placa: solicitud.placa },
       withDeleted: true,
@@ -251,10 +243,6 @@ export class VehiculosService {
     });
   }
 
-  /**
-   * Corrige una solicitud RECHAZADA y la reenvía a revisión (vuelve a PENDIENTE).
-   * Solo se actualizan los campos que el administrador marcó como incorrectos.
-   */
   async corregirSolicitud(
     documento: string,
     idSolicitud: number,
@@ -311,7 +299,6 @@ export class VehiculosService {
       solicitud.fotoPlaca = dto.fotoPlaca;
     }
 
-    // Reenviar: vuelve a pendiente y se limpian las marcas del rechazo anterior
     solicitud.estado = EstadoSolicitud.PENDIENTE;
     solicitud.motivoRechazo = null;
     solicitud.camposRechazados = null;
@@ -336,13 +323,6 @@ export class VehiculosService {
     return { mensaje: 'Solicitud corregida y reenviada para revisión.' };
   }
 
-  /**
-   * Comparte un vehículo con otro usuario (queda PENDIENTE de aceptación).
-   * Reglas:
-   *  - Solo el propietario del registro puede compartir.
-   *  - Un vehículo solo puede tener UNA invitación activa (PENDIENTE o ACEPTADA).
-   *  - El receptor puede tener máximo 2 vehículos compartidos ACEPTADOS (no se cuentan los PENDIENTES).
-   */
   async compartirVehiculo(documentoPropietario: string, placa: string, dto: CompartirVehiculoDto): Promise<{ mensaje: string }> {
     const placaNormalizada = this.normalizarPlaca(placa);
 
@@ -405,10 +385,6 @@ export class VehiculosService {
     return { mensaje: `Invitación enviada a ${dto.documentoReceptor}. Quedará activa cuando el usuario la acepte.` };
   }
 
-  /**
-   * El propietario cancela / quita el compartido de un vehículo.
-   * Sirve tanto para invitaciones PENDIENTES como para vínculos ya ACEPTADOS.
-   */
   async quitarCompartido(documentoPropietario: string, placa: string): Promise<{ mensaje: string }> {
     const placaNormalizada = this.normalizarPlaca(placa);
 
@@ -461,7 +437,6 @@ export class VehiculosService {
       throw new BadRequestException('Esta invitación ya fue respondida');
     }
 
-    // Verificar el límite de 2 aceptados (por si aceptó otros mientras tanto)
     const aceptados = await this.compartirRepository.count({
       where: { documento: documentoReceptor, estado: EstadoCompartido.ACEPTADO },
     });
@@ -510,7 +485,6 @@ export class VehiculosService {
       .getRepository('usuario')
       .findOne({ where: { documento: documentoReceptor } }) as any;
 
-    // Eliminamos la fila para que el propietario pueda volver a compartirlo
     await this.compartirRepository.remove(compartido);
 
     await this.notificacionesService.notificarUsuario({
@@ -525,16 +499,6 @@ export class VehiculosService {
     return { mensaje: 'Invitación rechazada' };
   }
 
-  /**
-   * El receptor RENUNCIA a un vehículo compartido que previamente aceptó.
-   * Elimina el vínculo y notifica al propietario.
-   *
-   * Reglas:
-   *  - Solo el receptor del compartido puede ejecutar esta acción.
-   *  - Solo se permite si el compartido está ACEPTADO.
-   *  - Si el receptor tiene un movimiento activo con este vehículo, no se permite
-   *    renunciar hasta que registre la salida (regla de seguridad operativa).
-   */
   async eliminarCompartidoComoReceptor(documentoReceptor: string, idCompartir: number): Promise<{ mensaje: string }> {
     const compartido = await this.compartirRepository.findOne({
       where: { idCompartir },
@@ -587,16 +551,20 @@ export class VehiculosService {
       relations: ['registroVehiculo', 'registroVehiculo.vehiculo', 'registroVehiculo.vehiculo.tipoVehiculo', 'registroVehiculo.usuario'],
     });
 
-    return compartidos.map((c) => ({
-      idCompartir: c.idCompartir,
-      placa: c.registroVehiculo.vehiculo.placa,
-      fotoVehiculo: c.registroVehiculo.vehiculo.fotoVehiculo,
-      fotoTarjetaP: c.registroVehiculo.vehiculo.fotoTarjetaP,
-      color: c.registroVehiculo.vehiculo.color,
-      tipoVehiculo: c.registroVehiculo.vehiculo.tipoVehiculo.tipoVehiculo,
-      propietario: c.registroVehiculo.usuario.nombreCompleto,
-      compartidoDesde: c.createdAt,
-    }));
+    return compartidos
+      // Si el vehículo (o su registro) fue eliminado, el compartido ya no es
+      // válido: se omite para no romper el listado del receptor.
+      .filter((c) => c.registroVehiculo?.vehiculo)
+      .map((c) => ({
+        idCompartir: c.idCompartir,
+        placa: c.registroVehiculo.vehiculo.placa,
+        fotoVehiculo: c.registroVehiculo.vehiculo.fotoVehiculo,
+        fotoTarjetaP: c.registroVehiculo.vehiculo.fotoTarjetaP,
+        color: c.registroVehiculo.vehiculo.color,
+        tipoVehiculo: c.registroVehiculo.vehiculo.tipoVehiculo.tipoVehiculo,
+        propietario: c.registroVehiculo.usuario.nombreCompleto,
+        compartidoDesde: c.createdAt,
+      }));
   }
 
   async listarInvitacionesPendientes(documento: string) {
@@ -606,16 +574,18 @@ export class VehiculosService {
       order: { createdAt: 'DESC' },
     });
 
-    return pendientes.map((c) => ({
-      idCompartir: c.idCompartir,
-      placa: c.registroVehiculo.vehiculo.placa,
-      fotoVehiculo: c.registroVehiculo.vehiculo.fotoVehiculo,
-      color: c.registroVehiculo.vehiculo.color,
-      tipoVehiculo: c.registroVehiculo.vehiculo.tipoVehiculo.tipoVehiculo,
-      propietario: c.registroVehiculo.usuario.nombreCompleto,
-      documentoPropietario: c.registroVehiculo.usuario.documento,
-      recibidaEn: c.createdAt,
-    }));
+    return pendientes
+      .filter((c) => c.registroVehiculo?.vehiculo)
+      .map((c) => ({
+        idCompartir: c.idCompartir,
+        placa: c.registroVehiculo.vehiculo.placa,
+        fotoVehiculo: c.registroVehiculo.vehiculo.fotoVehiculo,
+        color: c.registroVehiculo.vehiculo.color,
+        tipoVehiculo: c.registroVehiculo.vehiculo.tipoVehiculo.tipoVehiculo,
+        propietario: c.registroVehiculo.usuario.nombreCompleto,
+        documentoPropietario: c.registroVehiculo.usuario.documento,
+        recibidaEn: c.createdAt,
+      }));
   }
 
   async infoCompartidoMio(documentoPropietario: string, placa: string) {
@@ -723,10 +693,6 @@ export class VehiculosService {
     };
   }
 
-  /**
-   * Admin → crea un vehículo y lo asigna a un usuario existente.
-   * No requiere solicitud previa (es el admin quien aprueba).
-   */
   async crearVehiculoPorAdmin(dto: {
     documentoPropietario: string;
     placa: string;
@@ -799,9 +765,6 @@ export class VehiculosService {
     return { mensaje: 'Vehículo creado y asignado correctamente', placa: placaNormalizada };
   }
 
-  /**
-   * Admin → actualiza CUALQUIER campo del vehículo (sin restricción de 15 días).
-   */
   async actualizarVehiculoPorAdmin(
     placa: string,
     dto: {
@@ -855,20 +818,30 @@ export class VehiculosService {
       });
 
       const compartidos = await this.compartirRepository.find({
-        where: { idRegistroV: r.idRegistroV, estado: EstadoCompartido.ACEPTADO },
+        where: {
+          idRegistroV: r.idRegistroV,
+          estado: In([EstadoCompartido.PENDIENTE, EstadoCompartido.ACEPTADO]),
+        },
       });
       for (const c of compartidos) {
-        await this.notificacionesService.notificarUsuario({
-          idUsuario: c.documento,
-          tipo: 'COMPARTIDO_VEHICULO_ELIMINADO',
-          titulo: 'Vehículo ya no disponible',
-          mensaje: `El vehículo con placa ${placaNormalizada} fue eliminado del sistema. Por eso fue removido de tus vehículos compartidos.`,
-          metadata: { placa: placaNormalizada },
-        });
+        if (c.estado === EstadoCompartido.ACEPTADO) {
+          await this.notificacionesService.notificarUsuario({
+            idUsuario: c.documento,
+            tipo: 'COMPARTIDO_VEHICULO_ELIMINADO',
+            titulo: 'Vehículo ya no disponible',
+            mensaje: `El vehículo con placa ${placaNormalizada} fue eliminado del sistema. Por eso fue removido de tus vehículos compartidos.`,
+            metadata: { placa: placaNormalizada },
+          });
+        }
+      }
+      // Se eliminan los registros de compartido para que no queden "huérfanos"
+      // apuntando a un registro de vehículo ya eliminado (causaba un crash al
+      // listar los compartidos del receptor).
+      if (compartidos.length > 0) {
+        await this.compartirRepository.remove(compartidos);
       }
     }
 
-    // Eliminar registros relacionados (los compartidos caen por CASCADE)
     for (const r of registros) {
       await this.registroRepository.softRemove(r);
     }
@@ -922,13 +895,6 @@ export class VehiculosService {
     });
   }
 
-  /**
-   * Vehículos asociados al usuario:
-   *  - los registrados a su nombre (propios)
-   *  - los que otros le han COMPARTIDO y él ya ACEPTÓ
-   *
-   * Ambos pueden ser usados por el usuario para ingresar al parqueadero.
-   */
   async findByUsuario(documento: string): Promise<Vehiculo[]> {
     const propios = await this.registroRepository.find({
       where: { idUsuario: documento },
@@ -948,7 +914,6 @@ export class VehiculosService {
       .map((c) => c.registroVehiculo?.vehiculo)
       .filter((v): v is Vehiculo => !!v);
 
-    // Combinamos y deduplicamos por placa
     const todos = [...propios.map((r) => r.vehiculo), ...vehiculosCompartidos];
     const seen = new Set<string>();
     const unicos: Vehiculo[] = [];
@@ -1003,13 +968,6 @@ export class VehiculosService {
     };
   }
 
-  /**
-   * Actualiza foto y/o color del vehículo.
-   * Reglas:
-   *  - Solo el propietario puede editar.
-   *  - Solo se pueden modificar la foto del vehículo y el color.
-   *  - Cooldown: deben pasar al menos 15 días desde la última edición.
-   */
   async actualizarVehiculo(
     documento: string,
     placa: string,
@@ -1055,7 +1013,6 @@ export class VehiculosService {
 
     await this.vehiculoRepository.save(vehiculo);
 
-    // Limpieza de foto antigua en Cloudinary
     if (dto.fotoVehiculo && fotoVehiculoVieja && fotoVehiculoVieja !== dto.fotoVehiculo) {
       await this.cloudinaryService.borrarVariasPorUrl([fotoVehiculoVieja]);
     }
@@ -1109,10 +1066,6 @@ export class VehiculosService {
     return await this.tipoVehiculoRepository.find({ order: { tipoVehiculo: 'ASC' } });
   }
 
-  /**
-   * Desvincula usuario y vehículo.
-   * Borra lógicamente el vínculo (Soft Delete) para preservar historial.
-   */
   async eliminarRegistro(documento: string, placa: string) {
     const placaNormalizada = this.normalizarPlaca(placa);
 
@@ -1121,7 +1074,6 @@ export class VehiculosService {
     });
     if (!registro) throw new NotFoundException('El vínculo no existe o ya fue eliminado');
 
-    // Impedir eliminar si el vehículo está dentro
     const estaAdentro = await this.movimientoRepository.findOne({
       where: {
         idRegistroVehiculo: registro.idRegistroV,
@@ -1133,8 +1085,6 @@ export class VehiculosService {
       throw new BadRequestException('No puedes eliminar un vehículo que se encuentra dentro del parqueadero');
     }
 
-    // Si el vehículo estaba compartido (PENDIENTE o ACEPTADO), notificar al receptor
-    // y eliminar el registro de compartido para que NO siga apareciendo en sus compartidos
     const compartidosActivos = await this.compartirRepository.find({
       where: {
         idRegistroV: registro.idRegistroV,
@@ -1148,7 +1098,6 @@ export class VehiculosService {
         .findOne({ where: { documento } }) as any;
 
       for (const c of compartidosActivos) {
-        // Solo notificamos a quien YA tenía el vehículo aceptado (los pendientes nunca lo vieron)
         if (c.estado === EstadoCompartido.ACEPTADO) {
           await this.notificacionesService.notificarUsuario({
             idUsuario: c.documento,

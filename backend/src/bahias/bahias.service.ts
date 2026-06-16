@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Bahia } from './entities/bahia.entity';
+import { TipoBahia } from './entities/tipo-bahia.entity';
 import { ParqueaderoEstado } from './entities/parqueadero-estado.entity';
 import { MovimientoVehiculo, EstadoMovimiento } from '../vehiculos/entities/movimiento-vehiculo.entity';
 import { IOcupacionPayload } from '../common/interfaces/socket-payloads.interface';
@@ -15,45 +16,27 @@ import { RegistroVehiculo } from '../vehiculos/entities/registro-vehiculo.entity
 import { Visita, EstadoVisita } from '../visitas/entities/visita.entity';
 import { BahiaReconciliacionEstadoEnum } from '../common/enums/bahia-reconciliacion-estado.enum';
 
-/**
- * Estado visual calculado para cada bahía sensorizada en el Panel Operativo.
- * Combina el estado físico del sensor con el estado lógico del movimiento activo.
- */
 export enum EstadoPanelEnum {
-  /** Bahía vacía y sensor operativo. */
   LIBRE = 'LIBRE',
-  /** Vehículo físicamente presente y movimiento ADENTRO registrado. */
   OCUPADO = 'OCUPADO',
-  /** Vehículo retirado físicamente; operario aún no confirmó salida en portería. */
   SALIDA_PENDIENTE = 'SALIDA_PENDIENTE',
-  /** Inconsistencia entre sensor e historial lógico. */
   DISCREPANCIA = 'DISCREPANCIA',
-  /** Sensor sin reporte (heartbeat fallido). */
   OFFLINE = 'OFFLINE',
-  /** Bahía deshabilitada manualmente por administración. */
   DESHABILITADO = 'DESHABILITADO',
 }
 
-/** Shape tipado de cada bahía devuelta por `obtenerBahiasSensorizadas`. */
 export interface BahiaSensorizadaDto {
   idBahia: number;
   nombreBahia: string;
   tipoBahia: string;
   estadoReconciliado: BahiaReconciliacionEstadoEnum;
   estadoSensor: IotStatusEnum;
-  /** Estado calculado listo para renderizar en el panel sin lógica adicional. */
   estadoPanel: EstadoPanelEnum;
-  /** Placa del vehículo asociado al movimiento activo (null si la bahía está libre). */
   placa: string | null;
-  /** Estado del movimiento vigente (null si no hay movimiento activo). */
   estadoMovimiento: EstadoMovimiento | null;
   ultimaTelemetriaAt: Date | null;
 }
 
-/**
- * Servicio encargado de la gestión de la infraestructura física (Bahías).
- * Proporciona información de disponibilidad y ocupación en tiempo real.
- */
 @Injectable()
 export class BahiasService implements OnModuleInit {
   private readonly logger = new Logger(BahiasService.name);
@@ -91,15 +74,8 @@ export class BahiasService implements OnModuleInit {
     }
   }
 
-  /**
-   * Mantenimiento en el arranque: cierra movimientos ADENTRO huérfanos de sesiones
-   * anteriores. Las bahías sensorizadas (B-001..B-003) las siembra InfraestructuraSeedService.
-   */
   async onModuleInit() {
     try {
-      // Cerrar movimientos ADENTRO sin bahía asignada que lleven más de 8 horas activos.
-      // Estos son registros huérfanos de sesiones anteriores (reinicio del servidor,
-      // salida sin escaneo de QR). Evita que bloqueen re-ingresos en la sesión actual.
       await this.cerrarMovimientosHuerfanos();
     } catch (error) {
       const stack = error instanceof Error ? error.stack : undefined;
@@ -127,30 +103,12 @@ export class BahiasService implements OnModuleInit {
     }
   }
 
-  /**
-   * Retorna todas las bahías registradas con sus metadatos.
-   */
   async findAll(): Promise<Bahia[]> {
     return await this.bahiaRepository.find({
       relations: ['tipoBahia'],
     });
   }
 
-  /**
-   * Devuelve únicamente las bahías que tienen un sensor **activo** asociado,
-   * enriquecidas con el estado del movimiento vigente.
-   *
-   * Es la fuente de verdad que debe usar el Panel Operativo para renderizar el
-   * mapa físico del parqueadero, ya que filtra las bahías manuales o sin hardware.
-   *
-   * ### Cálculo del `estadoPanel`
-   * | `estadoReconciliado` | Movimiento activo | `estadoPanel` |
-   * |---|---|---|
-   * | `OCUPADO` | `ADENTRO` | `'OCUPADO'` |
-   * | `LIBRE` | `TRANSITO` (con bahía) | `'SALIDA_PENDIENTE'` |
-   * | `LIBRE` | ninguno | `'LIBRE'` |
-   * | `OFFLINE` / `DISCREPANCIA` / `DESHABILITADO` | cualquiera | refleja el estado |
-   */
   async obtenerBahiasSensorizadas(): Promise<BahiaSensorizadaDto[]> {
     const sensores = await this.bahiaRepository.manager.find(Sensor, {
       where: { activo: true },
@@ -168,7 +126,9 @@ export class BahiasService implements OnModuleInit {
 
     return bahias.map((b) => {
       const sensor = sensores.find((s) => s.idBahia === b.idBahia)!;
-      const estadoPanel = this.derivarEstadoPanel(b.estadoReconciliado);
+      const estadoPanel = b.estadoManual === IotStatusEnum.DISABLED
+        ? EstadoPanelEnum.DESHABILITADO
+        : this.derivarEstadoPanel(b.estadoReconciliado);
 
       return {
         idBahia: b.idBahia,
@@ -184,7 +144,6 @@ export class BahiasService implements OnModuleInit {
     });
   }
 
-  /** Mapea estado físico al valor visual que consume el frontend. */
   private derivarEstadoPanel(
     estadoReconciliado: BahiaReconciliacionEstadoEnum,
   ): EstadoPanelEnum {
@@ -203,9 +162,6 @@ export class BahiasService implements OnModuleInit {
     }
   }
 
-  /**
-   * Busca una bahía específica por su ID.
-   */
   async findOne(id: number): Promise<Bahia> {
     const bahia = await this.bahiaRepository.findOne({
       where: { idBahia: id },
@@ -215,25 +171,100 @@ export class BahiasService implements OnModuleInit {
     return bahia;
   }
 
-  /**
-   * Calcula el estado de ocupación global del parqueadero.
-   *
-   * Reglas:
-   *  - `total`     = bahías físicas (con sensor activo). Cupo máximo real.
-   *  - `ocupados`  = cantidad de QRs escaneados ACTIVOS (movimientos
-   *                  con estado ADENTRO o TRANSITO).
-   *                  Al escanear QR de entrada se crea un movimiento → sube.
-   *                  Al escanear QR de salida se cierra el movimiento → baja.
-   *  - `disponibles` = total - ocupados (mínimo 0).
-   *  - `LLENO`     = ocupados >= total.
-   *
-   * Nota: los sensores físicos NO afectan el contador de ocupados;
-   *       solo se usan para el mapa visual y para definir el total real.
-   */
+  async obtenerTiposBahia(): Promise<TipoBahia[]> {
+    return await this.bahiaRepository.manager.find(TipoBahia, { order: { idTipoB: 'ASC' } });
+  }
+
+  async crearBahia(
+    dto: { nombreBahia: string; idTipoBahia: number },
+    actor: { idUsuario: string; ip?: string; userAgent?: string },
+  ): Promise<Bahia> {
+    const nombre = String(dto.nombreBahia ?? '').trim();
+    if (!nombre) {
+      throw new BadRequestException({
+        message: 'El nombre de la bahía es obligatorio.',
+        errorCode: 'NOMBRE_OBLIGATORIO',
+      });
+    }
+
+    const tipo = await this.bahiaRepository.manager.findOne(TipoBahia, {
+      where: { idTipoB: dto.idTipoBahia },
+    });
+    if (!tipo) {
+      throw new BadRequestException({
+        message: 'El tipo de bahía indicado no existe.',
+        errorCode: 'TIPO_INVALIDO',
+      });
+    }
+
+    const existente = await this.bahiaRepository.findOne({
+      where: { nombreBahia: nombre },
+      withDeleted: true,
+    });
+    if (existente) {
+      throw new BadRequestException({
+        message: `Ya existe una bahía con el nombre "${nombre}".`,
+        errorCode: 'BAHIA_DUPLICADA',
+      });
+    }
+
+    const creada = await this.bahiaRepository.save(
+      this.bahiaRepository.create({
+        nombreBahia: nombre,
+        idTipoBahia: tipo.idTipoB,
+        estadoReconciliado: BahiaReconciliacionEstadoEnum.LIBRE,
+      }),
+    );
+
+    await this.auditoriaService.create({
+      accion: 'CREAR_BAHIA',
+      entidad: 'BAHIA',
+      idEntidad: creada.idBahia,
+      datosNuevos: { nombreBahia: creada.nombreBahia, idTipoBahia: creada.idTipoBahia },
+      idUsuario: actor.idUsuario,
+      ip: actor.ip,
+      userAgent: actor.userAgent,
+    });
+
+    return this.findOne(creada.idBahia);
+  }
+
+  async eliminarBahia(
+    id: number,
+    actor: { idUsuario: string; ip?: string; userAgent?: string },
+  ): Promise<{ ok: true; idBahia: number }> {
+    const bahia = await this.bahiaRepository.findOne({ where: { idBahia: id } });
+    if (!bahia) throw new NotFoundException(`Bahía con ID ${id} no encontrada`);
+
+    await this.bahiaRepository.manager.update(Sensor, { idBahia: id }, { activo: false });
+
+    await this.bahiaRepository.softDelete(id);
+
+    await this.auditoriaService.create({
+      accion: 'ELIMINAR_BAHIA',
+      entidad: 'BAHIA',
+      idEntidad: id,
+      datosAnteriores: { nombreBahia: bahia.nombreBahia, idTipoBahia: bahia.idTipoBahia },
+      idUsuario: actor.idUsuario,
+      ip: actor.ip,
+      userAgent: actor.userAgent,
+    });
+
+    const conteo = await this.obtenerConteoGlobal();
+    this.eventosGateway.emitirConteoGlobalDisponibles({
+      total: conteo.total,
+      ocupados: conteo.ocupados,
+      disponibles: conteo.disponibles,
+      estadoParqueadero: conteo.estadoParqueadero,
+      actualizadoEn: new Date(),
+    });
+
+    return { ok: true, idBahia: id };
+  }
+
   async obtenerOcupacion(): Promise<IOcupacionPayload> {
     const parqueadero = await this.getOrCreateParqueaderoEstado();
 
-    // Total = solo bahías con sensor activo (cupo físico real).
     const sensoresActivos = await this.bahiaRepository.manager.find(Sensor, {
       where: { activo: true },
     });
@@ -246,21 +277,20 @@ export class BahiasService implements OnModuleInit {
         })
       : [];
 
-    // Movimientos activos = QRs escaneados que aún no han salido.
     const movimientosActivos = await this.movimientoRepository.find({
       where: { estado: In([EstadoMovimiento.TRANSITO, EstadoMovimiento.ADENTRO]) },
       relations: ['registroVehiculo', 'registroVehiculo.vehiculo'],
     });
 
-    // Visitantes con vehículo actualmente dentro: ocupan una bahía real, por lo
-    // que cuentan en la ocupación igual que un movimiento normal.
     const visitasActivas = await this.visitaRepository.count({
       where: { estado: EstadoVisita.ADENTRO },
     });
 
     const parqueaderoDeshabilitado = Boolean(parqueadero.deshabilitado);
 
-    const total = bahias.length;
+    const bahiasEnServicio = bahias.filter((b) => b.estadoManual !== IotStatusEnum.DISABLED);
+
+    const total = bahiasEnServicio.length;
     const ocupados = movimientosActivos.length + visitasActivas;
     const disponibles = Math.max(total - ocupados, 0);
 
@@ -297,8 +327,6 @@ export class BahiasService implements OnModuleInit {
   }
 
   async obtenerConteoGlobal() {
-    // Reutilizamos obtenerOcupacion() para mantener una única fuente de verdad:
-    // ocupados = bahías físicamente ocupadas (sensores), no QRs escaneados.
     const ocupacion = await this.obtenerOcupacion();
     return {
       total: ocupacion.total,
@@ -310,8 +338,6 @@ export class BahiasService implements OnModuleInit {
   }
 
   private async getOrCreateParqueaderoEstado(): Promise<ParqueaderoEstado> {
-    // El estado global vive en una fila fija (id=1); si ya existe se retorna sin
-    // modificar para evitar resets accidentales.
     const existing = await this.parqueaderoEstadoRepository.findOne({ where: { id: 1 } });
     if (existing) return existing;
 
@@ -326,16 +352,6 @@ export class BahiasService implements OnModuleInit {
     return await this.parqueaderoEstadoRepository.save(created);
   }
 
-  /**
-   * RF14: Actualiza el estado global del parqueadero (habilitado/deshabilitado) con motivo y duración.
-   *
-   * Reglas RF14:
-   * - Si se deshabilita, el `motivo` es obligatorio.
-   * - La `duracionEstimada` es opcional, pero si viene se persiste y se comunica.
-   *
-   * Reglas RF25:
-   * - Si se deshabilita, se registra una notificación visible para aprendices incluyendo el nombre del admin.
-   */
   async actualizarEstadoParqueadero(
     dto: { deshabilitado: boolean; motivo?: string; duracionEstimada?: string },
     actor: { idUsuario: string; nombre: string | null; ip?: string; userAgent?: string },
@@ -359,7 +375,6 @@ export class BahiasService implements OnModuleInit {
       parqueadero.deshabilitado = true;
       parqueadero.motivo = motivo;
       parqueadero.duracionEstimada = dto.duracionEstimada ? String(dto.duracionEstimada).trim() : null;
-      // Fija el inicio del deshabilitado solo en la transición false→true.
       parqueadero.deshabilitadoDesde = anterior ? parqueadero.deshabilitadoDesde : new Date();
       parqueadero.ultimoUmbralNotificado = 0;
     } else {
@@ -407,6 +422,11 @@ export class BahiasService implements OnModuleInit {
         mensaje: `Parqueadero deshabilitado. Motivo: ${guardado.motivo}.${duracionTexto}`,
         fecha: new Date(),
       });
+      this.eventosGateway.emitirAlertaAprendices({
+        tipo: 'PARQUEADERO_DESHABILITADO',
+        mensaje: `Parqueadero deshabilitado. Motivo: ${guardado.motivo}.${duracionTexto}`,
+        fecha: new Date(),
+      });
 
       await this.notificacionesService.registrarParqueaderoDeshabilitadoBroadcast({
         motivo: guardado.motivo ?? 'Sin motivo',
@@ -427,15 +447,6 @@ export class BahiasService implements OnModuleInit {
     return guardado;
   }
 
-  /**
-   * Valida si se permite un ingreso.
-   * - Si está DESHABILITADO: se rechaza siempre.
-   * - Si la cantidad de QRs escaneados activos (movimientos ADENTRO/TRANSITO)
-   *   iguala o supera el total de bahías: se rechaza con alerta de "lleno".
-   *
-   * Esto controla la ocupación por CONTEO DE QR, no por sensores físicos:
-   * cada ingreso suma 1, cada salida resta 1. Cuando llega al 100%, no entra nadie.
-   */
   async validarIngresoPermitido() {
     const estado = await this.getOrCreateParqueaderoEstado();
 
@@ -447,12 +458,9 @@ export class BahiasService implements OnModuleInit {
       });
     }
 
-    // Conteo basado en QRs escaneados activos (movimientos ADENTRO/TRANSITO).
-    // Cada QR de entrada suma 1 al contador, cada QR de salida resta 1.
     const conteo = await this.obtenerConteoGlobal();
 
     if (conteo.total > 0 && conteo.ocupados >= conteo.total) {
-      // Disparar alerta de ocupación máxima inmediatamente (antes de rechazar)
       try {
         await this.evaluarAlertasOcupacion();
       } catch (_) { /* no bloquear por fallo en notificación */ }
@@ -464,10 +472,6 @@ export class BahiasService implements OnModuleInit {
     }
   }
 
-  /**
-   * RF13/RF39: Evalúa umbrales 80% y 100% y emite alertas websocket evitando spam.
-   * - Se recomienda invocar después de cada ingreso/salida (sincronización de ocupación).
-   */
   async evaluarAlertasOcupacion() {
     const estado = await this.getOrCreateParqueaderoEstado();
     if (estado.deshabilitado) {
@@ -487,8 +491,6 @@ export class BahiasService implements OnModuleInit {
       return;
     }
 
-    // Memoria del último umbral notificado: evita re-emitir el mismo umbral (anti-spam),
-    // persistida en BD para sobrevivir reinicios.
     if (estado.ultimoUmbralNotificado >= nuevoUmbral) return;
 
     estado.ultimoUmbralNotificado = nuevoUmbral;
@@ -516,6 +518,11 @@ export class BahiasService implements OnModuleInit {
       mensaje: `Alerta: capacidad máxima alcanzada (${ocupados}/${total}). El parqueadero está lleno.`,
       fecha: new Date(),
     });
+    this.eventosGateway.emitirAlertaAprendices({
+      tipo: 'PARQUEADERO_LLENO',
+      mensaje: `El parqueadero está lleno (${ocupados}/${total}). No hay espacios disponibles en este momento.`,
+      fecha: new Date(),
+    });
     try {
       await this.notificacionesService.notificarAdmins({
         tipo: 'PARQUEADERO_LLENO',
@@ -523,6 +530,9 @@ export class BahiasService implements OnModuleInit {
         mensaje: `Capacidad máxima alcanzada (${ocupados}/${total} bahías ocupadas). Ya no se permiten más ingresos hasta que ocurra una salida.`,
         metadata: { ocupados, total, porcentaje: 100 },
       });
+    } catch (_) { /* no bloquear flujo */ }
+    try {
+      await this.notificacionesService.registrarParqueaderoLlenoBroadcast({ ocupados, total });
     } catch (_) { /* no bloquear flujo */ }
   }
 
@@ -673,37 +683,6 @@ export class BahiasService implements OnModuleInit {
     });
   }
 
-  /**
-   * Punto de entrada de toda señal IoT proveniente del `SerialBridgeService`.
-   *
-   * ## Máquina de estados (flujo IoT completo)
-   *
-   * ### Ingreso
-   * ```
-   * QR scan → MovimientoVehiculo(TRANSITO, idBahia=null)
-   *   ↓  sensor dispara OCCUPIED
-   * procesarTelemetriaSensor(LIBRE → ocupado)
-   *   → vincula movimiento flotante más antiguo a esta bahía
-   *   → Movimiento: TRANSITO → ADENTRO
-   *   → Bahía:      LIBRE    → OCUPADO
-   * ```
-   *
-   * ### Salida
-   * ```
-   * Vehículo se retira físicamente
-   *   ↓  sensor dispara AVAILABLE
-   * procesarTelemetriaSensor(OCUPADO → libre)
-   *   → Movimiento: ADENTRO → TRANSITO  (idBahia conservado — señal para operario)
-   *   → Bahía:      OCUPADO → LIBRE     (el espacio queda físicamente disponible)
-   *   ↓  operario escanea en portería → registrarSalida()
-   *   → Movimiento: TRANSITO → SALIDA
-   * ```
-   *
-   * @param sensorId      Código del sensor (p.ej. `SN-001`).
-   * @param fisicoOcupado `true` cuando la distancia cae en `[3, 12)` cm (OCCUPIED),
-   *                      `false` cuando supera los 12 cm (AVAILABLE).
-   *                      Los rangos exactos los calcula {@link SerialBridgeService.handleLine}.
-   */
   async procesarTelemetriaSensor(sensorId: string, fisicoOcupado: boolean) {
     const codigo = String(sensorId ?? '').trim();
     if (!codigo) {
@@ -715,18 +694,6 @@ export class BahiasService implements OnModuleInit {
 
     this.logger.verbose(`[IoT] → procesarTelemetriaSensor  sensor=${codigo}  fisicoOcupado=${fisicoOcupado}`);
 
-    /**
-     * Cierre reutilizable que encapsula un ciclo completo de la máquina de estados:
-     * - Lectura con lock pesimista de sensor + bahía.
-     * - Transición de estado vía `manejarSensorOcupado` / `manejarSensorLibre`.
-     * - Persistencia y emisión WebSocket.
-     *
-     * Se llama dos veces cuando se detecta un posible race condition entre el
-     * escaneo de QR en portería (HTTP) y la señal OCCUPIED del sensor (serial):
-     *   1.er ciclo → DISCREPANCIA (TRANSITO aún no committed)
-     *   350 ms de espera FUERA de la transacción (sin locks activos)
-     *   2.º ciclo → OCUPADO (TRANSITO ya disponible en BD) o DISCREPANCIA definitiva
-     */
     const ejecutarCiclo = () =>
       this.bahiaRepository.manager.transaction(async (manager) => {
         const sensor = await manager.findOne(Sensor, {
@@ -778,11 +745,6 @@ export class BahiasService implements OnModuleInit {
 
     const resultado = await ejecutarCiclo();
 
-    // Emitir conteo global sensorizado tras cada evento de sensor para que los KPIs
-    // del panel se actualicen sin esperar a una operación de portería.
-    // El gateway deduplica `bahia_modificada` por estado; aquí siempre emitimos el
-    // conteo porque un cambio de estado de bahía puede no coincidir con operaciones
-    // de portería y el frontend necesita los KPIs actualizados.
     try {
       const conteo = await this.obtenerConteoGlobal();
       this.eventosGateway.emitirConteoGlobalDisponibles({
@@ -799,17 +761,6 @@ export class BahiasService implements OnModuleInit {
     return resultado;
   }
 
-  /**
-   * Sensor reporta presencia física (OCCUPIED).
-   *
-   * El sensor es la fuente de verdad exclusiva del estado físico de la bahía.
-   * No existe vinculación con movimientos: QR de portería y sensor son independientes.
-   *
-   * Transiciones:
-   * - `OCUPADO`      → idempotente, sin cambio.
-   * - `DESHABILITADO`→ el admin tiene prioridad, sin cambio.
-   * - cualquier otro → `OCUPADO`.
-   */
   private async manejarSensorOcupado(
     _manager: EntityManager,
     bahia: Bahia,
@@ -834,17 +785,6 @@ export class BahiasService implements OnModuleInit {
     this.logger.log(`${TAG} → OCUPADO`);
   }
 
-  /**
-   * Sensor reporta bahía vacía (AVAILABLE).
-   *
-   * El sensor es la fuente de verdad exclusiva del estado físico de la bahía.
-   * No existe vinculación con movimientos: QR de portería y sensor son independientes.
-   *
-   * Transiciones:
-   * - `LIBRE`        → idempotente, sin cambio.
-   * - `DESHABILITADO`→ el admin tiene prioridad, sin cambio.
-   * - cualquier otro → `LIBRE`.
-   */
   private async manejarSensorLibre(
     _manager: EntityManager,
     bahia: Bahia,
@@ -869,16 +809,6 @@ export class BahiasService implements OnModuleInit {
     this.logger.log(`${TAG} → LIBRE`);
   }
 
-  /**
-   * Calcula las métricas de ocupación basadas **únicamente** en las bahías que
-   * tienen un sensor activo registrado en la tabla `sensor`.
-   *
-   * Fórmulas:
-   * - `totalBahias`          = COUNT bahías con sensor activo.
-   * - `bahiasOcupadas`       = bahías en estado `OCUPADO` o `DISCREPANCIA`.
-   * - `bahiasDisponibles`    = bahías en estado `LIBRE` o `TRANSITO`.
-   * - `porcentajeOcupacion`  = (ocupadas / total) × 100, redondeado a 1 decimal.
-   */
   async obtenerMetricasSensorizadas(): Promise<{
     totalBahias: number;
     bahiasOcupadas: number;
@@ -895,9 +825,11 @@ export class BahiasService implements OnModuleInit {
       return { totalBahias: 0, bahiasOcupadas: 0, bahiasDisponibles: 0, porcentajeOcupacion: 0 };
     }
 
-    const bahias = await this.bahiaRepository.find({
+    const bahiasTodas = await this.bahiaRepository.find({
       where: { idBahia: In(idsBahias) },
     });
+
+    const bahias = bahiasTodas.filter((b) => b.estadoManual !== IotStatusEnum.DISABLED);
 
     const totalBahias = bahias.length;
 

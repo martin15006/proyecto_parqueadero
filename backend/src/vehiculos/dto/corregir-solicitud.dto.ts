@@ -1,9 +1,5 @@
 import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
-/**
- * Datos para que un usuario corrija una solicitud rechazada.
- * Todos los campos son opcionales: solo se actualizan los que el admin marcó como incorrectos.
- */
 export class CorregirSolicitudDto {
   @IsOptional()
   @IsString()

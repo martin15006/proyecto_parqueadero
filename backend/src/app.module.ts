@@ -18,8 +18,6 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 import { AuditoriaModule } from './auditoria/auditoria.module';
 
-// Entidad referenciada explícitamente en la config de TypeORM
-// (las demás entidades se cargan por glob '**/*.entity').
 import { ParqueaderoEstado } from './bahias/entities/parqueadero-estado.entity';
 
 import { GatewayModule } from './gateway/gateway.module';
@@ -100,16 +98,6 @@ function validateEnv(config: Record<string, unknown>) {
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const dbHost = String(configService.get<string>('DB_HOST') ?? '').trim();
-        const dbName = String(configService.get<string>('DB_NAME') ?? '').trim();
-
-        const isLocalDb =
-          dbName === 'parqueadero' &&
-          (dbHost === 'localhost' || dbHost === '127.0.0.1');
-
-        const syncEnv = configService.get<string>('TYPEORM_SYNCHRONIZE');
-        const synchronize = typeof syncEnv === 'string' ? syncEnv === 'true' : isLocalDb;
-
         return {
           type: 'postgres',
           url: configService.get<string>('DATABASE_URL'),
@@ -128,7 +116,7 @@ function validateEnv(config: Record<string, unknown>) {
             __dirname + '/migrations/*{.ts,.js}',
           ],
 
-          synchronize,
+          synchronize: false,
           migrationsRun: false,
           namingStrategy: new SnakeNamingStrategy(),
         };

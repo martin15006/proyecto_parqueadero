@@ -1,12 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-/**
- * Historial consultable de notificaciones/alertas del Aprendiz.
- *
- * Privacidad (RNF2): no se almacenan contraseñas, tokens JWT ni contenido de QR.
- * La referencia al destinatario es por documento (idUsuario) porque el sistema
- * ya usa el documento como identificador.
- */
 @Entity({ name: 'notificacion_usuario' })
 export class NotificacionUsuario {
   @PrimaryGeneratedColumn()

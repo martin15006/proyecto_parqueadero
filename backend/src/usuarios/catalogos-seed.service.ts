@@ -5,18 +5,6 @@ import { TipoUsuario } from './entities/tipo-usuario.entity';
 import { TipoVehiculo } from '../vehiculos/entities/tipo-vehiculo.entity';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 
-/**
- * Sembrador de catálogos base que dependen del módulo de usuarios:
- *  - tipo_usuario (con IDs fijos del enum TipoUsuarioEnum)
- *  - tipo_vehiculo (sin IDs específicos)
- *
- * NOTA: tipo_bahia lo siembra InfraestructuraSeedService en el módulo de
- * bahías, no se duplica aquí.
- *
- * Idempotente: solo inserta si la fila no existe.
- * Usa el patrón ensureSeeded() para garantizar que se ejecuta una sola vez
- * y permitir que AdminSeedService espere a que termine.
- */
 @Injectable()
 export class CatalogosSeedService {
   private readonly logger = new Logger(CatalogosSeedService.name);
@@ -30,10 +18,6 @@ export class CatalogosSeedService {
     private readonly tipoVehiculoRepo: Repository<TipoVehiculo>,
   ) {}
 
-  /**
-   * Garantiza que el seeding se ejecute una sola vez aunque varios servicios
-   * lo invoquen. Devuelve la misma promesa en llamadas concurrentes.
-   */
   async ensureSeeded(): Promise<void> {
     if (!this.seedPromise) {
       this.seedPromise = this.runSeed();
@@ -46,10 +30,6 @@ export class CatalogosSeedService {
     await this.seedTipoVehiculo();
   }
 
-  /**
-   * tipo_usuario: IDs fijos que deben coincidir con TipoUsuarioEnum.
-   * Se usa OVERRIDING SYSTEM VALUE porque la columna es GENERATED ALWAYS AS IDENTITY.
-   */
   private async seedTipoUsuario() {
     const tipos = [
       { id: TipoUsuarioEnum.APRENDIZ,      nombre: 'APRENDIZ'      },
@@ -72,7 +52,6 @@ export class CatalogosSeedService {
       this.logger.log(`Tipo de usuario creado: ${t.nombre} (id=${t.id})`);
     }
 
-    // Sincronizar la secuencia para que próximos INSERT no colisionen
     await this.dataSource.query(
       `SELECT setval(pg_get_serial_sequence('tipo_usuario', 'id_tipo_usr'),
                      (SELECT COALESCE(MAX(id_tipo_usr), 1) FROM tipo_usuario))`,

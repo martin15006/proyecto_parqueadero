@@ -527,7 +527,7 @@ export const VehiculosPage: React.FC = () => {
               placeholder="Subir tarjeta"
             />
             <ImageUpload
-              label="Foto de la placa (opcional)"
+              label="Foto de la placa"
               value={form.fotoPlaca}
               onChange={(url) => setForm((p) => ({ ...p, fotoPlaca: url }))}
               placeholder="Subir foto placa"

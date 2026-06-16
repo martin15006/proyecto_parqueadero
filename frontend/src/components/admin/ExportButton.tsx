@@ -16,9 +16,6 @@ export const ExportButton: React.FC<ExportButtonProps> = ({ label, url, color, f
   const handleExport = async () => {
     if (loading) return;
 
-    // El token de sesión se guarda como `accessToken` (camelCase). Contemplamos
-    // todas las variantes usadas en el frontend para no enviar "Bearer undefined"
-    // (lo que provocaba un 401 cuyo cuerpo JSON se guardaba como .xlsx/.pdf corrupto).
     let token: string | undefined;
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -38,8 +35,6 @@ export const ExportButton: React.FC<ExportButtonProps> = ({ label, url, color, f
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      // CRÍTICO: si el backend respondió con error, el cuerpo es JSON (no un binario).
-      // Guardarlo como archivo producía el .xlsx/.pdf "corrupto". Abortamos con aviso.
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }

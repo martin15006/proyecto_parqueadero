@@ -10,17 +10,6 @@ export interface ResumenPurga {
   errores: number;
 }
 
-/**
- * Retención de datos: los registros en soft-delete (usuarios, vehículos y
- * fichas) se eliminan **definitivamente** a los 90 días, junto con TODO su
- * historial dependiente (borrado en cascada total).
- *
- * Los borrados son físicos y se hacen en orden seguro respecto a las claves
- * foráneas RESTRICT (`registro_vehiculo→usuario/vehiculo`, `movimiento→registro`,
- * `compartir→registro/usuario`, `codigo_otp→usuario`, `solicitud→usuario`,
- * `usuario→formacion`). Cada registro se purga en su propia transacción con
- * try/catch para que un fallo aislado no detenga el resto del barrido.
- */
 @Injectable()
 export class RetencionService {
   private readonly logger = new Logger(RetencionService.name);
@@ -31,16 +20,11 @@ export class RetencionService {
     private readonly auditoriaService: AuditoriaService,
   ) {}
 
-  /** Barrido diario a las 3:00 a. m. */
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async ejecutarPurgaProgramada() {
     await this.purgar();
   }
 
-  /**
-   * Ejecuta la purga de todo lo que lleve más de `dias` en soft-delete.
-   * @param dias Umbral en días (por defecto 90). `0` purga todo lo soft-deleted ahora.
-   */
   async purgar(dias = RetencionService.DIAS_RETENCION): Promise<ResumenPurga> {
     const cutoff = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
     const resumen: ResumenPurga = { usuarios: 0, vehiculos: 0, fichas: 0, errores: 0 };
@@ -101,32 +85,25 @@ export class RetencionService {
     return resumen;
   }
 
-  /** Usuario + su historial dependiente, en orden seguro de FK. */
   private purgarUsuario(documento: string) {
     return this.dataSource.transaction(async (m) => {
-      // Compartidos donde el usuario es receptor.
       await m.query(`DELETE FROM compartir WHERE documento = $1`, [documento]);
-      // Movimientos de los registros del usuario (FK RESTRICT a registro).
       await m.query(
         `DELETE FROM movimiento_vehiculo WHERE id_registro_vehiculo IN (SELECT id_registro_v FROM registro_vehiculo WHERE id_usuario = $1)`,
         [documento],
       );
-      // Compartidos sobre los registros del usuario.
       await m.query(
         `DELETE FROM compartir WHERE id_registro_v IN (SELECT id_registro_v FROM registro_vehiculo WHERE id_usuario = $1)`,
         [documento],
       );
-      // Registros, OTP, notificaciones y solicitudes del usuario.
       await m.query(`DELETE FROM registro_vehiculo WHERE id_usuario = $1`, [documento]);
       await m.query(`DELETE FROM codigo_otp WHERE documento = $1`, [documento]);
       await m.query(`DELETE FROM notificacion_usuario WHERE id_usuario = $1`, [documento]);
       await m.query(`DELETE FROM solicitud_vehiculo WHERE documento = $1`, [documento]);
-      // Finalmente el usuario (sus movimientos como documento_ingreso quedan en NULL por FK SET NULL).
       await m.query(`DELETE FROM usuario WHERE documento = $1`, [documento]);
     });
   }
 
-  /** Vehículo + su historial dependiente. */
   private purgarVehiculo(placa: string) {
     return this.dataSource.transaction(async (m) => {
       await m.query(
@@ -142,7 +119,6 @@ export class RetencionService {
     });
   }
 
-  /** Ficha: se desvincula de los usuarios (FK anulable) y se borra. */
   private purgarFicha(ficha: string) {
     return this.dataSource.transaction(async (m) => {
       await m.query(`UPDATE usuario SET id_formacion = NULL WHERE id_formacion = $1`, [ficha]);

@@ -5,6 +5,8 @@ import { socketService } from '../../services/socket.service';
 import { Input } from '../../components/ui/Input';
 import { Table } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
+import { FiltroFechaHistorial } from '../../components/common/FiltroFechaHistorial';
+import type { RangoFecha } from '../../components/common/FiltroFechaHistorial';
 
 interface HistorialRow {
   idMovimiento: number | string;
@@ -41,11 +43,12 @@ export const HistorialPage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState('');
   const [expandido, setExpandido] = useState(false);
+  const [rango, setRango] = useState<RangoFecha>({});
 
-  const cargar = useCallback(async (targetPage: number) => {
+  const cargar = useCallback(async (targetPage: number, r: RangoFecha) => {
     try {
       setLoading(true);
-      const res = await dashboardService.getHistorial(targetPage, PAGE_SIZE);
+      const res = await dashboardService.getHistorial(targetPage, PAGE_SIZE, r.desde, r.hasta);
       setRows(Array.isArray(res.data) ? (res.data as HistorialRow[]) : []);
       setLastPage(Number(res.lastPage) || 1);
       setTotal(Number(res.total) || 0);
@@ -57,19 +60,22 @@ export const HistorialPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    cargar(page);
+    cargar(page, rango);
 
-    // Tiempo real: cada ingreso/salida de vehículo refresca el historial.
     socketService.connect();
-    const handler = () => cargar(page);
-    // Las visitas también emiten estos eventos, así que cubren ambos casos.
+    const handler = () => cargar(page, rango);
     socketService.on('vehiculo_ingresado', handler);
     socketService.on('vehiculo_retirado', handler);
     return () => {
       socketService.off('vehiculo_ingresado', handler);
       socketService.off('vehiculo_retirado', handler);
     };
-  }, [page, cargar]);
+  }, [page, rango, cargar]);
+
+  const handleRango = (r: RangoFecha) => {
+    setPage(1);
+    setRango(r);
+  };
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -168,13 +174,14 @@ export const HistorialPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <div className="bg-white dark:bg-[#121212] p-4 rounded-xl shadow-sm border border-slate-200 dark:border-white/5">
+      <div className="bg-white dark:bg-[#121212] p-4 rounded-xl shadow-sm border border-slate-200 dark:border-white/5 space-y-3">
         <Input
           icon={<Search size={20} />}
           placeholder="Buscar por placa, quién ingresó o quién autorizó..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        <FiltroFechaHistorial onChange={handleRango} />
       </div>
 
       <Table

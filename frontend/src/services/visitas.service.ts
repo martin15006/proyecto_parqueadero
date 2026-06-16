@@ -28,7 +28,6 @@ export interface RegistrarVisitaPayload {
   duracionMinutos?: number;
 }
 
-/** El ResponseInterceptor del backend envuelve la carga útil en `data`. */
 const unwrap = <T>(response: { data: { data?: T } & T }): T =>
   (response.data?.data ?? response.data) as T;
 

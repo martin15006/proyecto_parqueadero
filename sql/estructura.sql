@@ -72,7 +72,7 @@ CREATE TABLE bahia (
     estado_manual        VARCHAR(12),
     estado_reconciliado  VARCHAR(16) NOT NULL DEFAULT 'LIBRE'
         CONSTRAINT ck_bahia_estado_reconciliado
-        CHECK (estado_reconciliado IN ('LIBRE', 'TRANSITO', 'OCUPADO', 'DISCREPANCIA', 'OFFLINE', 'DESHABILITADO')),
+        CHECK (estado_reconciliado IN ('LIBRE', 'OCUPADO', 'DISCREPANCIA', 'OFFLINE', 'DESHABILITADO')),
     transito_desde       TIMESTAMPTZ,
     discrepancia_desde   TIMESTAMPTZ,
     ultima_telemetria_at TIMESTAMPTZ,
@@ -350,6 +350,33 @@ CREATE TABLE contingencia (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at      TIMESTAMPTZ
 );
+
+
+-- VISITAS
+CREATE TABLE visita (
+    id_visita            INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre_visitante     VARCHAR(80) NOT NULL,
+    documento_visitante  VARCHAR(10) NOT NULL,
+    placa                VARCHAR(10) NOT NULL,
+    tipo_vehiculo        VARCHAR(30),
+    a_quien_visita       VARCHAR(80) NOT NULL,
+    motivo               TEXT,
+    hora_ingreso         TIMESTAMPTZ NOT NULL,
+    hora_salida          TIMESTAMPTZ,
+    estado               VARCHAR(10) NOT NULL DEFAULT 'ADENTRO'
+        CONSTRAINT ck_visita_estado
+        CHECK (estado IN ('ADENTRO', 'SALIDA')),
+    expira_en            TIMESTAMPTZ NOT NULL,
+    id_operativo_ingreso VARCHAR(10) NOT NULL,
+    id_operativo_salida  VARCHAR(10),
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    deleted_at           TIMESTAMPTZ
+);
+
+CREATE INDEX idx_visita_estado    ON visita (estado);
+CREATE INDEX idx_visita_placa     ON visita (placa);
+CREATE INDEX idx_visita_documento ON visita (documento_visitante);
 
 
 -- NOTIFICACIONES

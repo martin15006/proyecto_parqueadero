@@ -35,7 +35,9 @@ export default function VehiculosCompartidosScreen({ navigation }: any) {
       setVehiculos(datos);
       setPendientes(invs.length);
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      // No se exponen errores técnicos crudos; en este contexto lo habitual es
+      // que un vehículo compartido haya dejado de estar disponible.
+      Alert.alert('Vehículo no disponible', 'El vehículo compartido ya no se encuentra disponible.');
     } finally {
       setCargando(false);
       setRefrescando(false);

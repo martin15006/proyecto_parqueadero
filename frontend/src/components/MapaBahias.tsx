@@ -23,8 +23,6 @@ const ESTADO_STYLES: Record<
     label: 'Salida pendiente',
   },
   DISCREPANCIA: {
-    // Rojo de alerta: el sensor detecta presencia física sin QR autorizado previamente.
-    // El operario debe verificar la bahía de inmediato.
     wrapper: 'bg-red-500/10 border-red-500/60 shadow-[0_0_20px_rgba(239,68,68,0.25)]',
     text: 'text-red-500',
     badge: 'bg-red-600',
@@ -46,17 +44,6 @@ interface BahiaCardProps {
   bahia: BahiaSensorizada;
 }
 
-/**
- * Tarjeta individual de bahía sensorizada.
- *
- * Muestra el estado físico en tiempo real derivado de `estadoPanel`:
- * - **LIBRE** — verde, sin placa.
- * - **OCUPADO** — rojo, muestra placa con animación.
- * - **SALIDA_PENDIENTE** — ámbar, vehículo salió físicamente pero el operario
- *   aún no confirmó en portería. Muestra placa y badge parpadeante.
- * - **DISCREPANCIA** — sensor detecta presencia física; se muestra igual que OCUPADO.
- * - **OFFLINE / DESHABILITADO** — gris con overlay.
- */
 export const BahiaCard: React.FC<BahiaCardProps> = ({ bahia }) => {
   const styles = ESTADO_STYLES[bahia.estadoPanel] ?? ESTADO_STYLES.LIBRE;
   const isInactive = bahia.estadoPanel === 'OFFLINE' || bahia.estadoPanel === 'DESHABILITADO';
@@ -95,8 +82,6 @@ export const BahiaCard: React.FC<BahiaCardProps> = ({ bahia }) => {
         </span>
       )}
 
-
-
       {isInactive && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
           <span className="text-[10px] font-black text-white uppercase tracking-tighter">
@@ -109,21 +94,10 @@ export const BahiaCard: React.FC<BahiaCardProps> = ({ bahia }) => {
 };
 
 interface MapaBahiasProps {
-  /** Lista proveniente de `GET /api/bahias/sensorizadas` (solo bahías con sensor activo). */
   bahias: BahiaSensorizada[];
-  /** Número de vehículos con QR escaneado que aún no llegaron a ninguna bahía. */
   enTransitoIngreso?: number;
 }
 
-/**
- * Grid dinámico de bahías sensorizadas.
- *
- * Renderiza **solo** las bahías recibidas (máx. las que tengan sensor activo,
- * normalmente 3 para `SN-001`, `SN-002`, `SN-003`) sin hardcodear ningún número.
- *
- * Si `enTransitoIngreso > 0` muestra un banner informativo indicando cuántos
- * vehículos fueron autorizados en portería y están en camino hacia una bahía.
- */
 export const MapaBahias: React.FC<MapaBahiasProps> = ({ bahias, enTransitoIngreso = 0 }) => {
   return (
     <div className="space-y-3">

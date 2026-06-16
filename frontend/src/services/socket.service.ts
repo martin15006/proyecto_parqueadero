@@ -19,11 +19,6 @@ class SocketService {
     }
   }
 
-  /**
-   * Si ya existe una instancia conectada la reutiliza (patrón singleton por ciclo de vida).
-   * Si existe pero está en estado `disconnected` (p.ej. JWT expirado silenciosamente),
-   * la destruye limpiamente antes de crear una nueva con el token fresco del localStorage.
-   */
   connect() {
     if (this.socket?.connected) {
       return this.socket;
@@ -55,10 +50,6 @@ class SocketService {
     return this.socket;
   }
 
-  /**
-   * Usar cuando el componente monta para garantizar que el socket use el JWT vigente
-   * y no uno que haya expirado silenciosamente durante la sesión anterior.
-   */
   reconnectWithFreshToken() {
     if (this.socket) {
       this.socket.removeAllListeners();
@@ -117,7 +108,6 @@ class SocketService {
     return this.socket?.connected || false;
   }
 
-  // No se usa para invalidar sesión; solo para diagnóstico visual si la UI lo desea.
   get connectionError() {
     return this.lastConnectionError;
   }

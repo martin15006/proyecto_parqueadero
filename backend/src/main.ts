@@ -21,7 +21,6 @@ async function bootstrap() {
   };
 
   const isDev = process.env.NODE_ENV !== 'production';
-  // Permite la IP del Wi-Fi en desarrollo para pruebas desde móviles en la red local
   const devAllowedHosts = new Set(['localhost', '127.0.0.1', '192.168.137.225']);
 
   const corsOrigins = (process.env.CORS_ORIGINS ?? '')
@@ -54,7 +53,6 @@ async function bootstrap() {
         try {
           const url = new URL(origin);
 
-          // En desarrollo se acepta cualquier host de la subred local (192.168.*) para pruebas móviles
           const hostOk = devAllowedHosts.has(url.hostname) || url.hostname.startsWith('192.168.');
           const protocolOk = url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'exp:';
 
@@ -87,7 +85,7 @@ async function bootstrap() {
     new ResponseInterceptor(),
     new ClassSerializerInterceptor(app.get(Reflector)),
   );
-  
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -110,7 +108,6 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT ?? 3000);
 
-  // Escucha en 0.0.0.0 para exponer la API a la red Wi-Fi local, no solo a localhost
   try {
     await app.listen(port, '0.0.0.0');
   } catch (error: any) {

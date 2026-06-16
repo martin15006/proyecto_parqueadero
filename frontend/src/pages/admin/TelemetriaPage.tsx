@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { 
-  Wifi, WifiOff, RefreshCw, Activity, 
+import {
+  Wifi, WifiOff, RefreshCw, Activity,
   AlertTriangle, Cpu, MapPin, Clock, ChevronDown
 } from 'lucide-react';
 import { useTelemetria } from '../../hooks/useTelemetria';
@@ -51,11 +51,6 @@ export const TelemetriaPage: React.FC = () => {
   const [simuladorOpen, setSimuladorOpen] = useState(false);
   const [simuladorLoading, setSimuladorLoading] = useState(false);
 
-  /**
-   * Heurística de salud del sensor según su última lectura.
-   * - Si no hay lectura, se considera "Sin Datos".
-   * - Si pasaron más de 5 minutos, se considera Offline para efectos visuales.
-   */
   const getEstadoSensor = (ultimaLectura?: string) => {
     if (!ultimaLectura) return { label: 'Sin Datos', variant: 'neutral' as const };
     const diff = Date.now() - new Date(ultimaLectura).getTime();
@@ -69,33 +64,6 @@ export const TelemetriaPage: React.FC = () => {
   useEffect(() => {
     socketService.connect();
 
-    /**
-     * ============================================================
-     *  BLOQUE RESERVADO PARA INTEGRACIÓN IoT (PEGAR AQUÍ)
-     * ============================================================
-     *
-     * OBJETIVO:
-     * - Recibir eventos por WebSocket del backend (lecturas de sensores reales).
-     * - Traducir el payload del sensor a un cambio de estado de una bahía.
-     * - Actualizar el estado local `bahias2D` SIN romper la UI si no hay datos.
-     *
-     * DÓNDE CONECTARSE:
-     * - Este frontend usa `socketService` (Socket.IO) hacia el backend.
-     * - El backend emite eventos en el Gateway principal:
-     *   - Evento: 'bahia_actualizada'  (payload incluye idBahia, ocupada, sensor, estado?)
-     *   - Evento: 'sensor_offline'     (payload incluye sensorId, idBahia, fecha)
-     *
-     * INSTRUCCIONES PARA MI COMPAÑERO (IoT):
-     * 1) Si el hardware emite un evento distinto (p.ej. 'sensor_data'), NORMALIZA en backend
-     *    para que siempre termine emitiéndose 'bahia_actualizada' con `idBahia` y `estado`.
-     * 2) En este bloque, si decides consumir otro evento adicional, hazlo con:
-     *      socketService.on('<evento>', (payload) => { ... })
-     * 3) Al recibir la lectura, actualiza SOLO la bahía objetivo:
-     *      setBahias2D(prev => prev.map(b => b.id === idBahia ? {...b, estado: 'OCUPADO'} : b))
-     * 4) Nunca asumas que el WS está conectado: si no hay eventos, el mapa queda en DISPONIBLE.
-     *
-     * ============================================================
-     */
 
     const handleBahiaActualizada = (payload: { idBahia: number; ocupada: boolean; sensor: string; estado?: string }) => {
       if (!payload?.idBahia || payload.idBahia < 1 || payload.idBahia > 30) return;
@@ -174,21 +142,12 @@ export const TelemetriaPage: React.FC = () => {
     { label: 'Mantenimiento', className: 'bg-gray-400' },
   ]), []);
 
-  /**
-   * El simulador solo debe verse en desarrollo o para cuentas ADMIN.
-   * Esto permite preparar la demo local sin exponer controles no operativos en producción.
-   */
   const canSeeSimulator = useMemo(() => {
     const idRol = parseInt(String(user?.usuario?.idTipoUsr || 0), 10);
     const isAdmin = idRol === 2;
     return Boolean(import.meta.env.DEV || isAdmin);
   }, [user]);
 
-  /**
-   * Simula un ingreso por QR (RF14 + demo de mapa 2D):
-   * - Backend fuerza bahía ocupada y emite evento WS.
-   * - Backend registra y emite alerta del sistema.
-   */
   const simularIngresoQr = async () => {
     try {
       setSimuladorLoading(true);
@@ -201,10 +160,6 @@ export const TelemetriaPage: React.FC = () => {
     }
   };
 
-  /**
-   * Simula un cambio de sensor (Bahía 5) reutilizando el endpoint admin de contingencia.
-   * Esto actualiza el estado manual en DB y emite el evento WS que el mapa 2D consume.
-   */
   const simularSensorBahia5 = async (estado: 'AVAILABLE' | 'OCCUPIED') => {
     try {
       setSimuladorLoading(true);
@@ -364,8 +319,8 @@ export const TelemetriaPage: React.FC = () => {
         {sensoresSafe.map((sensor) => {
           const { label, variant } = getEstadoSensor(sensor.ultimaLectura);
           return (
-            <div 
-              key={sensor.codigo} 
+            <div
+              key={sensor.codigo}
               className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/5 rounded-xl p-8 hover:shadow-sm transition-all duration-200 group relative overflow-hidden"
             >
               <div className="absolute top-0 right-0">
@@ -394,8 +349,8 @@ export const TelemetriaPage: React.FC = () => {
                   <div className="flex items-center gap-2 text-gray-400">
                     <Clock size={14} />
                     <span className="text-[10px] font-bold uppercase tracking-widest">
-                      {sensor.ultimaLectura 
-                        ? new Date(sensor.ultimaLectura).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                      {sensor.ultimaLectura
+                        ? new Date(sensor.ultimaLectura).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         : 'Sin reporte'}
                     </span>
                   </div>

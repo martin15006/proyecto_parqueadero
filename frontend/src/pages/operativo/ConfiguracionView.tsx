@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
-  User, Shield, Bell,
+  User, Shield,
   ChevronRight, Save, RotateCcw,
-  Key, Volume2, Eye, EyeOff
+  Key, Eye, EyeOff
 } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { usuariosService } from '../../services/usuarios.service';
 
-/** Mismas reglas que el validador `ContrasenaSegura` del backend (RF3). */
 const isPasswordSecure = (value: string) => {
   const check = {
     tieneMinimo: value.length >= 8,
@@ -21,7 +20,6 @@ const isPasswordSecure = (value: string) => {
   return { isValid: Object.values(check).every(Boolean), check };
 };
 
-/** Extrae el mensaje real del backend; class-validator envía `message` como array. */
 const mensajeDeError = (e: any, fallback: string): string => {
   const raw = e?.response?.data?.message ?? e?.message;
   if (Array.isArray(raw)) {
@@ -41,9 +39,6 @@ export const ConfiguracionView: React.FC = () => {
   );
   const [saving, setSaving] = useState(false);
 
-  // Si se navega a esta vista solicitando una sección concreta (p. ej. desde el
-  // recuadro de usuario del sidebar → "Perfil de usuario"), forzamos esa pestaña,
-  // incluso si ya estábamos en Configuración con otra sección activa.
   useEffect(() => {
     const requested = (location.state as { section?: string } | null)?.section;
     if (requested) setActiveSection(requested);
@@ -63,16 +58,7 @@ export const ConfiguracionView: React.FC = () => {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const [prefs, setPrefs] = useState({
-    sonido: true,
-    alertasOcupacion: true,
-    notificacionesCriticas: true,
-    autoRefresh: true
-  });
-
   const handleSave = async () => {
-    // El cambio de contraseña sí persiste contra el backend; el perfil y las
-    // preferencias todavía son locales, así que mantienen el guardado simulado.
     if (activeSection !== 'seguridad') {
       setSaving(true);
       setTimeout(() => {
@@ -84,7 +70,6 @@ export const ConfiguracionView: React.FC = () => {
 
     const { currentPassword, newPassword, confirmPassword } = securityData;
 
-    // Validamos en cliente para avisar al operador en vez de simular éxito.
     if (!currentPassword || !newPassword || !confirmPassword) {
       showNotification('Completa todos los campos de contraseña', 'error');
       return;
@@ -115,7 +100,6 @@ export const ConfiguracionView: React.FC = () => {
       setSecurityData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       showNotification('Contraseña actualizada correctamente', 'success');
     } catch (e: any) {
-      // El backend rechaza, p. ej., cuando la contraseña actual es incorrecta.
       showNotification(mensajeDeError(e, 'No se pudo cambiar la contraseña. Verifica tus datos.'), 'error');
     } finally {
       setSaving(false);
@@ -124,7 +108,6 @@ export const ConfiguracionView: React.FC = () => {
 
   const handleRevert = () => {
     if (window.confirm('¿Estás seguro de revertir los cambios?')) {
-      // En una app real, aquí volveríamos a pedir los datos al backend
       showNotification('Cambios revertidos', 'info');
     }
   };
@@ -132,7 +115,6 @@ export const ConfiguracionView: React.FC = () => {
   const sections = [
     { id: 'perfil', label: 'Perfil de Usuario', icon: <User size={16} />, sub: 'Datos institucionales' },
     { id: 'seguridad', label: 'Seguridad', icon: <Shield size={16} />, sub: 'Claves y accesos' },
-    { id: 'notificaciones', label: 'Preferencias', icon: <Bell size={16} />, sub: 'Alertas del sistema' },
   ];
 
   const renderSectionContent = () => {
@@ -151,9 +133,9 @@ export const ConfiguracionView: React.FC = () => {
               </div>
             </div>
             <div className="grid grid-cols-1 gap-5 max-w-md">
-              <InputGroup 
-                label="Nombre del Operador" 
-                value={profileData.nombre} 
+              <InputGroup
+                label="Nombre del Operador"
+                value={profileData.nombre}
                 onChange={(e) => setProfileData({...profileData, nombre: e.target.value})}
               />
               <InputGroup
@@ -182,13 +164,13 @@ export const ConfiguracionView: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 gap-5 max-w-md">
               <div className="relative">
-                <InputGroup 
-                  label="Contraseña Actual" 
-                  type={showPass ? "text" : "password"} 
+                <InputGroup
+                  label="Contraseña Actual"
+                  type={showPass ? "text" : "password"}
                   value={securityData.currentPassword}
                   onChange={(e) => setSecurityData({...securityData, currentPassword: e.target.value})}
                 />
-                <button 
+                <button
                   onClick={() => setShowPass(!showPass)}
                   className="absolute right-4 bottom-3 text-gray-400 hover:text-[#39B000]"
                 >
@@ -227,41 +209,6 @@ export const ConfiguracionView: React.FC = () => {
           </div>
         );
 
-      case 'notificaciones':
-        return (
-          <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Preferencias de Operación</p>
-            <ToggleGroup 
-              label="Confirmación Sonora" 
-              sub="Emitir sonido al escanear exitosamente" 
-              active={prefs.sonido} 
-              onToggle={() => setPrefs({...prefs, sonido: !prefs.sonido})}
-              icon={<Volume2 size={16} />}
-            />
-            <ToggleGroup 
-              label="Alertas de Ocupación" 
-              sub="Notificar cuando el nivel supere el 80%" 
-              active={prefs.alertasOcupacion} 
-              onToggle={() => setPrefs({...prefs, alertasOcupacion: !prefs.alertasOcupacion})}
-              icon={<LayoutGrid size={16} />}
-            />
-            <ToggleGroup 
-              label="Notificaciones Críticas" 
-              sub="Alertar sobre fallos en periféricos o sistema" 
-              active={prefs.notificacionesCriticas} 
-              onToggle={() => setPrefs({...prefs, notificacionesCriticas: !prefs.notificacionesCriticas})}
-              icon={<Shield size={16} />}
-            />
-            <ToggleGroup 
-              label="Actualización Automática" 
-              sub="Sincronizar datos en tiempo real cada 30s" 
-              active={prefs.autoRefresh} 
-              onToggle={() => setPrefs({...prefs, autoRefresh: !prefs.autoRefresh})}
-              icon={<RotateCcw size={16} />}
-            />
-          </div>
-        );
-
       default:
         return null;
     }
@@ -277,16 +224,16 @@ export const ConfiguracionView: React.FC = () => {
               onClick={() => setActiveSection(section.id)}
               className={`
                 w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 group
-                ${activeSection === section.id 
-                  ? 'bg-gray-50 dark:bg-white/5 text-[#012E25] dark:text-[#39B000]' 
+                ${activeSection === section.id
+                  ? 'bg-gray-50 dark:bg-white/5 text-[#012E25] dark:text-[#39B000]'
                   : 'text-gray-400 hover:bg-gray-50/50 dark:hover:bg-white/5 hover:text-gray-600 dark:hover:text-gray-300'}
               `}
             >
               <div className="flex items-center gap-3">
                 <div className={`
                   w-8 h-8 rounded-lg flex items-center justify-center transition-all
-                  ${activeSection === section.id 
-                    ? 'bg-[#39B000] text-white shadow-sm' 
+                  ${activeSection === section.id
+                    ? 'bg-[#39B000] text-white shadow-sm'
                     : 'bg-gray-100 dark:bg-white/5 text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-white/10'}
                 `}>
                   {section.icon}
@@ -313,14 +260,14 @@ export const ConfiguracionView: React.FC = () => {
           </div>
 
           <div className="px-6 py-5 bg-gray-50/30 dark:bg-white/5 border-t border-gray-50 dark:border-white/5 flex items-center justify-end gap-3">
-            <button 
+            <button
               onClick={handleRevert}
               className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all"
             >
               <RotateCcw size={14} />
               Revertir
             </button>
-            <button 
+            <button
               onClick={handleSave}
               disabled={saving}
               className={`
@@ -359,45 +306,4 @@ const InputGroup: React.FC<InputGroupProps> = ({ label, placeholder, value, type
   </div>
 );
 
-interface ToggleGroupProps {
-  label: string;
-  sub: string;
-  active: boolean;
-  onToggle: () => void;
-  icon?: React.ReactNode;
-}
-
-const ToggleGroup: React.FC<ToggleGroupProps> = ({ label, sub, active, onToggle, icon }) => (
-  <div 
-    onClick={onToggle}
-    className="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 dark:bg-white/5 border border-gray-100 dark:border-white/5 cursor-pointer hover:border-[#39B000]/30 transition-all group"
-  >
-    <div className="flex items-center gap-4">
-      {icon && (
-        <div className={`p-2 rounded-lg transition-all ${active ? 'bg-[#39B000]/10 text-[#39B000]' : 'bg-gray-100 dark:bg-white/10 text-gray-400'}`}>
-          {icon}
-        </div>
-      )}
-      <div>
-        <p className="text-xs font-bold text-[#012E25] dark:text-white tracking-tight">{label}</p>
-        <p className="text-[10px] text-gray-400 font-medium">{sub}</p>
-      </div>
-    </div>
-    <div className={`
-      w-10 h-5 rounded-full relative p-0.5 transition-all duration-300
-      ${active ? 'bg-[#39B000]' : 'bg-gray-200 dark:bg-white/10'}
-    `}>
-      <div className={`
-        w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-300 transform
-        ${active ? 'translate-x-5' : 'translate-x-0'}
-      `} />
-    </div>
-  </div>
-);
-
-const LayoutGrid: React.FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-  </svg>
-);
 

@@ -25,7 +25,6 @@ export class Formacion {
   })
   jornada: Jornada;
 
-  // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

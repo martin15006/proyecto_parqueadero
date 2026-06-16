@@ -25,7 +25,6 @@ export const OperativoLayout: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // El punto rojo de la campana solo aparece si llega una alerta nueva por socket.
   useEffect(() => {
     const onAlerta = () => setTieneAlertas(true);
     socketService.on('alerta_parqueadero', onAlerta);
@@ -36,7 +35,6 @@ export const OperativoLayout: React.FC = () => {
     };
   }, []);
 
-  // Al entrar a Alertas se consideran leídas y se apaga el punto.
   useEffect(() => {
     if (location.pathname === '/appperop/alertas') setTieneAlertas(false);
   }, [location.pathname]);
@@ -57,7 +55,7 @@ export const OperativoLayout: React.FC = () => {
 
   const menuItems = [
     { path: '/appperop', label: 'Control de Acceso', icon: <Scan size={20} /> },
-    { path: '/appperop/bahias', label: 'Estado de Salidas', icon: <LayoutGrid size={20} /> },
+    { path: '/appperop/bahias', label: 'Estado de Bahías', icon: <LayoutGrid size={20} /> },
     { path: '/appperop/movimientos', label: 'Movimientos', icon: <ClipboardList size={20} /> },
     { path: '/appperop/alertas', label: 'Alertas', icon: <Bell size={20} /> },
     { path: '/appperop/configuracion', label: 'Configuración', icon: <Settings size={20} /> },
@@ -70,7 +68,7 @@ export const OperativoLayout: React.FC = () => {
 
     const metaMap: Record<string, { title: string; subtitle: string }> = {
       '': { title: 'Control de Acceso', subtitle: 'Gestión de ingresos y salidas' },
-      bahias: { title: 'Estado de Salidas', subtitle: 'Monitoreo de plazas en tiempo real' },
+      bahias: { title: 'Estado de Bahías', subtitle: 'Monitoreo de plazas en tiempo real' },
       movimientos: { title: 'Movimientos', subtitle: 'Historial detallado de operaciones' },
       alertas: { title: 'Alertas', subtitle: 'Notificaciones críticas del sistema' },
       configuracion: { title: 'Configuración', subtitle: 'Preferencias y ajustes operativos' },
@@ -82,7 +80,6 @@ export const OperativoLayout: React.FC = () => {
   const operadorNombre = user?.usuario?.nombreCompleto || 'Operador';
 
   const sidebarWidth = isCollapsed ? 'w-20' : 'w-64';
-  // Estado visible del menú según el modo: en móvil manda isMobileOpen, en escritorio el colapso.
   const menuAbierto = isMobile ? isMobileOpen : !isCollapsed;
 
   const toggleMenu = () => {
@@ -96,7 +93,7 @@ export const OperativoLayout: React.FC = () => {
   return (
     <div className="flex h-screen bg-[#F8F9FA] dark:bg-[#0a0a0a] font-sans overflow-hidden transition-colors duration-300">
       {isMobileOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/20 dark:bg-black/40 z-[60] lg:hidden backdrop-blur-sm"
           onClick={() => setIsMobileOpen(false)}
         />
@@ -111,10 +108,10 @@ export const OperativoLayout: React.FC = () => {
         <div className="flex flex-col h-full py-6">
           <div className={`px-4 flex items-center ${isCollapsed ? 'justify-center' : 'justify-start px-6'} mb-10`}>
             <div className="flex items-center gap-3 overflow-hidden">
-              <img 
-                src="/logo.png" 
-                alt="SENA Logo" 
-                className="w-8 h-8 brightness-0 invert object-contain shrink-0" 
+              <img
+                src="/logo.png"
+                alt="SENA Logo"
+                className="w-8 h-8 brightness-0 invert object-contain shrink-0"
               />
               {!isCollapsed && (
                 <div className="flex flex-col leading-none">
@@ -137,10 +134,10 @@ export const OperativoLayout: React.FC = () => {
                   to={item.path}
                   onClick={() => setIsMobileOpen(false)}
                   className={`
-                    flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-4'} 
+                    flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-4'}
                     py-3 rounded-xl transition-all duration-200 group relative
-                    ${isActive 
-                      ? 'bg-[#39B000] text-white shadow-lg shadow-green-900/20' 
+                    ${isActive
+                      ? 'bg-[#39B000] text-white shadow-lg shadow-green-900/20'
                       : 'text-white/60 hover:bg-white/5 hover:text-white'}
                   `}
                   title={isCollapsed ? item.label : ''}
@@ -173,12 +170,12 @@ export const OperativoLayout: React.FC = () => {
                 </div>
               )}
             </button>
-            
-            <button 
+
+            <button
               onClick={logout}
               className={`
-                w-full flex items-center justify-center ${isCollapsed ? 'py-3' : 'gap-3 py-3 px-4'} 
-                text-white/30 font-bold text-[10px] uppercase tracking-widest 
+                w-full flex items-center justify-center ${isCollapsed ? 'py-3' : 'gap-3 py-3 px-4'}
+                text-white/30 font-bold text-[10px] uppercase tracking-widest
                 hover:bg-red-500/10 hover:text-red-400 rounded-xl transition-all duration-200
               `}
               title={isCollapsed ? 'Cerrar sesión' : ''}
@@ -214,7 +211,7 @@ export const OperativoLayout: React.FC = () => {
                 Servidor <span className="text-[#39B000]">Activo</span>
               </p>
             </div>
-            
+
             <div className="flex items-center gap-1">
               <button
                 onClick={() => {
@@ -232,7 +229,7 @@ export const OperativoLayout: React.FC = () => {
               </button>
 
 
-              <button 
+              <button
                 onClick={() => navigate('/appperop/alertas')}
                 className="relative p-2 text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg transition-all"
                 title="Notificaciones"
@@ -243,7 +240,7 @@ export const OperativoLayout: React.FC = () => {
                 )}
               </button>
 
-              <button 
+              <button
                 onClick={() => navigate('/appperop/configuracion')}
                 className="p-2 text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg transition-all"
                 title="Configuración"

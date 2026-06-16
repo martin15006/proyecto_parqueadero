@@ -15,7 +15,6 @@ export class RegistroVehiculo {
   @Column({ length: 10 })
   idVehiculo: string;
 
-  // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

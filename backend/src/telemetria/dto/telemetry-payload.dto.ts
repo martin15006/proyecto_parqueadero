@@ -1,10 +1,6 @@
 import { IsString, IsEnum, IsNotEmpty, IsNumber, Min, Max, IsOptional } from 'class-validator';
 import { IotStatusEnum } from '../../common/enums/iot-status.enum';
 
-/**
- * DTO Estricto para la recepción de telemetría desde hardware.
- * IOT_CONTRACT: Especificación del JSON que debe enviar el ESP32/Raspberry.
- */
 export class TelemetryPayloadDto {
   @IsString()
   @IsNotEmpty()

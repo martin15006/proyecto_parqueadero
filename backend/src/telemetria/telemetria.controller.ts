@@ -1,10 +1,12 @@
-import { Controller, Post, Body, UseGuards, Get, ForbiddenException, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Patch, Delete, Param, ParseIntPipe, ForbiddenException, Req, BadRequestException } from '@nestjs/common';
 import { TelemetriaService } from './telemetria.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 import { TelemetryPayloadDto } from './dto/telemetry-payload.dto';
+import { CrearSensorDto } from './dto/crear-sensor.dto';
+import { ActualizarSensorDto } from './dto/actualizar-sensor.dto';
 import { IotAuthGuard } from '../common/guards/iot-auth.guard';
 import { BahiasService } from '../bahias/bahias.service';
 import type { AuthenticatedRequest } from '../common/interfaces/auth.interface';
@@ -16,9 +18,6 @@ export class TelemetriaController {
     private readonly bahiasService: BahiasService,
   ) {}
 
-  /**
-   * En producción el simulador debe estar deshabilitado para evitar manipulación de telemetría/alertas.
-   */
   private assertSimuladorHabilitado() {
     if ((process.env.NODE_ENV || '').toLowerCase() === 'production') {
       throw new ForbiddenException('Simulador no disponible en producción');
@@ -32,10 +31,27 @@ export class TelemetriaController {
     return await this.telemetriaService.findAllSensores();
   }
 
-  /**
-   * IOT_CONTRACT: El hardware debe enviar un POST con 'x-iot-api-key' en el header.
-   * Ejemplo de payload: {"sensorId": "SN-001", "status": "OCCUPIED", "battery": 85, "rssi": -65}
-   */
+  @Post('sensores')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(TipoUsuarioEnum.ADMIN)
+  async crearSensor(@Body() dto: CrearSensorDto) {
+    return await this.telemetriaService.crearSensor(dto);
+  }
+
+  @Patch('sensores/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(TipoUsuarioEnum.ADMIN)
+  async actualizarSensor(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarSensorDto) {
+    return await this.telemetriaService.actualizarSensor(id, dto);
+  }
+
+  @Delete('sensores/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(TipoUsuarioEnum.ADMIN)
+  async eliminarSensor(@Param('id', ParseIntPipe) id: number) {
+    return await this.telemetriaService.eliminarSensor(id);
+  }
+
   @Post('lectura')
   @UseGuards(IotAuthGuard)
   async recibirLectura(@Body() dto: TelemetryPayloadDto) {
@@ -49,10 +65,6 @@ export class TelemetriaController {
     return await this.telemetriaService.monitorizarSensores();
   }
 
-  /**
-   * Simula un ingreso (QR escaneado) para la demo local.
-   * Restricciones: solo ADMIN y solo ambientes no productivos.
-   */
   @Post('simulador/qr-ingreso')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(TipoUsuarioEnum.ADMIN)
@@ -87,9 +99,6 @@ export class TelemetriaController {
     return { ok: true, mensaje: 'Ingreso simulado ejecutado', placa, idBahia };
   }
 
-  /**
-   * Crea una alerta manual para demo y la emite por WebSocket. Solo fuera de producción.
-   */
   @Post('simulador/alerta')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(TipoUsuarioEnum.ADMIN)

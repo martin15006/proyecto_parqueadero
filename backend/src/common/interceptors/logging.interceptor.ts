@@ -20,7 +20,6 @@ export class LoggingInterceptor implements NestInterceptor {
     const { method, url } = request;
     const startedAt = Date.now();
 
-    // RNF2 (Privacidad): correlationId anónimo para rastrear solicitudes sin registrar PII (prohibido: documento/cédula).
     const headerCorrelation = request.headers?.['x-correlation-id'];
     const correlationId =
       (typeof headerCorrelation === 'string' && headerCorrelation.trim().length > 0
@@ -37,8 +36,6 @@ export class LoggingInterceptor implements NestInterceptor {
         const delayMs = Date.now() - startedAt;
         const status = response.statusCode;
 
-        // RNF2 (Privacidad): prohibido loguear userId/documento, contraseñas, tokens, QR o payload.
-        // Por diseño, este interceptor no registra body de entrada ni respuesta.
         if (shouldDebug) {
           const hasAuthHeader = Boolean(request.headers?.authorization);
           this.logger.log(

@@ -13,9 +13,7 @@ interface OperativoStats {
   total: number;
   ocupados: number;
   disponibles: number;
-  /** Incluye vehículos ADENTRO + en SALIDA_PENDIENTE. */
   vehiculosActivos: number;
-  /** Vehículos en tránsito de ingreso (QR escaneado, sin bahía asignada aún). */
   enTransitoIngreso: number;
 }
 
@@ -26,15 +24,6 @@ interface Alert {
   fecha: Date;
 }
 
-/**
- * Hook del Panel Operativo.
- *
- * - Fuente de verdad para el mapa de bahías: `GET /bahias/sensorizadas`
- *   (solo las 3 bahías con sensor activo, con `estadoPanel` pre-calculado).
- * - Los conteos globales se mantienen desde `GET /operativo/resumen-turno`
- *   y se actualizan en tiempo real vía WebSocket `conteo_global_disponibles`.
- * - Polling de 4 segundos como respaldo cuando el socket no está disponible.
- */
 export const useOperativo = () => {
   const [stats, setStats] = useState<OperativoStats>({
     total: 0,
@@ -54,7 +43,6 @@ export const useOperativo = () => {
     setTimeout(() => setToast(null), 5000);
   }, []);
 
-  /** Extrae la lista de movimientos activos desde las bahías sensorizadas. */
   const mapActivosFromSensorizadas = useCallback((lista: BahiaSensorizada[]): Movement[] => {
     return lista
       .filter((b) => b.placa && (b.estadoPanel === 'OCUPADO' || b.estadoPanel === 'SALIDA_PENDIENTE'))
@@ -68,18 +56,10 @@ export const useOperativo = () => {
       }));
   }, []);
 
-  /**
-   * Carga inicial desde REST.
-   * - Bahías sensorizadas → mapa del panel (solo las 3 activas).
-   * - Resumen de turno → conteos y alertas técnicas.
-   */
   const loadInitialData = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Conteo global → fuente única de verdad para total/ocupados/disponibles.
-      // Estos valores vienen del backend basados en QRs ACTIVOS (movimientos),
-      // no en sensores. Cada QR de entrada sube +1, cada QR de salida baja -1.
       const [sensorizadas, ocupacion] = await Promise.all([
         bahiasService.getSensorizadas() as Promise<BahiaSensorizada[]>,
         bahiasService.getOcupacion(),
@@ -119,9 +99,6 @@ export const useOperativo = () => {
   };
 
   useEffect(() => {
-    // Garantizar que el socket use el JWT vigente antes de suscribir listeners
-    // o cargar datos: destruye cualquier conexión previa con token expirado y abre
-    // una nueva con el access_token más reciente del localStorage.
     socketService.reconnectWithFreshToken();
 
     loadInitialData();
@@ -135,7 +112,6 @@ export const useOperativo = () => {
           setBahias(sensorizadas);
           setVehiculos(mapActivosFromSensorizadas(sensorizadas));
         } catch {
-          // fallo silencioso — el socket es la fuente principal
         }
       }, 4000);
     };
@@ -169,11 +145,6 @@ export const useOperativo = () => {
       }
     };
 
-    /**
-     * Cuando llega `bahia_modificada`, actualizamos el `estadoPanel` de la
-     * bahía afectada mapeando el `nuevoEstado` (formato backend reconciliado)
-     * al `EstadoPanel` que usa el frontend.
-     */
     const mapNuevoEstadoToEstadoPanel = (
       nuevoEstado: BahiaModificadaPayload['nuevoEstado'],
     ): EstadoPanel => {
@@ -183,7 +154,6 @@ export const useOperativo = () => {
         case 'LIBRE':
           return 'LIBRE';
         case 'TRANSITO':
-          // El backend emite TRANSITO cuando la bahía tiene salida pendiente
           return 'SALIDA_PENDIENTE';
         case 'DISCREPANCIA':
           return 'DISCREPANCIA';
@@ -201,19 +171,6 @@ export const useOperativo = () => {
       return match ? Number(match[1]) : null;
     };
 
-    /**
-     * Handler de `bahia_modificada` en dos fases:
-     *
-     * **Fase 1 — optimista** (síncrona, 0 ms):
-     * Actualiza `estadoPanel` de la bahía afectada usando la tabla local de
-     * mapeo. El color cambia instantáneamente en pantalla.
-     *
-     * **Fase 2 — autoritativa** (asíncrona, ~1 RTT):
-     * Re-fetcha `/bahias/sensorizadas` para obtener el `estadoPanel` real del
-     * backend (que incluye `SALIDA_PENDIENTE` cuando bahía=LIBRE + movimiento
-     * TRANSITO con bahía) y la `placa` del vehículo vinculado.
-     * Si el fetch falla, la actualización optimista permanece.
-     */
     const handleBahiaModificada = async (data: BahiaModificadaPayload) => {
       const id = parseIdBahia(data.idBahia);
       if (id) {
@@ -229,7 +186,6 @@ export const useOperativo = () => {
         setBahias(sensorizadas);
         setVehiculos(mapActivosFromSensorizadas(sensorizadas));
       } catch {
-        // actualización optimista ya aplicada — se mantiene
       }
     };
 
@@ -274,7 +230,6 @@ export const useOperativo = () => {
       }
     };
 
-    // El wrapper void evita que TypeScript infiera `Promise` en la firma del listener.
     const onBahiaModificada = (data: BahiaModificadaPayload) => void handleBahiaModificada(data);
 
     socketService.on('conteo_global_disponibles', handleConteoGlobal);

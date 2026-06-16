@@ -16,11 +16,6 @@ export enum EstadoSolicitud {
   RECHAZADO  = 'RECHAZADO',
 }
 
-/**
- * Solicitud de registro de vehículo enviada por un usuario.
- * El administrador la revisa y la aprueba o rechaza.
- * Si se aprueba, se crea el Vehiculo + RegistroVehiculo correspondientes.
- */
 @Entity({ name: 'solicitud_vehiculo' })
 export class SolicitudVehiculo {
   @PrimaryGeneratedColumn({ name: 'id_solicitud' })
@@ -60,11 +55,6 @@ export class SolicitudVehiculo {
   @Column({ name: 'motivo_rechazo', type: 'text', nullable: true })
   motivoRechazo: string | null;
 
-  /**
-   * Campos específicos que el administrador marcó como incorrectos al rechazar.
-   * El usuario solo podrá corregir estos campos desde el móvil.
-   * Claves posibles: placa, color, idTipoVehiculo, fotoVehiculo, fotoTarjetaP, fotoPlaca.
-   */
   @Column({ name: 'campos_rechazados', type: 'jsonb', nullable: true })
   camposRechazados: string[] | null;
 

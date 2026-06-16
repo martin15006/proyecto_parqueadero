@@ -32,11 +32,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  /**
-   * Esta función se ejecuta automáticamente cuando un endpoint protegido
-   * recibe una petición con un JWT. Si retorna algo, ese valor queda
-   * disponible como request.user en el controlador.
-   */
   async validate(payload: JwtPayload) {
     const usuario = await this.usuarioRepository.findOne({
       where: { documento: payload.sub },

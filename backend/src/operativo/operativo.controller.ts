@@ -48,8 +48,6 @@ export class OperativoController {
     @Body() dto: EscanearQrDto,
     @Request() req: AuthenticatedRequest,
   ) {
-    // Inicia tránsito de ingreso SIN asignar bahía.
-    // El SerialBridgeService vincula el vehículo a la bahía física al detectar presencia (<umbral cm).
     return this.operativoService.escanearQr(dto.qr, { ...req.user, ip: req.ip });
   }
 
@@ -79,11 +77,6 @@ export class OperativoController {
     );
   }
 
-  /**
-   * Información de una placa para registro manual: datos del vehículo + fotos +
-   * lista de usuarios autorizados a ingresarlo (dueño + receptores con compartido ACEPTADO).
-   * También indica si tiene un movimiento activo y quién lo ingresó.
-   */
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
   @Get('info-placa/:placa')
@@ -118,7 +111,6 @@ export class OperativoController {
     );
   }
 
-  // Negar/revertir desde el modal de confirmación: el ingreso (o salida) "no se hace".
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
   @Post('anular-movimiento')
@@ -177,7 +169,6 @@ export class OperativoController {
     return this.operativoService.salidaEmergencia({ ...req.user, ip: req.ip });
   }
 
-  // Endpoint dedicado para OPERATIVO (no depende de /dashboard/resumen, que es admin-only).
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(TipoUsuarioEnum.OPERATIVO)
   @Get('resumen-turno')

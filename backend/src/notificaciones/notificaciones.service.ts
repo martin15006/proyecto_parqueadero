@@ -5,10 +5,6 @@ import { NotificacionUsuario } from './entities/notificacion-usuario.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { TipoUsuarioEnum } from '../common/enums/tipo-usuario.enum';
 
-/**
- * Este servicio NO registra en logs tokens/OTP/QR ni datos sensibles; persiste únicamente lo necesario
- * para la bandeja del usuario.
- */
 @Injectable()
 export class NotificacionesService {
   constructor(
@@ -106,9 +102,29 @@ export class NotificacionesService {
     await this.notificacionRepository.save(notificacion);
   }
 
-  /**
-   * Se persiste por usuario para que sea visible en la bandeja de cada aprendiz.
-   */
+  async registrarParqueaderoLlenoBroadcast(params: { ocupados: number; total: number }) {
+    const aprendices = await this.usuarioRepository.find({
+      where: { idTipoUsr: TipoUsuarioEnum.APRENDIZ },
+      select: ['documento'],
+    });
+
+    if (aprendices.length === 0) return;
+
+    const rows = aprendices.map((u) =>
+      this.notificacionRepository.create({
+        idUsuario: u.documento,
+        tipo: 'PARQUEADERO_LLENO',
+        titulo: 'Parqueadero lleno',
+        mensaje: `El parqueadero alcanzó su capacidad máxima (${params.ocupados}/${params.total}). No hay espacios disponibles en este momento.`,
+        actorNombre: null,
+        metadata: { ocupados: params.ocupados, total: params.total },
+        leidaAt: null,
+      }),
+    );
+
+    await this.notificacionRepository.save(rows);
+  }
+
   async registrarParqueaderoDeshabilitadoBroadcast(params: {
     motivo: string;
     duracionEstimada: string | null;

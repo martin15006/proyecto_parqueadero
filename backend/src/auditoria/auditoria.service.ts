@@ -21,7 +21,6 @@ export class AuditoriaService {
     private readonly auditoriaRepository: Repository<Auditoria>,
   ) {}
 
-  // idEntidad se convierte estrictamente a string para evitar errores de tipo en la entidad.
   async create(data: CreateAuditoriaDto): Promise<Auditoria> {
     const auditoriaData: Partial<Auditoria> = {
       accion: data.accion,
@@ -38,13 +37,6 @@ export class AuditoriaService {
     return await this.auditoriaRepository.save(nuevaAuditoria);
   }
 
-  /**
-   * Cuenta acciones de auditoría por usuario y rango temporal.
-   *
-   * Reutiliza los registros REGISTRAR_ENTRADA / REGISTRAR_SALIDA que OperativoService ya
-   * escribe en auditoría, para calcular "ingresos/salidas del día" sin tablas nuevas ni
-   * exponer datos administrativos. Solo ejecuta un COUNT; no registra datos sensibles.
-   */
   async contarAccionPorUsuarioEnRango(params: {
     idUsuario: string;
     accion: string;
@@ -78,11 +70,6 @@ export class AuditoriaService {
       .getMany();
   }
 
-  /**
-   * Mapea el autor (idUsuario) de la acción registrada para cada entidad.
-   * Útil para saber qué operativo autorizó cada ingreso (REGISTRAR_ENTRADA).
-   * Devuelve un Map<idEntidad, idUsuario>.
-   */
   async mapearAutoresPorEntidad(
     accion: string,
     entidad: string,

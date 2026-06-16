@@ -21,10 +21,6 @@ export const operativoService = {
     return response.data.data || response.data;
   },
 
-  /**
-   * Info de placa para registro manual: vehículo + usuarios autorizados a ingresarlo
-   * + estado de movimiento activo si lo hay.
-   */
   obtenerInfoPlaca: async (placa: string) => {
     const response = await api.get(`/operativo/info-placa/${encodeURIComponent(placa)}`);
     return response.data.data || response.data;
@@ -35,7 +31,6 @@ export const operativoService = {
     return response.data.data || response.data;
   },
 
-  /** Niega/revierte un movimiento (ingreso o salida) desde el modal de confirmación. */
   anularMovimiento: async (idMovimiento: number) => {
     const response = await api.post('/operativo/anular-movimiento', { idMovimiento });
     return response.data.data || response.data;
@@ -46,11 +41,6 @@ export const operativoService = {
     return response.data.data || response.data;
   },
 
-  /**
-   * Registro Manual de Contingencia (RF34).
-   * @param identificacion Placa o documento del vehículo.
-   * @param motivo Razón obligatoria de la contingencia.
-   */
   registrarIngresoManual: async (identificacion: string, motivo: string) => {
     const response = await api.post('/operativo/registrar-ingreso-manual', { identificacion, motivo });
     return response.data.data || response.data;
@@ -83,9 +73,8 @@ export const dashboardService = {
     const response = await api.get('/dashboard/heatmap');
     return response.data.data;
   },
-  getHistorial: async (page = 1, limit = 20) => {
-    const response = await api.get('/dashboard/historial', { params: { page, limit } });
-    // El ResponseInterceptor del backend deja las filas en `data` y la paginación en `meta`.
+  getHistorial: async (page = 1, limit = 20, desde?: string, hasta?: string) => {
+    const response = await api.get('/dashboard/historial', { params: { page, limit, desde, hasta } });
     const env = response.data || {};
     const filas = Array.isArray(env.data) ? env.data : (Array.isArray(env) ? env : []);
     const meta = env.meta || {};
@@ -137,7 +126,6 @@ export const bahiasService = {
     return payload;
   },
 
-  /** Devuelve solo las bahías con sensor activo, con `estadoPanel` calculado. */
   getSensorizadas: async () => {
     const response = await api.get('/bahias/sensorizadas');
     const payload = (response.data && response.data.data) ? response.data.data : response.data;

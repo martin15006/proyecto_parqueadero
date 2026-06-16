@@ -29,10 +29,6 @@ export class VehiculosController {
     return this.vehiculosService.listarTipos();
   }
 
-  /**
-   * Envía una solicitud de registro de vehículo al administrador.
-   * El vehículo NO queda registrado hasta que el admin apruebe.
-   */
   @UseGuards(JwtAuthGuard)
   @Post()
   solicitarRegistro(
@@ -48,9 +44,6 @@ export class VehiculosController {
     return this.vehiculosService.listarMisSolicitudes(usuario.documento);
   }
 
-  /**
-   * Corrige una solicitud rechazada (solo los campos marcados por el admin) y la reenvía.
-   */
   @UseGuards(JwtAuthGuard)
   @Patch('solicitudes/:id/corregir')
   corregirSolicitud(
@@ -92,7 +85,6 @@ export class VehiculosController {
     return this.vehiculosService.actualizarVehiculo(usuario.documento, placa, dto);
   }
 
-  /** Consulta si el vehículo se puede editar ahora (cooldown 15 días) */
   @UseGuards(JwtAuthGuard)
   @Get(':placa/puede-editar')
   puedeEditar(
@@ -111,21 +103,18 @@ export class VehiculosController {
     return this.vehiculosService.eliminarRegistro(usuario.documento, placa);
   }
 
-  /** Lista los vehículos que otros compartieron conmigo (ya ACEPTADOS) */
   @UseGuards(JwtAuthGuard)
   @Get('compartidos-conmigo')
   compartidosConmigo(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
     return this.vehiculosService.listarVehiculosCompartidosConmigo(usuario.documento);
   }
 
-  /** Invitaciones de compartido PENDIENTES dirigidas a mí */
   @UseGuards(JwtAuthGuard)
   @Get('compartidos-pendientes')
   compartidosPendientes(@CurrentUser() usuario: Omit<Usuario, 'contra'>) {
     return this.vehiculosService.listarInvitacionesPendientes(usuario.documento);
   }
 
-  /** Acepta una invitación de compartido */
   @UseGuards(JwtAuthGuard)
   @Post('compartidos/:idCompartir/aceptar')
   aceptarCompartido(
@@ -135,7 +124,6 @@ export class VehiculosController {
     return this.vehiculosService.aceptarCompartido(usuario.documento, Number(idCompartir));
   }
 
-  /** Rechaza una invitación de compartido */
   @UseGuards(JwtAuthGuard)
   @Post('compartidos/:idCompartir/rechazar')
   rechazarCompartido(
@@ -145,10 +133,6 @@ export class VehiculosController {
     return this.vehiculosService.rechazarCompartido(usuario.documento, Number(idCompartir));
   }
 
-  /**
-   * El receptor renuncia / elimina un vehículo compartido que ya aceptó.
-   * Borra el vínculo y notifica al propietario.
-   */
   @UseGuards(JwtAuthGuard)
   @Delete('compartidos/:idCompartir')
   eliminarCompartidoReceptor(
@@ -158,7 +142,6 @@ export class VehiculosController {
     return this.vehiculosService.eliminarCompartidoComoReceptor(usuario.documento, Number(idCompartir));
   }
 
-  /** Info de con quién está compartido un vehículo mío */
   @UseGuards(JwtAuthGuard)
   @Get(':placa/compartir')
   infoCompartido(
@@ -168,7 +151,6 @@ export class VehiculosController {
     return this.vehiculosService.infoCompartidoMio(usuario.documento, placa);
   }
 
-  /** Compartir mi vehículo con otro usuario por cédula */
   @UseGuards(JwtAuthGuard)
   @Post(':placa/compartir')
   compartir(
@@ -179,7 +161,6 @@ export class VehiculosController {
     return this.vehiculosService.compartirVehiculo(usuario.documento, placa, dto);
   }
 
-  /** Quitar el compartido de mi vehículo */
   @UseGuards(JwtAuthGuard)
   @Delete(':placa/compartir')
   quitarCompartido(

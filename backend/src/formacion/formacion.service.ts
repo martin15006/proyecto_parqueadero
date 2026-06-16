@@ -21,10 +21,6 @@ export class FormacionService {
     private readonly auditoriaService: AuditoriaService,
   ) {}
 
-  /**
-   * Lista las fichas. Por defecto solo las activas; `INACTIVO` solo las
-   * desactivadas (soft-delete) y `TODOS` ambas.
-   */
   async listar(estado: EstadoFiltro = 'ACTIVO') {
     const qb = this.formacionRepository
       .createQueryBuilder('f')
@@ -97,7 +93,6 @@ export class FormacionService {
     return guardada;
   }
 
-  /** Soft-delete: la ficha queda desactivada pero conserva su vínculo histórico. */
   async eliminar(ficha: string, actor: string): Promise<{ mensaje: string }> {
     const f = await this.formacionRepository.findOne({ where: { ficha } });
     if (!f) throw new NotFoundException('Ficha no encontrada');

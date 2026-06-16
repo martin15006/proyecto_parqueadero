@@ -13,10 +13,6 @@ import { RetencionService } from './retencion.service';
 export class RetencionController {
   constructor(private readonly retencionService: RetencionService) {}
 
-  /**
-   * Dispara la purga manualmente (pruebas). `?dias=N` ajusta el umbral; `dias=0`
-   * purga todo lo que esté en soft-delete ahora mismo.
-   */
   @Post('ejecutar')
   @ApiOperation({ summary: 'Ejecutar la purga de retención manualmente (Admin)' })
   ejecutar(@Query('dias') dias?: string) {

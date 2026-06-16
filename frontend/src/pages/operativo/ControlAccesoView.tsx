@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ShieldAlert, ShieldCheck,
-  Car, LayoutGrid, Info, LogOut
+  Car, LayoutGrid, Info
 } from 'lucide-react';
 import { useOperativo } from '../../hooks/useOperativo';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -10,12 +10,9 @@ import { VisitantesPanel } from '../../components/VisitantesPanel';
 import { operativoService } from '../../services/operativo.service';
 
 export const ControlAccesoView: React.FC = () => {
-  const { stats, alerts, vehiculos, loading, refresh, handleQuickSalida } = useOperativo();
+  const { stats, alerts, loading, refresh } = useOperativo();
   const { showNotification } = useNotification();
 
-  // El spinner a pantalla completa solo debe salir en la carga inicial. En refrescos
-  // posteriores (p. ej. tras registrar un movimiento) mantenemos el MovementForm montado
-  // para no desmontar su modal de confirmación de ingreso/salida.
   const [yaCargo, setYaCargo] = useState(false);
   useEffect(() => { if (!loading) setYaCargo(true); }, [loading]);
 
@@ -104,37 +101,6 @@ export const ControlAccesoView: React.FC = () => {
           </div>
 
           <VisitantesPanel onChange={refresh} />
-
-          <div className="bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 p-6 transition-colors duration-300">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Salida Rápida</h3>
-              <span className="text-[9px] font-bold text-[#39B000] uppercase tracking-widest">{vehiculos.length} activos</span>
-            </div>
-            <div className="space-y-3 max-h-[320px] overflow-y-auto custom-scrollbar">
-              {vehiculos.length === 0 ? (
-                <div className="py-6 text-center border border-dashed border-gray-100 dark:border-white/5 rounded-xl">
-                  <p className="text-[10px] font-bold text-gray-300 dark:text-gray-700 uppercase tracking-widest">Sin vehículos activos</p>
-                </div>
-              ) : (
-                vehiculos.slice(0, 6).map((v) => (
-                  <div key={v.placa} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/5 hover:border-gray-200 dark:hover:border-white/10 transition-all group">
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-[#012E25] dark:text-white tracking-widest truncate">{v.placa}</p>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">{v.bahia}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickSalida(v.placa)}
-                      className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-[#012E25] dark:bg-[#39B000] text-white rounded-lg text-[9px] font-bold uppercase tracking-widest hover:bg-black dark:hover:bg-[#007832] transition-all active:scale-95"
-                    >
-                      <LogOut size={12} />
-                      Salida
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>

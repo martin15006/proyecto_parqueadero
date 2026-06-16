@@ -73,8 +73,6 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
-// Redirige automáticamente al panel del rol. La plataforma web es para personal
-// (Administrador / Operativo); los aprendices usan la app móvil -> al login.
 function RedirectByRole() {
   const { user } = useAuth();
   const idRol = parseInt(String(user?.usuario?.idTipoUsr || 0), 10);

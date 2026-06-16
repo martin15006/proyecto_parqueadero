@@ -85,7 +85,6 @@ export class MailService {
         subject: 'Tu código de acceso - Sistema de Parqueadero SENA',
         html,
       });
-      // RNF2 (Privacidad): no registramos el correo del destinatario (PII) en logs.
       this.logger.log('Correo OTP enviado');
     } catch (error) {
       this.logger.error('Error al enviar correo OTP', error);
@@ -116,7 +115,6 @@ export class MailService {
     `;
 
     if (this.disabled) {
-      // RNF2 (Privacidad): sin SMTP omitimos el envío sin imprimir correos/placas (PII).
       return;
     }
 
@@ -131,7 +129,6 @@ export class MailService {
         subject,
         html,
       });
-      // RNF2 (Privacidad): no registramos correo (PII) en logs.
       this.logger.log('Notificación de salida de emergencia enviada');
     } catch (error) {
       this.logger.error('Error al enviar notificación de salida de emergencia', error);
@@ -152,7 +149,7 @@ export class MailService {
         <tr>
           <td align="center">
             <table width="500" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-              
+
               <!-- Header verde SENA -->
               <tr>
                 <td style="background-color:#39A900;padding:30px;text-align:center;">

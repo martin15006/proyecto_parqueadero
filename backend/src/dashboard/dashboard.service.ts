@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Between, In, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Vehiculo } from '../vehiculos/entities/vehiculo.entity';
 import { MovimientoVehiculo, EstadoMovimiento } from '../vehiculos/entities/movimiento-vehiculo.entity';
@@ -10,7 +10,6 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import * as ExcelJS from 'exceljs';
 import { Response } from 'express';
 
-// Importación de PDFKit con manejo de tipos manual para evitar errores de compilación
 const PDFDocument = require('pdfkit');
 
 @Injectable()
@@ -28,17 +27,6 @@ export class DashboardService {
     private readonly auditoriaService: AuditoriaService,
   ) {}
 
-  /**
-   * Resumen consolidado de KPIs del dashboard.
-   *
-   * ### Fuente de métricas de ocupación
-   * Los conteos (`total`, `ocupados`, `disponibles`, `porcentajeOcupacion`) se
-   * calculan **únicamente** sobre las bahías con sensor activo registrado en la
-   * tabla `sensor`, de modo que el total refleja la infraestructura física real
-   * (actualmente 3 bahías: SN-001, SN-002, SN-003).
-   *
-   * Las 7 queries se ejecutan en paralelo para minimizar latencia.
-   */
   async obtenerResumen() {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
@@ -55,7 +43,6 @@ export class DashboardService {
     ] = await Promise.all([
       this.usuarioRepository.count(),
       this.vehiculoRepository.count(),
-      // Conteo por movimientos (QR escaneados activos), única fuente de verdad para ocupación.
       this.bahiasService.obtenerOcupacion(),
       this.movimientoRepository
         .createQueryBuilder('m')
@@ -93,10 +80,6 @@ export class DashboardService {
     };
   }
 
-  /**
-   * Mapa de calor deshabilitado tras quitar la relación movimiento ↔ bahía.
-   * Se conserva el método para no romper el contrato del controller; devuelve vacío.
-   */
   async obtenerMapaCalor() {
     return [];
   }
@@ -148,15 +131,28 @@ export class DashboardService {
       .getRawMany();
   }
 
-  /**
-   * Historial unificado de ingresos: vehículos enrolados (movimiento_vehiculo) +
-   * visitantes (visita). Se trae lo más reciente de cada tabla, se normaliza a una
-   * misma forma (con bandera `esVisitante`), se mezcla por fecha y se pagina.
-   */
-  async obtenerHistorial(page: number = 1, limit: number = 20) {
+  private construirFiltroFecha(desde?: string, hasta?: string) {
+    const aFecha = (valor?: string) => {
+      if (!valor) return null;
+      const d = new Date(valor);
+      return isNaN(d.getTime()) ? null : d;
+    };
+    const desdeD = aFecha(desde);
+    const hastaD = aFecha(hasta);
+    if (desdeD && hastaD) return Between(desdeD, hastaD);
+    if (desdeD) return MoreThanOrEqual(desdeD);
+    if (hastaD) return LessThanOrEqual(hastaD);
+    return undefined;
+  }
+
+  async obtenerHistorial(page: number = 1, limit: number = 20, desde?: string, hasta?: string) {
     const take = page * limit;
 
+    const filtroFecha = this.construirFiltroFecha(desde, hasta);
+    const whereFecha = filtroFecha ? { horaIngreso: filtroFecha } : {};
+
     const [movs, movCount] = await this.movimientoRepository.findAndCount({
+      where: whereFecha,
       relations: [
         'registroVehiculo',
         'registroVehiculo.vehiculo',
@@ -164,16 +160,19 @@ export class DashboardService {
         'registroVehiculo.usuario',
         'usuarioIngreso',
       ],
+      // Conserva los movimientos aunque el vehículo o su registro hayan sido
+      // eliminados (soft-delete): el historial no debe perder estos ingresos.
+      withDeleted: true,
       order: { horaIngreso: 'DESC' },
       take,
     });
 
     const [visitas, visitaCount] = await this.visitaRepository.findAndCount({
+      where: whereFecha,
       order: { horaIngreso: 'DESC' },
       take,
     });
 
-    // Quién autorizó: vehículos vía auditoría (REGISTRAR_ENTRADA); visitas vía id_operativo_ingreso.
     const autores = await this.auditoriaService.mapearAutoresPorEntidad(
       'REGISTRAR_ENTRADA',
       'MOVIMIENTO_VEHICULO',
@@ -249,6 +248,8 @@ export class DashboardService {
   async exportarExcel(res: Response, user: any) {
     const movimientos = await this.movimientoRepository.find({
       relations: ['registroVehiculo', 'registroVehiculo.usuario', 'registroVehiculo.vehiculo'],
+      // Se incluyen los eliminados (soft-delete) para no perder históricos.
+      withDeleted: true,
       order: { horaIngreso: 'DESC' },
     });
 
@@ -267,15 +268,14 @@ export class DashboardService {
     movimientos.forEach(m => {
       worksheet.addRow({
         id: m.idMovimiento,
-        placa: m.registroVehiculo.vehiculo.placa,
-        usuario: m.registroVehiculo.usuario.nombreCompleto,
+        placa: m.registroVehiculo?.vehiculo?.placa ?? '—',
+        usuario: m.registroVehiculo?.usuario?.nombreCompleto ?? '—',
         ingreso: m.horaIngreso,
         salida: m.horaSalida || 'N/A',
         estado: m.estado,
       });
     });
 
-    // Auditoría de exportación para cumplimiento de seguridad
     await this.auditoriaService.create({
       accion: 'EXPORTAR_DATOS_EXCEL',
       entidad: 'DASHBOARD',
@@ -294,6 +294,8 @@ export class DashboardService {
   async exportarPDF(res: Response, user: any) {
     const movimientos = await this.movimientoRepository.find({
       relations: ['registroVehiculo', 'registroVehiculo.usuario', 'registroVehiculo.vehiculo'],
+      // Se incluyen los eliminados (soft-delete) para no perder históricos.
+      withDeleted: true,
       order: { horaIngreso: 'DESC' },
     });
 
@@ -308,12 +310,14 @@ export class DashboardService {
     doc.moveDown(2);
 
     movimientos.forEach((m, index) => {
-      doc.fontSize(11).fillColor('#2c3e50').text(`${index + 1}. ${m.registroVehiculo.vehiculo.placa} - ${m.registroVehiculo.usuario.nombreCompleto}`);
-      doc.fontSize(9).fillColor('#7f8c8d').text(`   Ingreso: ${m.horaIngreso.toLocaleString()} | Estado: ${m.estado}`);
+      const placa = m.registroVehiculo?.vehiculo?.placa ?? '—';
+      const usuario = m.registroVehiculo?.usuario?.nombreCompleto ?? '—';
+      const ingreso = m.horaIngreso ? new Date(m.horaIngreso).toLocaleString() : '—';
+      doc.fontSize(11).fillColor('#2c3e50').text(`${index + 1}. ${placa} - ${usuario}`);
+      doc.fontSize(9).fillColor('#7f8c8d').text(`   Ingreso: ${ingreso} | Estado: ${m.estado}`);
       doc.moveDown(0.5);
     });
 
-    // Auditoría de exportación
     await this.auditoriaService.create({
       accion: 'EXPORTAR_DATOS_PDF',
       entidad: 'DASHBOARD',

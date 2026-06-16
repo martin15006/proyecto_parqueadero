@@ -15,7 +15,6 @@ export class Bahia {
   @Column({ type: 'smallint' })
   idTipoBahia: number;
 
-  // FIX: Auditoría técnica - Timestamps estandarizados en snake_case vía SnakeNamingStrategy
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

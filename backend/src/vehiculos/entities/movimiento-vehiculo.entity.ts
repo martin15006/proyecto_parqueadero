@@ -36,14 +36,6 @@ export class MovimientoVehiculo {
   @Column({ default: false })
   esManual: boolean;
 
-  /**
-   * Documento del usuario que efectivamente realizó el ingreso al escanear el QR.
-   * Puede ser:
-   *  - el propietario del vehículo, o
-   *  - un usuario al que se le compartió el vehículo (ACEPTADO).
-   *
-   * Solo este mismo usuario podrá registrar la salida.
-   */
   @Index()
   @Column({ name: 'documento_ingreso', type: 'varchar', length: 10, nullable: true })
   documentoIngreso: string | null;
@@ -62,11 +54,6 @@ export class MovimientoVehiculo {
   @JoinColumn({ name: 'id_registro_vehiculo' })
   registroVehiculo: RegistroVehiculo;
 
-  /**
-   * Relación con el usuario que ejecutó el ingreso (puede ser dueño o receptor de compartido).
-   * onDelete SET NULL: si se elimina el usuario, el movimiento se conserva pero pierde el vínculo
-   * (preserva el historial para auditoría).
-   */
   @ManyToOne(() => Usuario, { nullable: true, onDelete: 'SET NULL', onUpdate: 'CASCADE' })
   @JoinColumn({ name: 'documento_ingreso' })
   usuarioIngreso: Usuario | null;

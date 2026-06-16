@@ -25,7 +25,6 @@ export const OperativoDashboard: React.FC = () => {
   const estadoGlobal = useMemo(() => {
     const tipos = alerts.map((a) => String(a.tipo || '').toUpperCase());
     if (tipos.some((t) => t.includes('PARQUEADERO_DESHABILITADO'))) return 'DESHABILITADO';
-    // Fuente principal: conteo de QRs activos. Si ocupados >= total → LLENO.
     if (stats.total > 0 && stats.ocupados >= stats.total) return 'LLENO';
     if (tipos.some((t) => t.includes('PARQUEADERO_LLENO'))) return 'LLENO';
     if (tipos.some((t) => t.includes('UMBRAL_80'))) return 'ALERTA_80';
@@ -201,7 +200,6 @@ const Kpi: React.FC<{ label: string; value: string | number; highlight?: boolean
   </div>
 );
 
-
 const MapaBahias: React.FC<{ bahias: BahiaSensorizada[] }> = ({ bahias }) => {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)] overflow-hidden">
@@ -222,8 +220,6 @@ const MapaBahias: React.FC<{ bahias: BahiaSensorizada[] }> = ({ bahias }) => {
             <div className="col-span-full py-16 text-center text-slate-500 font-semibold">Cargando infraestructura...</div>
           ) : (
             bahias.map((b) => {
-              // La fuente de verdad es estadoPanel (calculado por BahiasService.derivarEstadoPanel).
-              // NO usar b.ocupada — ese campo no existe en BahiaSensorizada y siempre sería undefined.
               const isOffline = b.estadoPanel === 'OFFLINE' || b.estadoPanel === 'DESHABILITADO';
               const isOcupado = b.estadoPanel === 'OCUPADO'
                 || b.estadoPanel === 'SALIDA_PENDIENTE'

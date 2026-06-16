@@ -12,7 +12,6 @@ interface Props {
   placeholder?: string;
 }
 
-/** Sube directamente a Cloudinary y devuelve la URL segura. */
 export const ImageUpload: React.FC<Props> = ({
   value,
   onChange,

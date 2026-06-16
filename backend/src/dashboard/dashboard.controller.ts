@@ -13,8 +13,13 @@ export class DashboardController {
 
   @Get('historial')
   @Roles(TipoUsuarioEnum.ADMIN, TipoUsuarioEnum.OPERATIVO)
-  async getHistorial(@Query('page') page: number = 1, @Query('limit') limit: number = 20) {
-    return await this.dashboardService.obtenerHistorial(page, limit);
+  async getHistorial(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    return await this.dashboardService.obtenerHistorial(page, limit, desde, hasta);
   }
 
   @Get('resumen')
