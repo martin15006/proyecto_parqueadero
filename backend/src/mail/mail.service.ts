@@ -66,7 +66,7 @@ export class MailService {
 
   async enviarCodigoOtp(destinatario: string, codigo: string, nombreUsuario: string): Promise<void> {
     const remitenteNombre = this.configService.get<string>('MAIL_FROM_NAME') ?? 'Parqueadero SENA';
-    const remitenteCorreo = this.configService.get<string>('MAIL_USER');
+    const remitenteCorreo = this.configService.get<string>('MAIL_FROM') ?? this.configService.get<string>('MAIL_USER');
 
     const html = this.plantillaHtml(codigo, nombreUsuario);
 
@@ -101,7 +101,7 @@ export class MailService {
     motivo: string,
   ): Promise<void> {
     const remitenteNombre = this.configService.get<string>('MAIL_FROM_NAME') ?? 'Parqueadero SENA';
-    const remitenteCorreo = this.configService.get<string>('MAIL_USER');
+    const remitenteCorreo = this.configService.get<string>('MAIL_FROM') ?? this.configService.get<string>('MAIL_USER');
 
     const subject = 'Salida de emergencia registrada';
     const html = `
