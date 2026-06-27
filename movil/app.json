@@ -19,6 +19,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.martin15006.parqueadero",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#FFFFFF"
