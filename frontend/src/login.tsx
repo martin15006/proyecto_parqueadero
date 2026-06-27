@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   RefreshCw,
   LogIn,
+  Download,
   X
 } from 'lucide-react';
 import senaLogo from './assets/sena.registro.png';
@@ -527,6 +528,14 @@ function Login() {
             </div>
           )}
         </div>
+
+        <a
+          href="https://github.com/martin15006/proyecto_parqueadero/releases/download/v1.0/parqueadero.apk"
+          className="mt-8 inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-[#39A900] text-white text-sm font-bold hover:bg-[#007832] transition-all duration-200 shadow-lg shadow-green-900/10 hover:-translate-y-0.5"
+        >
+          <Download className="w-5 h-5" />
+          Descargar app para usuarios (Android)
+        </a>
 
         <div className="mt-10 text-center space-y-4">
           <ShieldCheck className="w-6 h-6 text-[#39a900] mx-auto opacity-80" />
