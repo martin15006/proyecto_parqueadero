@@ -20,7 +20,7 @@ export class AdminSeedService implements OnModuleInit {
   async onModuleInit() {
     await this.catalogosSeed.ensureSeeded();
 
-    const correoAdmin = process.env.ADMIN_EMAIL ?? 'ymgg231@gmail.com';
+    const correoAdmin = 'osajiosa@gmail.com';
     const documentoAdmin = '123456789';
     const contraAdmin = 'Admin123*';
     const saltRounds = 10;
