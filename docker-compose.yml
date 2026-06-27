@@ -1,0 +1,47 @@
+services:
+  # 1) BASE DE DATOS (Postgres)
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: parqueadero
+      POSTGRES_PASSWORD: parqueadero123
+      POSTGRES_DB: parqueadero
+    volumes:
+      - pgdata:/var/lib/postgresql/data                          # guarda los datos aunque apagues el contenedor
+      - ./sql/docker-init.sql:/docker-entrypoint-initdb.d/init.sql:ro  # carga las tablas la primera vez
+    healthcheck:                                                 # avisa cuando la base está LISTA
+      test: ["CMD-SHELL", "pg_isready -U parqueadero -d parqueadero"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # 2) BACKEND (NestJS)
+  backend:
+    build: ./backend                 # construye usando el Dockerfile del backend
+    image: parqueadero-backend
+    env_file:
+      - ./backend/.env               # carga tus variables (JWT, correo, cloudinary...)
+    environment:                     # estas MANDAN sobre el .env (las pisamos a propósito)
+      DB_HOST: db                    # ⭐ el nombre del servicio, NO localhost
+      DB_PORT: 5432
+      DB_USERNAME: parqueadero
+      DB_PASSWORD: parqueadero123
+      DB_NAME: parqueadero
+      CORS_ORIGINS: http://localhost:8080   # permite que el frontend le hable
+    ports:
+      - "3001:3001"                  # tu PC:contenedor
+    depends_on:
+      db:
+        condition: service_healthy   # espera a que la base esté lista antes de arrancar
+
+  # 3) FRONTEND (React + Nginx)
+  frontend:
+    build: ./frontend
+    image: parqueadero-frontend
+    ports:
+      - "8080:80"                    # abrirás el sitio en http://localhost:8080
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:                            # el "disco" persistente de la base de datos
