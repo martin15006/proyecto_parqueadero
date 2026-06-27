@@ -10,7 +10,9 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://parqueadero-backend-280k.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://parqueadero-backend-280k.onrender.com",
+        "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME": "dxlgoeqih",
+        "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET": "parqueadero_sena"
       }
     },
     "production": {
@@ -18,7 +20,9 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://parqueadero-backend-280k.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://parqueadero-backend-280k.onrender.com",
+        "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME": "dxlgoeqih",
+        "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET": "parqueadero_sena"
       }
     }
   }
